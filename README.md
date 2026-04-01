@@ -1,5 +1,13 @@
 # Tesla FSD Controller — ESP32 Web 版
 
+> ## 🚫 重要公告：本项目对中国国内车辆已失效
+>
+> 自 **2026 年 3 月 31 日晚 9 时左右**，Tesla 向中国国内车辆远程下发了底层配置，从芯片层面禁用了 FSD 相关功能。**CAN 总线层面的修改已无法绕过此限制，本项目对中国国内车辆不再有效。**
+>
+> 海外车辆暂不受影响。本项目代码保留供学习、研究及海外用户使用。
+
+---
+
 基于 [tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod) 的 ESP32 + WiFi 控制面板版本。
 
 烧录后，ESP32 会创建一个 WiFi 热点，手机连上就能用浏览器实时控制所有参数，**无需重新编程**。
@@ -52,7 +60,7 @@ SN65HVD230 CANH  →  车辆 CAN-H（通常为白色/棕色线）
 SN65HVD230 CANL  →  车辆 CAN-L（通常为蓝色/绿色线）
 ```
 
-> **⚠️ 注意**：Tesla Model 3/Y 的 OBD-II 诊断口**不暴露** Autopilot 相关 CAN 报文，需要从车辆内部 CAN 总线并联接入。
+> 🚫 **禁止使用 OBD2 接口**：OBD2 诊断口连接的是诊断 CAN 总线，经过车辆网关 ECU 隔离，修改后的报文**永远无法到达 Autopilot 电脑**，设备将完全无效。必须直接接车辆内部 CAN 总线（X179 / X652 连接器）。
 >
 > - **Model 3 / Model Y（2021 及以后）**：推荐接 X179 连接器，Pin 13（CAN-H）/ Pin 14（CAN-L）
 > - **Model 3（2020 及以前旧款）**：推荐接 X652 连接器，Pin 1（CAN-H）/ Pin 2（CAN-L）
