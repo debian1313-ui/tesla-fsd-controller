@@ -18,12 +18,12 @@ struct TWAIDriver : public CanDriver {
         : txPin(tx), rxPin(rx) {}
 
     bool init() override {
-        g_config_ = TWAI_GENERAL_CONFIG_DEFAULT(txPin, rxPin, TWAI_MODE_NORMAL);
-        g_config_.rx_queue_len = 32;
-        g_config_.tx_queue_len = 16;
-        t_config_ = TWAI_TIMING_CONFIG_500KBITS();
-        f_config_ = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-        if (twai_driver_install(&g_config_, &t_config_, &f_config_) != ESP_OK) return false;
+        twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(txPin, rxPin, TWAI_MODE_NORMAL);
+        g.rx_queue_len = 32;
+        g.tx_queue_len = 16;
+        twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+        twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+        if (twai_driver_install(&g, &t, &f) != ESP_OK) return false;
         return twai_start() == ESP_OK;
     }
 
@@ -56,10 +56,6 @@ struct TWAIDriver : public CanDriver {
     }
 
 private:
-    twai_general_config_t g_config_{};
-    twai_timing_config_t  t_config_{};
-    twai_filter_config_t  f_config_{};
-
     bool isBusOff() {
         twai_status_info_t status;
         if (twai_get_status_info(&status) != ESP_OK) return false;
@@ -67,9 +63,8 @@ private:
     }
 
     void recover() {
-        twai_stop();
-        twai_driver_uninstall();
-        twai_driver_install(&g_config_, &t_config_, &f_config_);
-        twai_start();
+        // Use ESP-IDF native recovery API — lighter than full reinstall.
+        // Driver handles the 128-bit recovery sequence automatically.
+        twai_initiate_recovery();
     }
 };
