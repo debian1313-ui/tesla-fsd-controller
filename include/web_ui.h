@@ -6,11 +6,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>FSD 控制器</title>
+<title>FSD Controller</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;background:#0b1120;color:#e2e8f0;min-height:100vh;padding:16px}
-h1{text-align:center;font-size:22px;color:#38bdf8;padding:20px 0 24px;font-weight:700;letter-spacing:1px}
+.title-wrap{position:relative;text-align:center;padding:20px 0 24px}
+h1{font-size:22px;color:#38bdf8;font-weight:700;letter-spacing:1px}
+.lang-btn{position:absolute;right:0;top:50%;transform:translateY(-50%);background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:600}
+.lang-btn:hover{border-color:#38bdf8;color:#38bdf8}
 .card{background:#131d32;border-radius:14px;padding:18px;margin-bottom:16px}
 .card-title{font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:14px}
 .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1e293b}
@@ -51,16 +54,19 @@ select:focus{outline:none;border-color:#38bdf8}
 </head>
 <body>
 
-<h1>FSD 控制器</h1>
+<div class="title-wrap">
+  <h1 id="iTitle">FSD 控制器</h1>
+  <button class="lang-btn" id="iLangBtn" onclick="toggleLang()">EN</button>
+</div>
 
 <div class="card">
-  <div class="card-title">控制</div>
+  <div class="card-title" id="iCardCtrl">控制</div>
   <div class="row">
-    <span class="row-label">FSD 开关</span>
+    <span class="row-label" id="iLblFsdEn">FSD 开关</span>
     <label class="toggle"><input type="checkbox" id="fsdEnable" checked onchange="setVal('fsdEnable',this.checked?1:0)"><span class="slider"></span></label>
   </div>
   <div class="row">
-    <span class="row-label">硬件版本</span>
+    <span class="row-label" id="iLblHW">硬件版本</span>
     <select id="hwMode" onchange="setVal('hwMode',this.value)">
       <option value="0">LEGACY</option>
       <option value="1">HW3</option>
@@ -68,52 +74,52 @@ select:focus{outline:none;border-color:#38bdf8}
     </select>
   </div>
   <div class="row">
-    <span class="row-label">速度模式</span>
+    <span class="row-label" id="iLblSpeed">速度模式</span>
     <select id="speedProfile" onchange="setVal('speedProfile',this.value)">
-      <option value="0">保守</option>
-      <option value="1" selected>默认</option>
-      <option value="2">适中</option>
-      <option value="3">激进</option>
-      <option value="4">最大</option>
+      <option value="0" data-zh="保守" data-en="Chill">保守</option>
+      <option value="1" data-zh="默认" data-en="Default" selected>默认</option>
+      <option value="2" data-zh="适中" data-en="Moderate">适中</option>
+      <option value="3" data-zh="激进" data-en="Aggressive">激进</option>
+      <option value="4" data-zh="最大" data-en="Maximum">最大</option>
     </select>
   </div>
   <div class="row">
-    <span class="row-label">模式来源</span>
+    <span class="row-label" id="iLblPMode">模式来源</span>
     <select id="profileMode" onchange="setVal('profileMode',this.value)">
-      <option value="1" selected>自动（拨杆）</option>
-      <option value="0">手动</option>
+      <option value="1" data-zh="自动（拨杆）" data-en="Auto (Stalk)" selected>自动（拨杆）</option>
+      <option value="0" data-zh="手动" data-en="Manual">手动</option>
     </select>
   </div>
   <div class="row">
-    <span class="row-label">限速提示音抑制</span>
+    <span class="row-label" id="iLblISA">限速提示音抑制</span>
     <label class="toggle"><input type="checkbox" id="isaChime" onchange="setVal('isaChime',this.checked?1:0)"><span class="slider"></span></label>
   </div>
   <div class="row">
-    <span class="row-label">紧急车辆检测</span>
+    <span class="row-label" id="iLblEmg">紧急车辆检测</span>
     <label class="toggle"><input type="checkbox" id="emergencyDet" checked onchange="setVal('emergencyDet',this.checked?1:0)"><span class="slider"></span></label>
   </div>
   <div class="row">
-    <span class="row-label">中国模式 🇨🇳</span>
+    <span class="row-label" id="iLblCN">中国模式 🇨🇳</span>
     <label class="toggle"><input type="checkbox" id="chinaMode" onchange="setVal('chinaMode',this.checked?1:0)"><span class="slider"></span></label>
   </div>
 </div>
 
 <div class="card">
-  <div class="card-title">状态</div>
+  <div class="card-title" id="iCardStat">状态</div>
   <div class="stats">
-    <div class="stat"><div class="stat-val green" id="sModified">0</div><div class="stat-label">已修改</div></div>
-    <div class="stat"><div class="stat-val" id="sRX">0</div><div class="stat-label">已接收</div></div>
-    <div class="stat"><div class="stat-val amber" id="sErrors">0</div><div class="stat-label">错误</div></div>
-    <div class="stat"><div class="stat-val" id="sUptime">0秒</div><div class="stat-label">运行时间</div></div>
+    <div class="stat"><div class="stat-val green" id="sModified">0</div><div class="stat-label" id="iLblMod">已修改</div></div>
+    <div class="stat"><div class="stat-val" id="sRX">0</div><div class="stat-label" id="iLblRX">已接收</div></div>
+    <div class="stat"><div class="stat-val amber" id="sErrors">0</div><div class="stat-label" id="iLblErr">错误</div></div>
+    <div class="stat"><div class="stat-val" id="sUptime">0秒</div><div class="stat-label" id="iLblUp">运行时间</div></div>
   </div>
-  <div class="status-row"><span>CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
-  <div class="status-row"><span>FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
+  <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
+  <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
 </div>
 
 <div class="card">
-  <div class="card-title">固件更新</div>
+  <div class="card-title" id="iCardOTA">固件更新</div>
   <div class="ota-row">
-    <label class="file-btn" for="fwFile">选择文件</label>
+    <label class="file-btn" id="iLblFile" for="fwFile">选择文件</label>
     <input type="file" id="fwFile" accept=".bin" style="display:none" onchange="fileChosen(this)">
     <span class="file-name" id="fileName">未选择文件</span>
   </div>
@@ -123,19 +129,72 @@ select:focus{outline:none;border-color:#38bdf8}
 </div>
 
 <script>
+var lang='zh';
+var T={
+  zh:{title:'FSD 控制器',cardCtrl:'控制',cardStat:'状态',cardOTA:'固件更新',
+    lblFsdEn:'FSD 开关',lblHW:'硬件版本',lblSpeed:'速度模式',lblPMode:'模式来源',
+    lblISA:'限速提示音抑制',lblEmg:'紧急车辆检测',lblCN:'中国模式 🇨🇳',
+    lblMod:'已修改',lblRX:'已接收',lblErr:'错误',lblUp:'运行时间',
+    lblCAN:'CAN 总线',lblFSDTrig:'FSD 已触发',
+    lblFile:'选择文件',noFile:'未选择文件',uploadBtn:'上传固件',
+    canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
+    otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',
+    uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN'},
+  en:{title:'FSD Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
+    lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
+    lblISA:'ISA Chime Suppress',lblEmg:'Emergency Detection',lblCN:'China Mode 🇨🇳',
+    lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
+    lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
+    lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
+    canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
+    otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',
+    uptH:'h',uptM:'m',uptS:'s',langBtn:'中文'}
+};
+function applyLang(){
+  var t=T[lang];
+  document.documentElement.lang=lang;
+  document.getElementById('iTitle').textContent=t.title;
+  document.getElementById('iLangBtn').textContent=t.langBtn;
+  document.getElementById('iCardCtrl').textContent=t.cardCtrl;
+  document.getElementById('iCardStat').textContent=t.cardStat;
+  document.getElementById('iCardOTA').textContent=t.cardOTA;
+  document.getElementById('iLblFsdEn').textContent=t.lblFsdEn;
+  document.getElementById('iLblHW').textContent=t.lblHW;
+  document.getElementById('iLblSpeed').textContent=t.lblSpeed;
+  document.getElementById('iLblPMode').textContent=t.lblPMode;
+  document.getElementById('iLblISA').textContent=t.lblISA;
+  document.getElementById('iLblEmg').textContent=t.lblEmg;
+  document.getElementById('iLblCN').textContent=t.lblCN;
+  document.getElementById('iLblMod').textContent=t.lblMod;
+  document.getElementById('iLblRX').textContent=t.lblRX;
+  document.getElementById('iLblErr').textContent=t.lblErr;
+  document.getElementById('iLblUp').textContent=t.lblUp;
+  document.getElementById('iLblCAN').textContent=t.lblCAN;
+  document.getElementById('iLblFSDTrig').textContent=t.lblFSDTrig;
+  document.getElementById('iLblFile').textContent=t.lblFile;
+  document.getElementById('uploadBtn').textContent=t.uploadBtn;
+  ['speedProfile','profileMode'].forEach(function(id){
+    Array.from(document.getElementById(id).options).forEach(function(o){
+      if(o.dataset[lang])o.textContent=o.dataset[lang];
+    });
+  });
+  var fn=document.getElementById('fileName');
+  if(!fn.dataset.hasFile)fn.textContent=t.noFile;
+}
+function toggleLang(){lang=lang==='zh'?'en':'zh';applyLang();}
 function poll(){
   fetch('/api/status').then(r=>r.json()).then(d=>{
+    var t=T[lang];
     document.getElementById('sModified').textContent=d.modified;
     document.getElementById('sRX').textContent=d.rx;
     document.getElementById('sErrors').textContent=d.errors;
-    let u=d.uptime;
-    let h=Math.floor(u/3600),m=Math.floor((u%3600)/60),s=u%60;
-    document.getElementById('sUptime').textContent=h>0?h+'时'+m+'分':m>0?m+'分'+s+'秒':s+'秒';
-    let canEl=document.getElementById('sCAN');
-    canEl.textContent=d.canOK?'正常':'异常';
+    var u=d.uptime,h=Math.floor(u/3600),m=Math.floor((u%3600)/60),s=u%60;
+    document.getElementById('sUptime').textContent=h>0?h+t.uptH+m+t.uptM:m>0?m+t.uptM+s+t.uptS:s+t.uptS;
+    var canEl=document.getElementById('sCAN');
+    canEl.textContent=d.canOK?t.canOK:t.canErr;
     canEl.className=d.canOK?'status-ok':'status-err';
-    let fsdEl=document.getElementById('sFSD');
-    fsdEl.textContent=d.fsdTriggered?'是':'否';
+    var fsdEl=document.getElementById('sFSD');
+    fsdEl.textContent=d.fsdTriggered?t.fsdYes:t.fsdNo;
     fsdEl.className=d.fsdTriggered?'status-yes':'status-no';
     document.getElementById('fsdEnable').checked=!!d.fsdEnable;
     document.getElementById('hwMode').value=d.hwMode;
@@ -146,29 +205,31 @@ function poll(){
     document.getElementById('chinaMode').checked=!!d.chinaMode;
   }).catch(()=>{});
 }
-setInterval(poll,1000);
-poll();
+setInterval(poll,1000);poll();
 function setVal(key,val){fetch('/api/set?'+key+'='+val).catch(()=>{});}
 function fileChosen(inp){
-  document.getElementById('fileName').textContent=inp.files[0]?inp.files[0].name:'未选择文件';
+  var fn=document.getElementById('fileName');
+  if(inp.files[0]){fn.textContent=inp.files[0].name;fn.dataset.hasFile='1';}
+  else{delete fn.dataset.hasFile;fn.textContent=T[lang].noFile;}
   document.getElementById('uploadBtn').disabled=!inp.files[0];
 }
 function doOTA(){
-  let file=document.getElementById('fwFile').files[0];
+  var file=document.getElementById('fwFile').files[0];
   if(!file)return;
-  let xhr=new XMLHttpRequest();
-  let prog=document.getElementById('progWrap');
-  let bar=document.getElementById('progBar');
-  let msg=document.getElementById('otaMsg');
+  var t=T[lang];
+  var xhr=new XMLHttpRequest();
+  var prog=document.getElementById('progWrap');
+  var bar=document.getElementById('progBar');
+  var msg=document.getElementById('otaMsg');
   prog.style.display='block';bar.style.width='0%';msg.textContent='';msg.className='msg';
   document.getElementById('uploadBtn').disabled=true;
   xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable)bar.style.width=Math.round(e.loaded/e.total*100)+'%';});
   xhr.onload=function(){
-    if(xhr.status===200){msg.textContent='上传成功，正在重启...';msg.className='msg ok';}
-    else{msg.textContent='上传失败: '+xhr.statusText;msg.className='msg err';document.getElementById('uploadBtn').disabled=false;}
+    if(xhr.status===200){msg.textContent=t.otaOK;msg.className='msg ok';}
+    else{msg.textContent=t.otaFail+xhr.statusText;msg.className='msg err';document.getElementById('uploadBtn').disabled=false;}
   };
-  xhr.onerror=function(){msg.textContent='连接失败';msg.className='msg err';document.getElementById('uploadBtn').disabled=false;};
-  let form=new FormData();form.append('firmware',file);
+  xhr.onerror=function(){msg.textContent=t.otaConn;msg.className='msg err';document.getElementById('uploadBtn').disabled=false;};
+  var form=new FormData();form.append('firmware',file);
   xhr.open('POST','/api/ota');xhr.send(form);
 }
 </script>
