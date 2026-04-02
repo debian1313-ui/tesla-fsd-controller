@@ -50,6 +50,11 @@ select:focus{outline:none;border-color:#38bdf8}
 .msg{text-align:center;font-size:12px;margin-top:8px;min-height:16px}
 .msg.ok{color:#22c55e}
 .msg.err{color:#ef4444}
+.text-input{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;margin-top:4px}
+.text-input:focus{outline:none;border-color:#38bdf8}
+.save-btn{background:#22c55e;color:#fff;border:none;border-radius:8px;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:10px;letter-spacing:1px}
+.save-btn:hover{background:#16a34a}
+.save-btn:disabled{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -118,6 +123,20 @@ select:focus{outline:none;border-color:#38bdf8}
 </div>
 
 <div class="card">
+  <div class="card-title" id="iCardWifi">WiFi 设置</div>
+  <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
+    <span class="row-label" id="iLblSSID">热点名称（SSID）</span>
+    <input type="text" id="wifiSSID" class="text-input" maxlength="32" placeholder="FSD-Controller">
+  </div>
+  <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
+    <span class="row-label" id="iLblPass">新密码（留空保持不变）</span>
+    <input type="password" id="wifiPass" class="text-input" maxlength="63" placeholder="≥ 8 位">
+  </div>
+  <button class="save-btn" id="wifiSaveBtn" onclick="doWifi()">保存并重启</button>
+  <div class="msg" id="wifiMsg"></div>
+</div>
+
+<div class="card">
   <div class="card-title" id="iCardOTA">固件更新</div>
   <div class="ota-row">
     <label class="file-btn" id="iLblFile" for="fwFile">选择文件</label>
@@ -141,7 +160,10 @@ var T={
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
     otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
-    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3'},
+    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3',
+    cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
+    wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
+    wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空'},
   en:{title:'FSD Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
     lblISA:'ISA Chime Suppress',lblEmg:'Emergency Detection',lblCN:'China Mode 🇨🇳',
@@ -151,7 +173,10 @@ var T={
     canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
     otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',
     uptH:'h',uptM:'m',uptS:'s',langBtn:'中文',
-    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3'}
+    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3',
+    cardWifi:'WiFi Settings',lblSSID:'AP Name (SSID)',lblPass:'New Password (blank = keep current)',
+    wifiSave:'Save & Restart',wifiOK:'Saved, rebooting...',wifiFail:'Save failed: ',
+    wifiPassErr:'Password must be ≥ 8 chars',wifiSSIDErr:'SSID cannot be empty'}
 };
 function applyLang(){
   var t=T[lang];
@@ -175,6 +200,10 @@ function applyLang(){
   document.getElementById('iLblCAN').textContent=t.lblCAN;
   document.getElementById('iLblFSDTrig').textContent=t.lblFSDTrig;
   document.getElementById('iHWHint').textContent=t.hwHint;
+  document.getElementById('iCardWifi').textContent=t.cardWifi;
+  document.getElementById('iLblSSID').textContent=t.lblSSID;
+  document.getElementById('iLblPass').textContent=t.lblPass;
+  document.getElementById('wifiSaveBtn').textContent=t.wifiSave;
   document.getElementById('iLblFile').textContent=t.lblFile;
   document.getElementById('uploadBtn').textContent=t.uploadBtn;
   ['speedProfile','profileMode'].forEach(function(id){
@@ -207,10 +236,28 @@ function poll(){
     document.getElementById('isaChime').checked=!!d.isaChime;
     document.getElementById('emergencyDet').checked=!!d.emergencyDet;
     document.getElementById('chinaMode').checked=!!d.chinaMode;
+    if(d.apSSID&&!wifiSSIDLoaded){document.getElementById('wifiSSID').value=d.apSSID;wifiSSIDLoaded=true;}
   }).catch(()=>{});
 }
+var wifiSSIDLoaded=false;
 setInterval(poll,1000);poll();
 function setVal(key,val){fetch('/api/set?'+key+'='+val).catch(()=>{});}
+function doWifi(){
+  var t=T[lang];
+  var ssid=document.getElementById('wifiSSID').value.trim();
+  var pass=document.getElementById('wifiPass').value;
+  var msg=document.getElementById('wifiMsg');
+  if(!ssid){msg.textContent=t.wifiSSIDErr;msg.className='msg err';return;}
+  if(pass.length>0&&pass.length<8){msg.textContent=t.wifiPassErr;msg.className='msg err';return;}
+  var btn=document.getElementById('wifiSaveBtn');
+  btn.disabled=true;
+  var body='ssid='+encodeURIComponent(ssid)+(pass.length>=8?'&pass='+encodeURIComponent(pass):'');
+  fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+    .then(r=>r.text()).then(txt=>{
+      if(txt==='OK'){msg.textContent=t.wifiOK;msg.className='msg ok';}
+      else{msg.textContent=t.wifiFail+txt;msg.className='msg err';btn.disabled=false;}
+    }).catch(()=>{msg.textContent=t.wifiFail+'connection error';msg.className='msg err';btn.disabled=false;});
+}
 function fileChosen(inp){
   var fn=document.getElementById('fileName');
   if(inp.files[0]){fn.textContent=inp.files[0].name;fn.dataset.hasFile='1';}

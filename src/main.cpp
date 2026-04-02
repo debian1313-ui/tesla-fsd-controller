@@ -17,9 +17,9 @@
 #include "handlers.h"
 #include "web_ui.h"
 
-// ── WiFi AP config ──
-static const char* AP_SSID = "FSD-Controller";
-static const char* AP_PASS = "12345678";   // min 8 chars
+// ── WiFi AP config (NVS-overridable) ──
+static char apSSID[33] = "FSD-Controller";
+static char apPass[64] = "12345678";
 
 // ── Globals ──
 static TWAIDriver     canDriver;
@@ -44,6 +44,8 @@ void loadConfig() {
     cfg.isaChimeSuppress   = prefs.getBool("isaChm", false);
     cfg.emergencyDetection = prefs.getBool("emDet", true);
     cfg.chinaMode          = prefs.getBool("cnMode", false);
+    strlcpy(apSSID, prefs.getString("apSSID", "FSD-Controller").c_str(), sizeof(apSSID));
+    strlcpy(apPass, prefs.getString("apPass", "12345678").c_str(), sizeof(apPass));
     prefs.end();
 
     // Clamp values
@@ -81,7 +83,8 @@ void setupWebServer() {
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
             "\"canOK\":%s,\"fsdTriggered\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
-            "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"chinaMode\":%d}",
+            "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"chinaMode\":%d,"
+            "\"apSSID\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
             cfg.canOK ? "true" : "false",
@@ -92,7 +95,8 @@ void setupWebServer() {
             (int)cfg.profileModeAuto,
             (int)cfg.isaChimeSuppress,
             (int)cfg.emergencyDetection,
-            (int)cfg.chinaMode
+            (int)cfg.chinaMode,
+            apSSID
         );
         req->send(200, "application/json", buf);
     });
@@ -132,6 +136,32 @@ void setupWebServer() {
 
         if (changed) saveConfig();
         req->send(200, "text/plain", "OK");
+    });
+
+    // WiFi AP settings — save to NVS then restart
+    server.on("/api/wifi", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!req->hasParam("ssid", true)) {
+            req->send(400, "text/plain", "Missing ssid");
+            return;
+        }
+        String newSSID = req->getParam("ssid", true)->value();
+        String newPass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
+        newSSID.trim();
+        if (newSSID.length() == 0 || newSSID.length() > 32) {
+            req->send(400, "text/plain", "SSID must be 1-32 chars");
+            return;
+        }
+        if (newPass.length() > 0 && newPass.length() < 8) {
+            req->send(400, "text/plain", "Password must be >= 8 chars");
+            return;
+        }
+        Preferences wPrefs;
+        wPrefs.begin("fsd", false);
+        wPrefs.putString("apSSID", newSSID);
+        if (newPass.length() >= 8) wPrefs.putString("apPass", newPass);
+        wPrefs.end();
+        req->send(200, "text/plain", "OK");
+        otaPendingRestart = true;
     });
 
     // OTA firmware upload — flag-based restart (no delay in async context)
@@ -218,8 +248,8 @@ void setup() {
 
     // Start WiFi AP
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_SSID, AP_PASS);
-    Serial.printf("WiFi AP: %s  IP: %s\n", AP_SSID, WiFi.softAPIP().toString().c_str());
+    WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
+    Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
     // Start web server
     setupWebServer();
