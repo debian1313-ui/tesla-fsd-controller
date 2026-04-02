@@ -32,7 +32,7 @@ struct TWAIDriver : public CanDriver {
         msg.identifier        = frame.id;
         msg.data_length_code  = frame.dlc;
         memcpy(msg.data, frame.data, 8);
-        if (twai_transmit(&msg, pdMS_TO_TICKS(10)) != ESP_OK) {
+        if (twai_transmit(&msg, pdMS_TO_TICKS(2)) != ESP_OK) {
             if (isBusOff()) recover();
             return false;
         }
@@ -46,8 +46,9 @@ struct TWAIDriver : public CanDriver {
             return false;
         }
         frame.id  = msg.identifier;
-        frame.dlc = msg.data_length_code;
-        memcpy(frame.data, msg.data, 8);
+        frame.dlc = (msg.data_length_code <= 8) ? msg.data_length_code : 8;
+        memset(frame.data, 0, 8);
+        memcpy(frame.data, msg.data, frame.dlc);
         return true;
     }
 

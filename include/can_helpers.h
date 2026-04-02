@@ -20,6 +20,7 @@ inline void setSpeedProfileV12V13(CanFrame& frame, int profile) {
 }
 
 inline void setBit(CanFrame& frame, int bit, bool value) {
+    if (bit < 0 || bit >= 64) return;
     int byteIndex = bit / 8;
     int bitIndex = bit % 8;
     uint8_t mask = static_cast<uint8_t>(1U << bitIndex);
