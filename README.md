@@ -14,7 +14,11 @@
 
 烧录后，ESP32 会创建一个 WiFi 热点，手机连上就能用浏览器实时控制所有参数，**无需重新编程**。
 
-<p align="center"><img src="images/screenshot.jpg" width="320" alt="Web UI screenshot"></p>
+<p align="center">
+  <img src="images/screenshot_zh.jpg" width="45%" alt="Web UI - 中文">
+  &nbsp;&nbsp;
+  <img src="images/screenshot_en.jpg" width="45%" alt="Web UI - English">
+</p>
 
 ---
 
