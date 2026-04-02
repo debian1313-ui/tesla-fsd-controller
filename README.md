@@ -242,7 +242,7 @@ static const char* AP_PASS = "MySecret2024";
 修改代码后不需要再插 USB，可以直接通过 WiFi 更新：
 
 1. 在 VS Code 中修改代码并编译（点「Build」）。
-2. 找到生成的固件文件，路径通常是 `.pio/build/esp32dev/firmware.bin`。
+2. 找到生成的固件文件，路径为 `.pio/build/esp32/firmware.bin`（在项目根目录下，编译成功后自动生成）。
 3. 在控制面板底部找到「固件更新」卡片，点「选择文件」，选择 `firmware.bin`。
 4. 点「上传固件」，等待进度条完成，设备会自动重启。
 
