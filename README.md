@@ -44,7 +44,11 @@
 
 ## 接线方法
 
-![接线图](images/wiring.svg)
+**Model 3 / Model Y 2021 及以后（X179）：**
+![接线图 X179](images/wiring.svg)
+
+**Model 3 2020 及以前（X652）：**
+![接线图 X652](images/wiring_x652.svg)
 
 ### ESP32 ↔ SN65HVD230 模块
 
