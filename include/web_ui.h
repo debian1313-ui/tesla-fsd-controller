@@ -160,7 +160,7 @@ var T={
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
     otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
-    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3',
+    hwHint:'HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3',
     cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
     wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空'},
