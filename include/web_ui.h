@@ -65,13 +65,14 @@ select:focus{outline:none;border-color:#38bdf8}
     <span class="row-label" id="iLblFsdEn">FSD 开关</span>
     <label class="toggle"><input type="checkbox" id="fsdEnable" checked onchange="setVal('fsdEnable',this.checked?1:0)"><span class="slider"></span></label>
   </div>
-  <div class="row">
+  <div class="row" style="flex-wrap:wrap;gap:4px">
     <span class="row-label" id="iLblHW">硬件版本</span>
     <select id="hwMode" onchange="setVal('hwMode',this.value)">
       <option value="0">LEGACY</option>
       <option value="1">HW3</option>
       <option value="2" selected>HW4</option>
     </select>
+    <div id="iHWHint" style="width:100%;font-size:11px;color:#64748b;padding:2px 0">HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3</div>
   </div>
   <div class="row">
     <span class="row-label" id="iLblSpeed">速度模式</span>
@@ -139,7 +140,8 @@ var T={
     lblFile:'选择文件',noFile:'未选择文件',uploadBtn:'上传固件',
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
     otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',
-    uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN'},
+    uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
+    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3'},
   en:{title:'FSD Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
     lblISA:'ISA Chime Suppress',lblEmg:'Emergency Detection',lblCN:'China Mode 🇨🇳',
@@ -148,7 +150,8 @@ var T={
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
     canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
     otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',
-    uptH:'h',uptM:'m',uptS:'s',langBtn:'中文'}
+    uptH:'h',uptM:'m',uptS:'s',langBtn:'中文',
+    hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3'}
 };
 function applyLang(){
   var t=T[lang];
@@ -171,6 +174,7 @@ function applyLang(){
   document.getElementById('iLblUp').textContent=t.lblUp;
   document.getElementById('iLblCAN').textContent=t.lblCAN;
   document.getElementById('iLblFSDTrig').textContent=t.lblFSDTrig;
+  document.getElementById('iHWHint').textContent=t.hwHint;
   document.getElementById('iLblFile').textContent=t.lblFile;
   document.getElementById('uploadBtn').textContent=t.uploadBtn;
   ['speedProfile','profileMode'].forEach(function(id){
