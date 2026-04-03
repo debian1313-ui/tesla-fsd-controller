@@ -1,5 +1,7 @@
 # Tesla FSD Controller — ESP32 Web 版
 
+<p align="right"><a href="README_EN.md">English</a> | 中文</p>
+
 > ## 🚫 重要公告：本项目对中国国内车辆已失效
 >
 > 自 **2026 年 3 月 31 日晚 9 时左右**，Tesla 向中国国内车辆远程下发了底层配置，从芯片层面禁用了 FSD 相关功能。**CAN 总线层面的修改已无法绕过此限制，本项目对中国国内车辆不再有效。**
