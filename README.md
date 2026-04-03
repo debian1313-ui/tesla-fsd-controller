@@ -14,6 +14,21 @@
 
 烧录后，ESP32 会创建一个 WiFi 热点，手机连上就能用浏览器实时控制所有参数，**无需重新编程**。
 
+---
+
+## ⚡ 快速刷机（推荐，无需安装任何软件）
+
+> 使用预编译固件，全程用浏览器完成，5 分钟搞定。
+
+1. [**下载 firmware.bin**](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware.bin)
+2. 用 **Chrome 或 Edge** 打开 [ESP Web Flasher](https://esp.huhn.me/)
+3. ESP32 通过 USB 连接电脑 → 点击「**Connect**」选择串口
+4. 点「**Add File**」选择刚下载的 `firmware.bin`，地址填 `0x0`
+5. 点「**Program**」等待完成
+6. 刷机完成后连接 WiFi 热点 `FSD-Controller`（密码 `12345678`），浏览器访问 `192.168.4.1`
+
+> ⚠️ Safari 不支持 WebUSB，请使用 Chrome 或 Edge。部分 ESP32 需要按住 **BOOT** 键后再点 Connect。
+
 <p align="center">
   <img src="images/screenshot_zh.jpg" width="45%" alt="Web UI - 中文">
   &nbsp;&nbsp;
