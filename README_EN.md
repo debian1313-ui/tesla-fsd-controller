@@ -22,12 +22,20 @@ After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and co
 
 > Uses a pre-built binary. Done entirely in the browser in under 5 minutes.
 
-1. [**Download firmware.bin**](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware.bin)
-2. Open [ESP Web Flasher](https://esp.huhn.me/) in **Chrome or Edge**
-3. Connect ESP32 via USB → click **Connect** and select the serial port
-4. Click **Add File**, select `firmware.bin`, set address to `0x0`
-5. Click **Program** and wait for completion
-6. Connect to the `FSD-Controller` WiFi hotspot (password: `12345678`), then open `192.168.4.1` in your browser
+### Step 1: Download the firmware for your board
+
+| Board | Firmware | Power | Notes |
+|-------|----------|-------|-------|
+| Standard ESP32 dev board + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | 5V USB | Entry-level, Dupont wiring |
+| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | **7–36V direct** | Recommended for permanent in-car install — no buck converter needed, CAN transceiver built-in |
+
+### Step 2: Flash the firmware
+
+1. Open [ESP Web Flasher](https://esp.huhn.me/) in **Chrome or Edge**
+2. Connect the board via **Type-C** → click **Connect** and select the serial port
+3. Click **Add File**, select the downloaded firmware, set address to `0x0`
+4. Click **Program** and wait for completion
+5. Connect to the `FSD-Controller` WiFi hotspot (password: `12345678`), then open `192.168.4.1`
 
 > ⚠️ Safari does not support WebUSB. Use Chrome or Edge. Some ESP32 boards require holding the **BOOT** button before clicking Connect.
 

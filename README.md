@@ -22,12 +22,20 @@
 
 > 使用预编译固件，全程用浏览器完成，5 分钟搞定。
 
-1. [**下载 firmware.bin**](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware.bin)
-2. 用 **Chrome 或 Edge** 打开 [ESP Web Flasher](https://esp.huhn.me/)
-3. ESP32 通过 USB 连接电脑 → 点击「**Connect**」选择串口
-4. 点「**Add File**」选择刚下载的 `firmware.bin`，地址填 `0x0`
-5. 点「**Program**」等待完成
-6. 刷机完成后连接 WiFi 热点 `FSD-Controller`（密码 `12345678`），浏览器访问 `192.168.4.1`
+### 第一步：选择对应你的板子的固件
+
+| 板子 | 固件 | 供电 | 说明 |
+|------|------|------|------|
+| 标准 ESP32 开发板 + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | 5V USB | 入门推荐，杜邦线接线 |
+| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | **7–36V 直接供电** | 推荐车内永久安装，无需降压模块，CAN 收发器已集成 |
+
+### 第二步：刷入固件
+
+1. 用 **Chrome 或 Edge** 打开 [ESP Web Flasher](https://esp.huhn.me/)
+2. 板子通过 **Type-C** 连接电脑 → 点击「**Connect**」选择串口
+3. 点「**Add File**」选择刚下载的固件，地址填 `0x0`
+4. 点「**Program**」等待完成
+5. 连接 WiFi 热点 `FSD-Controller`（密码 `12345678`），浏览器访问 `192.168.4.1`
 
 > ⚠️ Safari 不支持 WebUSB，请使用 Chrome 或 Edge。部分 ESP32 需要按住 **BOOT** 键后再点 Connect。
 
