@@ -62,6 +62,8 @@
 
 > 以下材料在淘宝/京东均可购买，搜索括号内的关键词即可。
 
+### 方案一：标准 ESP32 开发板（入门推荐）
+
 | 材料 | 说明 | 参考价 |
 |------|------|--------|
 | ESP32 开发板 | 搜「ESP32-DevKitC」或「ESP32 38Pin 开发板」 | ¥20–35 |
@@ -71,31 +73,18 @@
 
 > **为什么选 ESP32？** 内置 WiFi 和原生 CAN（TWAI）控制器，无需额外芯片，成本最低。
 
+### 方案二：Waveshare ESP32-S3-RS485-CAN（推荐车内永久安装）
+
+| 材料 | 说明 | 参考价 |
+|------|------|--------|
+| **Waveshare ESP32-S3-RS485-CAN** | 搜「微雪 ESP32-S3-RS485-CAN」，CAN 收发器已集成，导轨安装外壳 | **¥99** |
+| Type-C 数据线 | 仅烧录时使用，车内无需常接 | 通常自备 |
+
+> **为什么选这个板？** 7–36V 宽压直接供电（可接车内 12V，无需降压模块），CAN 收发器已集成（TJA1051T），端子排螺丝接线（无需杜邦线），DIN 导轨外壳适合车内隐蔽安装。120Ω 终端电阻默认未接入，无需处理。
+
 ---
 
 ## 接线方法
-
-**Model 3 / Model Y 2021 及以后（X179）：**
-![接线图 X179](images/wiring.svg)
-
-**Model 3 2020 及以前（X652）：**
-![接线图 X652](images/wiring_x652.svg)
-
-### ESP32 ↔ SN65HVD230 模块
-
-```
-ESP32 GPIO 5  →  SN65HVD230 TX（有的板子标 CTX/D）
-ESP32 GPIO 4  →  SN65HVD230 RX（有的板子标 CRX/R）
-ESP32 3.3V    →  SN65HVD230 VCC
-ESP32 GND     →  SN65HVD230 GND
-```
-
-### SN65HVD230 ↔ 车辆 CAN 总线
-
-```
-SN65HVD230 CANH  →  车辆 CAN-H（通常为白色/棕色线）
-SN65HVD230 CANL  →  车辆 CAN-L（通常为蓝色/绿色线）
-```
 
 > 🚫 **禁止使用 OBD2 接口**：OBD2 诊断口连接的是诊断 CAN 总线，经过车辆网关 ECU 隔离，修改后的报文**永远无法到达 Autopilot 电脑**，设备将完全无效。必须直接接车辆内部 CAN 总线（X179 / X652 连接器）。
 >
@@ -106,23 +95,51 @@ SN65HVD230 CANL  →  车辆 CAN-L（通常为蓝色/绿色线）
 >
 > 不确定时请先查阅 Tesla 服务手册，切勿盲目拆车接线。
 
-### 接线示意图
+---
+
+### 方案一：标准 ESP32 + SN65HVD230
+
+**Model 3 / Model Y 2021 及以后（X179）：**
+![接线图 X179](images/wiring.svg)
+
+**Model 3 2020 及以前（X652）：**
+![接线图 X652](images/wiring_x652.svg)
+
+#### ESP32 ↔ SN65HVD230 模块
 
 ```
-[车辆 CAN-H] ─────────────┐
-                           │  SN65HVD230
-[车辆 CAN-L] ─────────────┤   模块
-                        CANH/CANL
-                           │
-                        TX → GPIO5
-                        RX → GPIO4   [ESP32]
-                       VCC → 3.3V
-                       GND → GND
-                                │
-                              USB
-                                │
-                          [电脑/充电宝]
+ESP32 GPIO 5  →  SN65HVD230 TX（有的板子标 CTX/D）
+ESP32 GPIO 4  →  SN65HVD230 RX（有的板子标 CRX/R）
+ESP32 3.3V    →  SN65HVD230 VCC
+ESP32 GND     →  SN65HVD230 GND
 ```
+
+#### SN65HVD230 ↔ 车辆 CAN 总线
+
+```
+SN65HVD230 CANH  →  车辆 CAN-H（通常为白色/棕色线）
+SN65HVD230 CANL  →  车辆 CAN-L（通常为蓝色/绿色线）
+```
+
+---
+
+### 方案二：Waveshare ESP32-S3-RS485-CAN（推荐车内永久安装）
+
+![接线图 Waveshare](images/wiring_waveshare.svg)
+
+接线极为简单，只需 4 根线，全部拧螺丝端子：
+
+```
+车辆 12V（保险丝盒 ACC 路）→  板子左侧端子 VCC+
+车辆 GND                   →  板子左侧端子 GND
+车辆 CAN-H（X179 Pin 13）  →  板子右侧端子 CAN H
+车辆 CAN-L（X179 Pin 14）  →  板子右侧端子 CAN L
+```
+
+> - **无需** SN65HVD230 模块，CAN 收发器已集成（TJA1051T）
+> - **无需**处理终端电阻，120Ω 默认未接入
+> - **无需** USB 常供电，可直接接车内 12V（ACC 路，随车熄火断电）
+> - 推荐用 **T 型线夹**（搜「T型分线夹」）从 X179 连接器的 CAN-H/CAN-L 取线，不破坏原车线束
 
 ---
 

@@ -60,6 +60,8 @@ After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and co
 
 ## Hardware Required
 
+### Option A: Standard ESP32 Dev Board (entry-level)
+
 | Component | Notes | Approx. Cost |
 |-----------|-------|--------------|
 | ESP32 Dev Board | Search "ESP32-DevKitC" or "ESP32 38-pin dev board" | $3–6 |
@@ -69,31 +71,18 @@ After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and co
 
 > **Why ESP32?** Built-in WiFi and native CAN (TWAI) controller — no extra chips needed, lowest cost.
 
+### Option B: Waveshare ESP32-S3-RS485-CAN (recommended for permanent in-car install)
+
+| Component | Notes | Approx. Cost |
+|-----------|-------|--------------|
+| **Waveshare ESP32-S3-RS485-CAN** | Integrated CAN transceiver, DIN rail enclosure, 7–36V wide-voltage input | ~$14 |
+| Type-C USB cable | For initial flashing only — not needed once installed in car | Usually on hand |
+
+> **Why this board?** 7–36V wide-voltage direct power (connect to car 12V, no buck converter needed), CAN transceiver built-in (TJA1051T), screw terminal connections (no Dupont wires), DIN rail enclosure for hidden in-car mounting. 120Ω termination resistor is NC by default — no action needed.
+
 ---
 
 ## Wiring
-
-**Model 3 / Model Y 2021 and later (X179):**
-![Wiring diagram X179](images/wiring.svg)
-
-**Model 3 2020 and earlier (X652):**
-![Wiring diagram X652](images/wiring_x652.svg)
-
-### ESP32 ↔ SN65HVD230
-
-```
-ESP32 GPIO 5  →  SN65HVD230 TX  (may be labeled CTX or D)
-ESP32 GPIO 4  →  SN65HVD230 RX  (may be labeled CRX or R)
-ESP32 3.3V    →  SN65HVD230 VCC
-ESP32 GND     →  SN65HVD230 GND
-```
-
-### SN65HVD230 ↔ Vehicle CAN Bus
-
-```
-SN65HVD230 CANH  →  Vehicle CAN-H  (typically white/brown wire)
-SN65HVD230 CANL  →  Vehicle CAN-L  (typically blue/green wire)
-```
 
 > 🚫 **Do NOT use the OBD2 port.** The OBD2 diagnostic port connects to a separate diagnostic CAN bus that is isolated by the vehicle's gateway ECU. Modified frames will **never reach the Autopilot computer**. You must connect directly to the internal CAN bus via the X179 or X652 connector.
 >
@@ -104,23 +93,51 @@ SN65HVD230 CANL  →  Vehicle CAN-L  (typically blue/green wire)
 >
 > When in doubt, consult the Tesla service manual before touching any wiring.
 
-### Wiring Overview
+---
+
+### Option A: Standard ESP32 + SN65HVD230
+
+**Model 3 / Model Y 2021 and later (X179):**
+![Wiring diagram X179](images/wiring.svg)
+
+**Model 3 2020 and earlier (X652):**
+![Wiring diagram X652](images/wiring_x652.svg)
+
+#### ESP32 ↔ SN65HVD230
 
 ```
-[Vehicle CAN-H] ───────────┐
-                            │  SN65HVD230
-[Vehicle CAN-L] ───────────┤   module
-                         CANH/CANL
-                            │
-                         TX → GPIO5
-                         RX → GPIO4   [ESP32]
-                        VCC → 3.3V
-                        GND → GND
-                                 │
-                               USB
-                                 │
-                          [PC / power bank]
+ESP32 GPIO 5  →  SN65HVD230 TX  (may be labeled CTX or D)
+ESP32 GPIO 4  →  SN65HVD230 RX  (may be labeled CRX or R)
+ESP32 3.3V    →  SN65HVD230 VCC
+ESP32 GND     →  SN65HVD230 GND
 ```
+
+#### SN65HVD230 ↔ Vehicle CAN Bus
+
+```
+SN65HVD230 CANH  →  Vehicle CAN-H  (typically white/brown wire)
+SN65HVD230 CANL  →  Vehicle CAN-L  (typically blue/green wire)
+```
+
+---
+
+### Option B: Waveshare ESP32-S3-RS485-CAN (recommended for permanent in-car install)
+
+![Wiring diagram Waveshare](images/wiring_waveshare.svg)
+
+Only 4 wires, all screw-terminal connections:
+
+```
+Car 12V (fuse box ACC circuit)  →  Board left terminal VCC+
+Car GND                         →  Board left terminal GND
+Vehicle CAN-H (X179 Pin 13)    →  Board right terminal CAN H
+Vehicle CAN-L (X179 Pin 14)    →  Board right terminal CAN L
+```
+
+> - **No** SN65HVD230 module needed — CAN transceiver is integrated (TJA1051T)
+> - **No** termination resistor action needed — 120Ω is NC by default
+> - **No** USB power in car — connect directly to vehicle 12V ACC (cuts off with ignition)
+> - Use a **T-tap connector** on X179 CAN-H/CAN-L for non-destructive wiring (no cutting original harness)
 
 ---
 
