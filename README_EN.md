@@ -79,7 +79,7 @@ After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and co
 
 | Component | Notes | Approx. Cost |
 |-----------|-------|--------------|
-| **Waveshare ESP32-S3-RS485-CAN** | Integrated CAN transceiver, DIN rail enclosure, 7–36V wide-voltage input | ~$14 |
+| **Waveshare ESP32-S3-RS485-CAN** | [Taobao link](https://m.tb.cn/h.ikuhpPd) — integrated CAN transceiver, DIN rail enclosure, 7–36V wide-voltage input | ~$14 |
 | Type-C USB cable | For initial flashing only — not needed once installed in car | Usually on hand |
 
 > **Why this board?** 7–36V wide-voltage direct power (connect to car 12V, no buck converter needed), CAN transceiver built-in (TJA1051T), screw terminal connections (no Dupont wires), DIN rail enclosure for hidden in-car mounting. 120Ω termination resistor is NC by default — no action needed.
