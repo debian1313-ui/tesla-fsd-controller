@@ -120,6 +120,7 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
+  <div class="status-row"><span id="iLblVer">固件版本</span><span id="sVer" style="color:#64748b;font-weight:600">--</span></div>
 </div>
 
 <div class="card">
@@ -157,6 +158,7 @@ var T={
     lblMod:'已修改',lblRX:'已接收',lblErr:'错误',lblUp:'运行时间',
     lblCAN:'CAN 总线',lblFSDTrig:'FSD 已触发',
     lblFile:'选择文件',noFile:'未选择文件',uploadBtn:'上传固件',
+    lblVer:'固件版本',
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
     otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
@@ -170,6 +172,7 @@ var T={
     lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
     lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
+    lblVer:'Firmware Version',
     canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
     otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',
     uptH:'h',uptM:'m',uptS:'s',langBtn:'中文',
@@ -199,6 +202,7 @@ function applyLang(){
   document.getElementById('iLblUp').textContent=t.lblUp;
   document.getElementById('iLblCAN').textContent=t.lblCAN;
   document.getElementById('iLblFSDTrig').textContent=t.lblFSDTrig;
+  document.getElementById('iLblVer').textContent=t.lblVer;
   document.getElementById('iHWHint').textContent=t.hwHint;
   document.getElementById('iCardWifi').textContent=t.cardWifi;
   document.getElementById('iLblSSID').textContent=t.lblSSID;
@@ -238,6 +242,7 @@ function poll(){
     document.getElementById('emergencyDet').checked=!!d.emergencyDet;
     document.getElementById('chinaMode').checked=!!d.chinaMode;
     if(d.apSSID&&!wifiSSIDLoaded){document.getElementById('wifiSSID').value=d.apSSID;wifiSSIDLoaded=true;}
+    if(d.version)document.getElementById('sVer').textContent='v'+d.version;
   }).catch(()=>{});
 }
 var wifiSSIDLoaded=false;

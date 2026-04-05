@@ -16,6 +16,7 @@
 #include "drivers/twai_driver.h"
 #include "handlers.h"
 #include "web_ui.h"
+#include "version.h"
 
 // ── WiFi AP config (NVS-overridable) ──
 static char apSSID[33] = "FSD-Controller";
@@ -89,13 +90,13 @@ void setupWebServer() {
             *dst++ = *src++;
         }
 
-        char buf[384];
+        char buf[420];
         snprintf(buf, sizeof(buf),
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
             "\"canOK\":%s,\"fsdTriggered\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"chinaMode\":%d,"
-            "\"apSSID\":\"%s\"}",
+            "\"apSSID\":\"%s\",\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
             cfg.canOK ? "true" : "false",
@@ -107,7 +108,7 @@ void setupWebServer() {
             (int)cfg.isaChimeSuppress,
             (int)cfg.emergencyDetection,
             (int)cfg.chinaMode,
-            escapedSSID
+            escapedSSID, FIRMWARE_VERSION
         );
         req->send(200, "application/json", buf);
     });
