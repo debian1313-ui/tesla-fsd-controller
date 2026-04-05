@@ -24,10 +24,14 @@ After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and co
 
 ### Step 1: Download the firmware for your board
 
-| Board | Firmware | Power | Notes |
-|-------|----------|-------|-------|
-| Standard ESP32 dev board + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | 5V USB | Entry-level, Dupont wiring |
-| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | **7–36V direct** | Recommended for permanent in-car install — no buck converter needed, CAN transceiver built-in |
+> Two firmware files are provided per board — use the right one for the right purpose:
+> - **`firmware_xxx.bin`** (merged binary) → first-time flash via ESP Web Flasher at address `0x0`
+> - **`firmware_xxx_ota.bin`** (OTA binary) → wireless updates via the web panel "OTA Update" card
+
+| Board | First-time flash | OTA update | Power |
+|-------|----------|----------|-------|
+| Standard ESP32 dev board + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | [firmware_esp32_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32_ota.bin) | 5V USB |
+| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | [firmware_esp32s3_waveshare_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare_ota.bin) | **7–36V direct** |
 
 ### Step 2: Flash the firmware
 
@@ -278,9 +282,11 @@ The status card updates in real time:
 After modifying and rebuilding the firmware, you can update wirelessly — no USB needed:
 
 1. Build in VS Code (click **Build**).
-2. Locate the output file at `.pio/build/esp32/firmware.bin`.
-3. In the web panel, find the **OTA Update** card, click **Choose File**, select `firmware.bin`.
+2. The build script auto-generates **`firmware_esp32_ota.bin`** (or `firmware_esp32s3_waveshare_ota.bin` for Waveshare) in the project root.
+3. In the web panel, find the **OTA Update** card, click **Choose File**, select the **`_ota.bin`** file.
 4. Click **Upload Firmware** and wait for the progress bar. The device restarts automatically.
+
+> ⚠️ **OTA requires the `_ota.bin` file.** Do not upload the merged `firmware_esp32.bin` — it contains the bootloader and will fail with "Wrong Magic Byte".
 
 ---
 

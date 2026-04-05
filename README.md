@@ -24,10 +24,14 @@
 
 ### 第一步：选择对应你的板子的固件
 
-| 板子 | 固件 | 供电 | 说明 |
+> 每个板子有两个固件文件，用途不同，请注意区分：
+> - **`firmware_xxx.bin`**（合并固件）→ 首次刷机用，通过 ESP Web Flasher 写入，地址 `0x0`
+> - **`firmware_xxx_ota.bin`**（OTA 固件）→ 后续无线升级用，通过控制面板「固件更新」上传
+
+| 板子 | 首次刷机固件 | OTA 升级固件 | 供电 |
 |------|------|------|------|
-| 标准 ESP32 开发板 + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | 5V USB | 入门推荐，杜邦线接线 |
-| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | **7–36V 直接供电** | 推荐车内永久安装，无需降压模块，CAN 收发器已集成 |
+| 标准 ESP32 开发板 + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | [firmware_esp32_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32_ota.bin) | 5V USB |
+| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | [firmware_esp32s3_waveshare_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare_ota.bin) | **7–36V 直接供电** |
 
 ### 第二步：刷入固件
 
@@ -280,9 +284,11 @@ static char apPass[64] = "12345678";
 修改代码后不需要再插 USB，可以直接通过 WiFi 更新：
 
 1. 在 VS Code 中修改代码并编译（点「Build」）。
-2. 找到生成的固件文件，路径为 `.pio/build/esp32/firmware.bin`（在项目根目录下，编译成功后自动生成）。
-3. 在控制面板底部找到「固件更新」卡片，点「选择文件」，选择 `firmware.bin`。
+2. 编译完成后，项目根目录会自动生成 **`firmware_esp32_ota.bin`**（Waveshare 则为 `firmware_esp32s3_waveshare_ota.bin`）。
+3. 在控制面板底部找到「固件更新」卡片，点「选择文件」，选择对应的 **`_ota.bin`** 文件。
 4. 点「上传固件」，等待进度条完成，设备会自动重启。
+
+> ⚠️ **OTA 必须使用 `_ota.bin` 文件**，不能用合并固件（`firmware_esp32.bin`）。合并固件包含 bootloader，OTA 上传器会报 "Wrong Magic Byte" 错误。
 
 ---
 
