@@ -31,7 +31,7 @@
 | 板子 | 首次刷机固件 | OTA 升级固件 | 供电 |
 |------|------|------|------|
 | 标准 ESP32 开发板 + SN65HVD230 | [firmware_esp32.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32.bin) | [firmware_esp32_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32_ota.bin) | 5V USB |
-| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | [firmware_esp32s3_waveshare_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare_ota.bin) | **7–36V 直接供电** |
+| **Waveshare ESP32-S3-RS485-CAN** | [firmware_esp32s3_waveshare.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare.bin) | [firmware_esp32s3_waveshare_ota.bin](https://github.com/wjsall/tesla-fsd-controller/releases/latest/download/firmware_esp32s3_waveshare_ota.bin) | **7–36V 直接供电** 或 **USB-C** |
 
 ### 第二步：刷入固件
 
@@ -82,9 +82,9 @@
 | 材料 | 说明 | 参考价 |
 |------|------|--------|
 | **Waveshare ESP32-S3-RS485-CAN** | [淘宝购买链接](https://m.tb.cn/h.ikuhpPd)，CAN 收发器已集成，导轨安装外壳 | [**¥99**](https://m.tb.cn/h.ikuhpPd) |
-| Type-C 数据线 | 仅烧录时使用，车内无需常接 | 通常自备 |
+| Type-C 数据线 | 烧录或 USB-C 车内供电时使用 | 通常自备 |
 
-> **为什么选这个板？** 7–36V 宽压直接供电（可接车内 12V，无需降压模块），CAN 收发器已集成（TJA1051T），端子排螺丝接线（无需杜邦线），DIN 导轨外壳适合车内隐蔽安装。120Ω 终端电阻默认未接入，无需处理。
+> **为什么选这个板？** 支持两种供电方式：**直接接车内 12V**（7–36V 宽压端子供电，无需降压模块）或 **USB-C 供电**。CAN 收发器已集成（TJA1051T），端子排螺丝接线（无需杜邦线），DIN 导轨外壳适合车内隐蔽安装。120Ω 终端电阻默认未接入，无需处理。
 
 ---
 
