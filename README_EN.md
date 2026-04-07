@@ -20,16 +20,31 @@ After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and co
 
 ## vs. Commercial Closed-Source Modules
 
-Closed-source FSD activation modules sell for around ¥500. Here's how this project compares:
+Closed-source FSD activation modules sell for around ¥500. Here's the full comparison:
+
+### Feature Comparison
+
+| Feature | Commercial Module | This Project |
+|---------|------------------|--------------|
+| FSD activation (HW3 / HW4 / Legacy) | ✅ | ✅ |
+| Speed offset | ✅ | ✅ |
+| Driving mode adjustment | ✅ | ✅ |
+| Scroll wheel speed control | ✅ | ✅ |
+| China mode toggle | ✅ | ✅ |
+| Web control panel | ❌ | ✅ |
+| OTA firmware update | ❌ | ✅ |
+| Open source / auditable | ❌ | ✅ |
+| Affected by 2026.2.9 ban | Same | Same |
+
+### Other Differences
 
 | | Commercial Module | This Project |
 |--|--|--|
 | **Cost** | ¥500 | ¥30–99 (hardware only) |
-| **Source code** | Closed, unverifiable | **Fully open source**, GPL |
-| **Web control panel** | None | **Built-in**, real-time browser UI |
-| **OTA firmware update** | None | **Supported**, no disassembly needed |
-| **Runtime configuration** | Usually requires reflashing | **Web panel**, persists across reboots |
-| **Per-vehicle lock** | Yes (repurchase if you change cars) | **No**, universal firmware |
+| **Source code** | Closed black box, unverifiable | Fully open source, GPL |
+| **Runtime configuration** | Usually requires reflashing | Web panel, persists across reboots |
+| **Per-vehicle lock** | Yes (repurchase if you change cars) | No, universal firmware |
+| **Chip** | Proprietary, opaque | Standard ESP32, public specs |
 | **Installation** | Plug and play | Self-wiring + flashing required |
 
 > This project is free and fully open. If you're willing to do it yourself, total hardware cost is under ¥100.
