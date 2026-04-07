@@ -263,19 +263,36 @@ function poll(){
 var wifiSSIDLoaded=false;
 setInterval(poll,1000);poll();
 function updateSpeedOptions(hwMode){
-  // Profiles 3 (Aggressive) and 4 (Maximum) are HW4-only.
-  // Hide them in Legacy (0) and HW3 (1) modes to prevent invalid frame writes.
-  var hw4Only=[3,4];
+  // HW3/Legacy: 3 profiles (0-2) with different labels than HW4
+  // HW4: 5 profiles (0-4) — Sloth/Chill/Standard/Hurry/Mad Max
+  var hw3Labels=[
+    {zh:'轻松',en:'Chill'},
+    {zh:'标准',en:'Standard'},
+    {zh:'迅捷',en:'Sport'}
+  ];
+  var hw4Labels=[
+    {zh:'平缓',en:'Sloth'},
+    {zh:'舒适',en:'Chill'},
+    {zh:'标准',en:'Standard'},
+    {zh:'迅捷',en:'Hurry'},
+    {zh:'狂飙',en:'Mad Max'}
+  ];
+  var isHW4=(hwMode===2);
+  var labels=isHW4?hw4Labels:hw3Labels;
   var sel=document.getElementById('speedProfile');
   Array.from(sel.options).forEach(function(o){
     var v=parseInt(o.value);
-    if(hw4Only.indexOf(v)!==-1){
-      o.disabled=(hwMode!==2);
-      o.style.display=(hwMode!==2)?'none':'';
+    var hide=(!isHW4&&v>2);
+    o.disabled=hide;
+    o.style.display=hide?'none':'';
+    if(!hide&&labels[v]){
+      o.setAttribute('data-zh',labels[v].zh);
+      o.setAttribute('data-en',labels[v].en);
+      o.textContent=(lang==='en')?labels[v].en:labels[v].zh;
     }
   });
   // If current selection is now invalid, clamp to 2
-  if(hwMode!==2&&parseInt(sel.value)>2){sel.value='2';setVal('speedProfile',2);}
+  if(!isHW4&&parseInt(sel.value)>2){sel.value='2';setVal('speedProfile',2);}
 }
 function setVal(key,val){fetch('/api/set?'+key+'='+val).catch(()=>{});}
 function doWifi(){
