@@ -240,10 +240,12 @@ Identify your version before connecting so you can select it immediately:
 |----------------|-----------------|-------------|-----------------|
 | HW4.x | 2026.2.9.x or newer | V14 | `HW4` |
 | HW4.x | 2026.8.x or older | V13 | `HW3` ⚠️ |
-| HW3.x | Any | V13 | `HW3` |
-| Legacy Model S/X (portrait screen) | Any | — | `LEGACY` |
+| HW3.x | Any | — | `HW3` |
+| HW2.5 or older | Any | — | `LEGACY` |
 
 > ⚠️ **HW4 hardware + V13 firmware must use `HW3` mode.** HW4 mode is designed for FSD V14 and causes intermittent behavior on V13 firmware. Check your firmware version under **Controls → Software** in the car.
+
+> **How to tell HW2.5 from HW3?** Go to **Software → Additional Vehicle Information** in the car. If you see "Full Self-Driving Computer" listed → HW3. If not → HW2.5, select `LEGACY`. Most vehicles from mid-2019 onward are HW3, but HW2.5 also exists for the same year — always check the car's display to be sure.
 
 ---
 
