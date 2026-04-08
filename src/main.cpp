@@ -101,7 +101,7 @@ void setupWebServer() {
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
             "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
-            "\"bmsSeen\":%s,\"bmsV\":%.2f,\"bmsA\":%.1f,\"bmsSoc\":%.1f,"
+            "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
@@ -120,9 +120,9 @@ void setupWebServer() {
             (int)cfg.precondition,
             (int)cfg.hwDetected,
             cfg.bmsSeen ? "true" : "false",
-            cfg.packVoltage_cV * 0.01f,
-            cfg.packCurrent_dA * 0.1f,
-            cfg.socPercent_d * 0.1f,
+            (unsigned)cfg.packVoltage_cV,   // ÷100 = V  (done in JS)
+            (int)cfg.packCurrent_dA,        // ÷10  = A  (done in JS)
+            (unsigned)cfg.socPercent_d,     // ÷10  = %  (done in JS)
             (int)cfg.battTempMin,
             (int)cfg.battTempMax,
             escapedSSID, FIRMWARE_VERSION
