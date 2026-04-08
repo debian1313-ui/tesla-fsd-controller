@@ -327,15 +327,11 @@ function poll(){
   }).catch(()=>{});
 }
 function confirmDisclaimer(){
-  sessionStorage.setItem('disclaimed','1');
   document.getElementById('disclaimer').style.display='none';
 }
 function rejectDisclaimer(){
   document.getElementById('disclaimerBtns').style.display='none';
   document.getElementById('disclaimerRejected').style.display='block';
-}
-if(sessionStorage.getItem('disclaimed')){
-  document.getElementById('disclaimer').style.display='none';
 }
 var wifiSSIDLoaded=false;
 setInterval(poll,1000);poll();
