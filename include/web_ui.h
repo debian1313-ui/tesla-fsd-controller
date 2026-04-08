@@ -70,7 +70,11 @@ select:focus{outline:none;border-color:#38bdf8}
       · 人身及财产安全事故<br><br>
       <b style="color:#f59e0b">所有风险与法律责任由使用者自行承担，与开发者无关。</b>
     </div>
-    <button onclick="confirmDisclaimer()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:13px;width:100%;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px">我已了解，仅用于技术探讨</button>
+    <div id="disclaimerBtns">
+      <button onclick="confirmDisclaimer()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:13px;width:100%;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px;margin-bottom:10px">我已了解，仅用于技术探讨</button>
+      <button onclick="rejectDisclaimer()" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:11px;width:100%;font-size:13px;cursor:pointer">不同意</button>
+    </div>
+    <div id="disclaimerRejected" style="display:none;text-align:center;color:#64748b;font-size:13px;padding:8px 0">您已拒绝，请关闭此页面。</div>
   </div>
 </div>
 
@@ -325,6 +329,10 @@ function poll(){
 function confirmDisclaimer(){
   sessionStorage.setItem('disclaimed','1');
   document.getElementById('disclaimer').style.display='none';
+}
+function rejectDisclaimer(){
+  document.getElementById('disclaimerBtns').style.display='none';
+  document.getElementById('disclaimerRejected').style.display='block';
 }
 if(sessionStorage.getItem('disclaimed')){
   document.getElementById('disclaimer').style.display='none';
