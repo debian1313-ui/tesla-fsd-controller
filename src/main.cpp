@@ -45,6 +45,8 @@ void loadConfig() {
     cfg.isaChimeSuppress   = prefs.getBool("isaChm", false);
     cfg.emergencyDetection = prefs.getBool("emDet", true);
     cfg.forceActivate      = prefs.getBool("cnMode", false);
+    cfg.hw3OffsetManual    = prefs.getInt("hw3Off", -1);
+    cfg.precondition       = prefs.getBool("precond", false);
     strlcpy(apSSID, prefs.getString("apSSID", "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass, prefs.getString("apPass", "12345678").c_str(), sizeof(apPass));
     prefs.end();
@@ -63,6 +65,8 @@ void saveConfig() {
     prefs.putBool("isaChm",  cfg.isaChimeSuppress);
     prefs.putBool("emDet",   cfg.emergencyDetection);
     prefs.putBool("cnMode",  cfg.forceActivate);
+    prefs.putInt("hw3Off",   cfg.hw3OffsetManual);
+    prefs.putBool("precond", cfg.precondition);
     prefs.end();
 }
 
@@ -90,17 +94,21 @@ void setupWebServer() {
             *dst++ = *src++;
         }
 
-        char buf[560];
+        char buf[800];
         snprintf(buf, sizeof(buf),
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
-            "\"canOK\":%s,\"fsdTriggered\":%s,"
+            "\"canOK\":%s,\"fsdTriggered\":%s,\"otaInProgress\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
+            "\"hw3Offset\":%d,\"precond\":%d,"
+            "\"bmsSeen\":%s,\"bmsV\":%.2f,\"bmsA\":%.1f,\"bmsSoc\":%.1f,"
+            "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
             cfg.canOK ? "true" : "false",
             cfg.fsdTriggered ? "true" : "false",
+            cfg.otaInProgress ? "true" : "false",
             (int)cfg.fsdEnable,
             (int)cfg.hwMode,
             (int)cfg.speedProfile,
@@ -108,6 +116,14 @@ void setupWebServer() {
             (int)cfg.isaChimeSuppress,
             (int)cfg.emergencyDetection,
             (int)cfg.forceActivate,
+            (int)cfg.hw3OffsetManual,
+            (int)cfg.precondition,
+            cfg.bmsSeen ? "true" : "false",
+            cfg.packVoltage_cV * 0.01f,
+            cfg.packCurrent_dA * 0.1f,
+            cfg.socPercent_d * 0.1f,
+            (int)cfg.battTempMin,
+            (int)cfg.battTempMax,
             escapedSSID, FIRMWARE_VERSION
         );
 
@@ -159,6 +175,14 @@ void setupWebServer() {
         }
         if (req->hasParam("forceActivate")) {
             cfg.forceActivate = req->getParam("forceActivate")->value().toInt() != 0;
+            changed = true;
+        }
+        if (req->hasParam("hw3Offset")) {
+            int v = req->getParam("hw3Offset")->value().toInt();
+            if (v == -1 || (v >= 0 && v <= 100)) { cfg.hw3OffsetManual = v; changed = true; }
+        }
+        if (req->hasParam("precond")) {
+            cfg.precondition = req->getParam("precond")->value().toInt() != 0;
             changed = true;
         }
 
@@ -232,12 +256,24 @@ void setupWebServer() {
 
 void canTask(void* param) {
     CanFrame frame;
+    uint32_t precondTick = 0;
     for (;;) {
         bool activity = false;
         while (canDriver.read(frame)) {
             cfg.canOK = true;
             activity = true;
             handleMessage(frame, canDriver);
+        }
+        // Send precondition frame every ~1 s when enabled (and not during OTA)
+        if (cfg.precondition && !cfg.otaInProgress) {
+            if (++precondTick >= 1000) {
+                precondTick = 0;
+                CanFrame pcFrame;
+                buildPreconditionFrame(pcFrame);
+                canDriver.send(pcFrame);
+            }
+        } else {
+            precondTick = 0;
         }
         // LED: on during activity, off when idle
         digitalWrite(PIN_LED, activity ? HIGH : LOW);

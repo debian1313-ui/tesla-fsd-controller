@@ -15,6 +15,17 @@ struct FSDConfig {
     volatile bool     emergencyDetection  = true;
     volatile bool     forceActivate      = false;  // bypass isFSDSelectedInUI check (regions without TLSSC)
     volatile int      hw3SpeedOffset     = 0;      // cached from mux-0 frame, used in mux-2
+    volatile int      hw3OffsetManual    = -1;     // -1=auto(from CAN), 0-100=user override (%)
+    volatile bool     otaInProgress      = false;  // true when Tesla OTA update detected
+    volatile bool     precondition       = false;  // trigger battery preheating via 0x082
+
+    // BMS (read-only sniff)
+    volatile bool     bmsSeen           = false;
+    volatile uint32_t packVoltage_cV    = 0;   // centivolt  (÷100 = V)
+    volatile int32_t  packCurrent_dA    = 0;   // deciampere (÷10  = A, signed)
+    volatile uint32_t socPercent_d      = 0;   // deci-%     (÷10  = %)
+    volatile int8_t   battTempMin       = 0;   // °C
+    volatile int8_t   battTempMax       = 0;   // °C
 
     // Stats
     volatile uint32_t rxCount       = 0;
@@ -32,6 +43,39 @@ struct FSDConfig {
 };
 
 static FSDConfig cfg;
+
+// ── Precondition frame builder ──
+inline void buildPreconditionFrame(CanFrame& frame) {
+    frame = CanFrame{};
+    frame.id  = 0x082;  // 130 — UI_tripPlanning
+    frame.dlc = 8;
+    frame.data[0] = 0x05;  // bit0=tripPlanningActive, bit2=requestActiveBatteryHeating
+}
+
+// ── BMS frame parsers (read-only sniff) ──
+// 0x132 (306) — BMS_hvBusStatus
+inline void handleBMSHV(const CanFrame& frame) {
+    if (frame.dlc < 4) return;
+    uint16_t raw_v = ((uint16_t)frame.data[1] << 8) | frame.data[0];
+    int16_t  raw_i = (int16_t)(((uint16_t)frame.data[3] << 8) | frame.data[2]);
+    cfg.packVoltage_cV = raw_v;                 // ×0.01 V
+    cfg.packCurrent_dA = (int32_t)raw_i;        // ×0.1  A
+    cfg.bmsSeen = true;
+}
+// 0x292 (658) — BMS_socStatus
+inline void handleBMSSOC(const CanFrame& frame) {
+    if (frame.dlc < 2) return;
+    uint16_t raw = ((uint16_t)(frame.data[1] & 0x03) << 8) | frame.data[0];
+    cfg.socPercent_d = raw;                     // ×0.1 %
+    cfg.bmsSeen = true;
+}
+// 0x312 (786) — BMS_thermalStatus
+inline void handleBMSThermal(const CanFrame& frame) {
+    if (frame.dlc < 6) return;
+    cfg.battTempMin = (int8_t)((int)frame.data[4] - 40);
+    cfg.battTempMax = (int8_t)((int)frame.data[5] - 40);
+    cfg.bmsSeen = true;
+}
 
 // ── Filter IDs per HW mode ──
 static constexpr uint32_t LEGACY_IDS[] = {69, 1006};
@@ -114,10 +158,11 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
             else cfg.errorCount++;
         }
         if (index == 2 && cfg.fsdTriggered && cfg.fsdEnable) {
+            int offset = (cfg.hw3OffsetManual >= 0) ? cfg.hw3OffsetManual : cfg.hw3SpeedOffset;
             frame.data[0] &= ~(0b11000000);
             frame.data[1] &= ~(0b00111111);
-            frame.data[0] |= (cfg.hw3SpeedOffset & 0x03) << 6;
-            frame.data[1] |= (cfg.hw3SpeedOffset >> 2);
+            frame.data[0] |= (offset & 0x03) << 6;
+            frame.data[1] |= (offset >> 2);
             if (driver.send(frame)) cfg.modifiedCount++;
             else cfg.errorCount++;
         }
@@ -180,6 +225,22 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
 // ── Unified dispatch ──
 static void handleMessage(CanFrame& frame, CanDriver& driver) {
     cfg.rxCount++;
+
+    // OTA detection: GTW_carState 0x318
+    // byte[6] bits 0-1: GTW_updateInProgress. Any non-zero = OTA active.
+    if (frame.id == 792) {
+        cfg.otaInProgress = ((frame.data[6] & 0x03) != 0);
+        return;
+    }
+
+    // BMS read-only sniff (no transmission)
+    if (frame.id == 306) { handleBMSHV(frame);      return; }  // 0x132 BMS_hvBusStatus
+    if (frame.id == 658) { handleBMSSOC(frame);     return; }  // 0x292 BMS_socStatus
+    if (frame.id == 786) { handleBMSThermal(frame); return; }  // 0x312 BMS_thermalStatus
+
+    // Pause all CAN modifications during Tesla OTA update
+    if (cfg.otaInProgress) return;
+
     if (!isFilteredId(frame.id)) return;
     switch (cfg.hwMode) {
         case 0: handleLegacy(frame, driver); break;

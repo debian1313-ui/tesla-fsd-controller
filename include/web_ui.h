@@ -108,6 +108,37 @@ select:focus{outline:none;border-color:#38bdf8}
     <span class="row-label" id="iLblCN">强制激活</span>
     <label class="toggle"><input type="checkbox" id="forceActivate" onchange="setVal('forceActivate',this.checked?1:0)"><span class="slider"></span></label>
   </div>
+  <div class="row">
+    <span class="row-label" id="iLblPrecond">电池预热</span>
+    <label class="toggle"><input type="checkbox" id="precond" onchange="setVal('precond',this.checked?1:0)"><span class="slider"></span></label>
+  </div>
+  <div class="row" id="rowHW3Offset" style="display:none">
+    <span class="row-label" id="iLblHW3Off">速度偏移（HW3）</span>
+    <select id="hw3Offset" onchange="setVal('hw3Offset',this.value)">
+      <option value="-1" data-zh="自动" data-en="Auto">自动</option>
+      <option value="0" data-zh="0%" data-en="0%">0%</option>
+      <option value="5" data-zh="5%" data-en="5%">5%</option>
+      <option value="10" data-zh="10%" data-en="10%">10%</option>
+      <option value="15" data-zh="15%" data-en="15%">15%</option>
+      <option value="20" data-zh="20%" data-en="20%">20%</option>
+      <option value="25" data-zh="25%" data-en="25%">25%</option>
+      <option value="30" data-zh="30%" data-en="30%">30%</option>
+      <option value="35" data-zh="35%" data-en="35%">35%</option>
+      <option value="40" data-zh="40%" data-en="40%">40%</option>
+      <option value="45" data-zh="45%" data-en="45%">45%</option>
+      <option value="50" data-zh="50%" data-en="50%">50%</option>
+      <option value="55" data-zh="55%" data-en="55%">55%</option>
+      <option value="60" data-zh="60%" data-en="60%">60%</option>
+      <option value="65" data-zh="65%" data-en="65%">65%</option>
+      <option value="70" data-zh="70%" data-en="70%">70%</option>
+      <option value="75" data-zh="75%" data-en="75%">75%</option>
+      <option value="80" data-zh="80%" data-en="80%">80%</option>
+      <option value="85" data-zh="85%" data-en="85%">85%</option>
+      <option value="90" data-zh="90%" data-en="90%">90%</option>
+      <option value="95" data-zh="95%" data-en="95%">95%</option>
+      <option value="100" data-zh="100%" data-en="100%">100%</option>
+    </select>
+  </div>
 </div>
 
 <div class="card">
@@ -120,6 +151,11 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
+  <div class="status-row" id="rowOTA" style="display:none"><span id="iLblOTA">OTA 升级中</span><span style="color:#f59e0b;font-weight:700" id="sOTA">⚠️ 暂停注入</span></div>
+  <div class="status-row" id="rowBMS" style="display:none">
+    <span id="iLblBMS">电池</span>
+    <span id="sBMS" style="color:#38bdf8;font-weight:600;font-size:13px">--</span>
+  </div>
   <div class="status-row"><span id="iLblVer">固件版本</span><span id="sVer" style="color:#64748b;font-weight:600">--</span></div>
 </div>
 
@@ -164,11 +200,13 @@ var T={
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
     hwHint:'HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3',
     cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
+    lblHW3Off:'速度偏移（HW3）',lblOTA:'OTA 升级中',lblPrecond:'电池预热',lblBMS:'电池',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
     wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空'},
   en:{title:'FSD Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
     lblISA:'ISA Chime Suppress',lblEmg:'Emergency Detection',lblCN:'Force Activate',
+    lblHW3Off:'HW3 Speed Offset',lblOTA:'OTA In Progress',lblPrecond:'Battery Preheat',lblBMS:'Battery',
     lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
     lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
@@ -196,6 +234,10 @@ function applyLang(){
   document.getElementById('iLblISA').textContent=t.lblISA;
   document.getElementById('iLblEmg').textContent=t.lblEmg;
   document.getElementById('iLblCN').textContent=t.lblCN;
+  document.getElementById('iLblHW3Off').textContent=t.lblHW3Off;
+  document.getElementById('iLblOTA').textContent=t.lblOTA;
+  document.getElementById('iLblPrecond').textContent=t.lblPrecond;
+  document.getElementById('iLblBMS').textContent=t.lblBMS;
   document.getElementById('iLblMod').textContent=t.lblMod;
   document.getElementById('iLblRX').textContent=t.lblRX;
   document.getElementById('iLblErr').textContent=t.lblErr;
@@ -241,6 +283,19 @@ function poll(){
     document.getElementById('isaChime').checked=!!d.isaChime;
     document.getElementById('emergencyDet').checked=!!d.emergencyDet;
     document.getElementById('forceActivate').checked=!!d.forceActivate;
+    var hw3OffEl=document.getElementById('hw3Offset');
+    if(hw3OffEl)hw3OffEl.value=String(d.hw3Offset!=null?d.hw3Offset:-1);
+    document.getElementById('precond').checked=!!d.precond;
+    document.getElementById('rowOTA').style.display=d.otaInProgress?'':'none';
+    if(d.bmsSeen){
+      var bmsRow=document.getElementById('rowBMS');
+      bmsRow.style.display='';
+      var soc=d.bmsSoc!=null?d.bmsSoc.toFixed(1)+'%':'--';
+      var volt=d.bmsV!=null?d.bmsV.toFixed(1)+'V':'--';
+      var tmin=d.bmsMinT!=null?d.bmsMinT+'°C':'--';
+      var tmax=d.bmsMaxT!=null?d.bmsMaxT+'°C':'--';
+      document.getElementById('sBMS').textContent=soc+' '+volt+' '+tmin+'~'+tmax;
+    }
     if(d.apSSID&&!wifiSSIDLoaded){document.getElementById('wifiSSID').value=d.apSSID;wifiSSIDLoaded=true;}
     if(d.version)document.getElementById('sVer').textContent='v'+d.version;
     if(d.dbg&&d.dbg.captured&&!document.getElementById('dbgCard')){
@@ -293,6 +348,8 @@ function updateSpeedOptions(hwMode){
   });
   // If current selection is now invalid, clamp to 2
   if(!isHW4&&parseInt(sel.value)>2){sel.value='2';setVal('speedProfile',2);}
+  // Show HW3 offset row only for HW3 mode
+  document.getElementById('rowHW3Offset').style.display=(hwMode===1)?'':'none';
 }
 function setVal(key,val){fetch('/api/set?'+key+'='+val).catch(()=>{});}
 function doWifi(){
