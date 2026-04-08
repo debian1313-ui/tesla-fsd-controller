@@ -202,6 +202,7 @@ select:focus{outline:none;border-color:#38bdf8}
 
 <script>
 var lang='zh';
+var agreed=false;
 var T={
   zh:{title:'FSD 控制器',cardCtrl:'控制',cardStat:'状态',cardOTA:'固件更新',
     lblFsdEn:'FSD 开关',lblHW:'硬件版本',lblSpeed:'速度模式',lblPMode:'模式来源',
@@ -332,21 +333,20 @@ function poll(){
   }).catch(()=>{});
 }
 var FW_VER=')rawliteral" FIRMWARE_VERSION R"rawliteral(';
-var agreed=false;
 function startApp(){
   agreed=true;
   document.getElementById('disclaimer').style.display='none';
   setInterval(poll,1000);poll();
 }
 function confirmDisclaimer(){
-  localStorage.setItem('disclaimed',FW_VER);
+  try{localStorage.setItem('disclaimed',FW_VER);}catch(e){}
   startApp();
 }
 function rejectDisclaimer(){
   document.getElementById('disclaimerBtns').style.display='none';
   document.getElementById('disclaimerRejected').style.display='block';
 }
-if(localStorage.getItem('disclaimed')===FW_VER){startApp();}
+try{if(localStorage.getItem('disclaimed')===FW_VER){startApp();}}catch(e){}
 var wifiSSIDLoaded=false;
 function updateSpeedOptions(hwMode){
   // HW3/Legacy: 3 profiles (0-2) with different labels than HW4
