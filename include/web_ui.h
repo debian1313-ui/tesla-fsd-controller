@@ -310,8 +310,8 @@ function poll(){
     if(d.bmsSeen){
       var bmsRow=document.getElementById('rowBMS');
       bmsRow.style.display='';
-      var soc=d.bmsSoc!=null?d.bmsSoc.toFixed(1)+'%':'--';
-      var volt=d.bmsV!=null?d.bmsV.toFixed(1)+'V':'--';
+      var soc=d.bmsSoc!=null?(d.bmsSoc/10).toFixed(1)+'%':'--';
+      var volt=d.bmsV!=null?(d.bmsV/100).toFixed(1)+'V':'--';
       var tmin=d.bmsMinT!=null?d.bmsMinT+'°C':'--';
       var tmax=d.bmsMaxT!=null?d.bmsMaxT+'°C':'--';
       document.getElementById('sBMS').textContent=soc+' '+volt+' '+tmin+'~'+tmax;
