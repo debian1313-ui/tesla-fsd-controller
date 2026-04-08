@@ -59,6 +59,21 @@ select:focus{outline:none;border-color:#38bdf8}
 </head>
 <body>
 
+<div id="disclaimer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#131d32;border-radius:16px;padding:24px;max-width:360px;width:100%;border:1px solid #ef4444">
+    <div style="color:#ef4444;font-weight:700;font-size:16px;margin-bottom:14px">⚠️ 免责声明</div>
+    <div style="font-size:13px;color:#94a3b8;line-height:1.8;margin-bottom:20px">
+      本工具<b style="color:#e2e8f0">仅限技术探讨</b>，<b style="color:#ef4444">严禁用于实际道路行驶</b>。<br><br>
+      操作涉及修改车辆 CAN 总线协议，可能导致：<br>
+      · 硬件损毁<br>
+      · 质量保修失效<br>
+      · 人身及财产安全事故<br><br>
+      <b style="color:#f59e0b">所有风险与法律责任由使用者自行承担，与开发者无关。</b>
+    </div>
+    <button onclick="confirmDisclaimer()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:13px;width:100%;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px">我已了解，仅用于技术探讨</button>
+  </div>
+</div>
+
 <div class="title-wrap">
   <h1 id="iTitle">FSD 控制器</h1>
   <button class="lang-btn" id="iLangBtn" onclick="toggleLang()">EN</button>
@@ -78,6 +93,7 @@ select:focus{outline:none;border-color:#38bdf8}
       <option value="2" selected>HW4</option>
     </select>
     <div id="iHWHint" style="width:100%;font-size:11px;color:#64748b;padding:2px 0">HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3</div>
+    <div id="iHWAuto" style="width:100%;font-size:11px;color:#22c55e;padding:2px 0;display:none">✓ 已从 CAN 总线自动识别</div>
   </div>
   <div class="row">
     <span class="row-label" id="iLblSpeed">速度模式</span>
@@ -127,16 +143,6 @@ select:focus{outline:none;border-color:#38bdf8}
       <option value="40" data-zh="40%" data-en="40%">40%</option>
       <option value="45" data-zh="45%" data-en="45%">45%</option>
       <option value="50" data-zh="50%" data-en="50%">50%</option>
-      <option value="55" data-zh="55%" data-en="55%">55%</option>
-      <option value="60" data-zh="60%" data-en="60%">60%</option>
-      <option value="65" data-zh="65%" data-en="65%">65%</option>
-      <option value="70" data-zh="70%" data-en="70%">70%</option>
-      <option value="75" data-zh="75%" data-en="75%">75%</option>
-      <option value="80" data-zh="80%" data-en="80%">80%</option>
-      <option value="85" data-zh="85%" data-en="85%">85%</option>
-      <option value="90" data-zh="90%" data-en="90%">90%</option>
-      <option value="95" data-zh="95%" data-en="95%">95%</option>
-      <option value="100" data-zh="100%" data-en="100%">100%</option>
     </select>
   </div>
 </div>
@@ -277,6 +283,7 @@ function poll(){
     fsdEl.className=d.fsdTriggered?'status-yes':'status-no';
     document.getElementById('fsdEnable').checked=!!d.fsdEnable;
     document.getElementById('hwMode').value=d.hwMode;
+    document.getElementById('iHWAuto').style.display=d.hwAutoDetected?'':'none';
     updateSpeedOptions(d.hwMode);
     document.getElementById('speedProfile').value=d.speedProfile;
     document.getElementById('profileMode').value=d.profileMode?'1':'0';
@@ -314,6 +321,13 @@ function poll(){
       b30.style.color=d.dbg.bit30===1?'#ef4444':'#22c55e';
     }
   }).catch(()=>{});
+}
+function confirmDisclaimer(){
+  sessionStorage.setItem('disclaimed','1');
+  document.getElementById('disclaimer').style.display='none';
+}
+if(sessionStorage.getItem('disclaimed')){
+  document.getElementById('disclaimer').style.display='none';
 }
 var wifiSSIDLoaded=false;
 setInterval(poll,1000);poll();

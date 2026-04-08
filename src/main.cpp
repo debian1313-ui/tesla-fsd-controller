@@ -100,7 +100,7 @@ void setupWebServer() {
             "\"canOK\":%s,\"fsdTriggered\":%s,\"otaInProgress\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
-            "\"hw3Offset\":%d,\"precond\":%d,"
+            "\"hw3Offset\":%d,\"precond\":%d,\"hwAutoDetected\":%d,"
             "\"bmsSeen\":%s,\"bmsV\":%.2f,\"bmsA\":%.1f,\"bmsSoc\":%.1f,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
@@ -118,6 +118,7 @@ void setupWebServer() {
             (int)cfg.forceActivate,
             (int)cfg.hw3OffsetManual,
             (int)cfg.precondition,
+            (int)cfg.hwAutoDetected,
             cfg.bmsSeen ? "true" : "false",
             cfg.packVoltage_cV * 0.01f,
             cfg.packCurrent_dA * 0.1f,
@@ -179,7 +180,7 @@ void setupWebServer() {
         }
         if (req->hasParam("hw3Offset")) {
             int v = req->getParam("hw3Offset")->value().toInt();
-            if (v == -1 || (v >= 0 && v <= 100)) { cfg.hw3OffsetManual = v; changed = true; }
+            if (v == -1 || (v >= 0 && v <= 50)) { cfg.hw3OffsetManual = v; changed = true; }
         }
         if (req->hasParam("precond")) {
             cfg.precondition = req->getParam("precond")->value().toInt() != 0;

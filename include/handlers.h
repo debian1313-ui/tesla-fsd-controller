@@ -18,6 +18,7 @@ struct FSDConfig {
     volatile int      hw3OffsetManual    = -1;     // -1=auto(from CAN), 0-100=user override (%)
     volatile bool     otaInProgress      = false;  // true when Tesla OTA update detected
     volatile bool     precondition       = false;  // trigger battery preheating via 0x082
+    volatile bool     hwAutoDetected    = false;  // true once HW version auto-detected from 0x398
 
     // BMS (read-only sniff)
     volatile bool     bmsSeen           = false;
@@ -146,7 +147,7 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
         auto index = readMuxID(frame);
         if (index == 0) cfg.fsdTriggered = cfg.forceActivate || isFSDSelectedInUI(frame);
         if (index == 0 && cfg.fsdTriggered && cfg.fsdEnable) {
-            cfg.hw3SpeedOffset = std::max(std::min(((int)((frame.data[3] >> 1) & 0x3F) - 30) * 5, 100), 0);
+            cfg.hw3SpeedOffset = std::max(std::min(((int)((frame.data[3] >> 1) & 0x3F) - 30) * 5, 50), 0);
             setBit(frame, 46, true);
             setSpeedProfileV12V13(frame, cfg.speedProfile);
             if (driver.send(frame)) cfg.modifiedCount++;
@@ -225,6 +226,15 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
 // ── Unified dispatch ──
 static void handleMessage(CanFrame& frame, CanDriver& driver) {
     cfg.rxCount++;
+
+    // HW auto-detection: GTW_carConfig 0x398 (920)
+    // byte[0] bits 6-7: 2=HW3, 3=HW4. Legacy cars won't send this frame.
+    if (frame.id == 920) {
+        uint8_t das_hw = (frame.data[0] >> 6) & 0x03;
+        if (das_hw == 2) { cfg.hwMode = 1; cfg.hwAutoDetected = true; }
+        else if (das_hw == 3) { cfg.hwMode = 2; cfg.hwAutoDetected = true; }
+        return;
+    }
 
     // OTA detection: GTW_carState 0x318
     // byte[6] bits 0-1: GTW_updateInProgress. Any non-zero = OTA active.
