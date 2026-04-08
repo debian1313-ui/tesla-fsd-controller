@@ -15,8 +15,8 @@
 #include "can_frame_types.h"
 #include "drivers/twai_driver.h"
 #include "handlers.h"
-#include "web_ui.h"
 #include "version.h"
+#include "web_ui.h"
 
 // ── WiFi AP config (NVS-overridable) ──
 static char apSSID[33] = "FSD-Controller";

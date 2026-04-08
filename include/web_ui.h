@@ -87,7 +87,7 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="card-title" id="iCardCtrl">控制</div>
   <div class="row">
     <span class="row-label" id="iLblFsdEn">FSD 开关</span>
-    <label class="toggle"><input type="checkbox" id="fsdEnable" checked onchange="setVal('fsdEnable',this.checked?1:0)"><span class="slider"></span></label>
+    <label class="toggle"><input type="checkbox" id="fsdEnable" onchange="setVal('fsdEnable',this.checked?1:0)"><span class="slider"></span></label>
   </div>
   <div class="row" style="flex-wrap:wrap;gap:4px">
     <span class="row-label" id="iLblHW">硬件版本</span>
@@ -326,15 +326,23 @@ function poll(){
     }
   }).catch(()=>{});
 }
-function confirmDisclaimer(){
+var FW_VER=')rawliteral" FIRMWARE_VERSION R"rawliteral(';
+var agreed=false;
+function startApp(){
+  agreed=true;
   document.getElementById('disclaimer').style.display='none';
+  setInterval(poll,1000);poll();
+}
+function confirmDisclaimer(){
+  localStorage.setItem('disclaimed',FW_VER);
+  startApp();
 }
 function rejectDisclaimer(){
   document.getElementById('disclaimerBtns').style.display='none';
   document.getElementById('disclaimerRejected').style.display='block';
 }
+if(localStorage.getItem('disclaimed')===FW_VER){startApp();}
 var wifiSSIDLoaded=false;
-setInterval(poll,1000);poll();
 function updateSpeedOptions(hwMode){
   // HW3/Legacy: 3 profiles (0-2) with different labels than HW4
   // HW4: 5 profiles (0-4) — Sloth/Chill/Standard/Hurry/Mad Max
@@ -369,7 +377,7 @@ function updateSpeedOptions(hwMode){
   // Show HW3 offset row only for HW3 mode
   document.getElementById('rowHW3Offset').style.display=(hwMode===1)?'':'none';
 }
-function setVal(key,val){fetch('/api/set?'+key+'='+val).catch(()=>{});}
+function setVal(key,val){if(!agreed)return;fetch('/api/set?'+key+'='+val).catch(()=>{});}
 function doWifi(){
   var t=T[lang];
   var ssid=document.getElementById('wifiSSID').value.trim();
