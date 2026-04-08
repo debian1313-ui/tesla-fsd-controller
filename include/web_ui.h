@@ -195,6 +195,11 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="msg" id="otaMsg"></div>
 </div>
 
+<div style="text-align:center;padding:20px 0 8px;font-size:11px;color:#334155;line-height:1.8">
+  本软件完全免费开源，如有人向你收费请勿上当<br>
+  <a href="https://github.com/wjsall/tesla-fsd-controller" style="color:#334155;text-decoration:none">github.com/wjsall/tesla-fsd-controller</a>
+</div>
+
 <script>
 var lang='zh';
 var T={
