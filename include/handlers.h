@@ -18,7 +18,7 @@ struct FSDConfig {
     volatile int      hw3OffsetManual    = -1;     // -1=auto(from CAN), 0-100=user override (%)
     volatile bool     otaInProgress      = false;  // true when Tesla OTA update detected
     volatile bool     precondition       = false;  // trigger battery preheating via 0x082
-    volatile bool     hwAutoDetected    = false;  // true once HW version auto-detected from 0x398
+    volatile uint8_t  hwDetected        = 0;      // HW detected from 0x398: 0=unknown,1=HW3,2=HW4 (informational only, does NOT override hwMode)
 
     // BMS (read-only sniff)
     volatile bool     bmsSeen           = false;
@@ -227,12 +227,12 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
 static void handleMessage(CanFrame& frame, CanDriver& driver) {
     cfg.rxCount++;
 
-    // HW auto-detection: GTW_carConfig 0x398 (920)
-    // byte[0] bits 6-7: 2=HW3, 3=HW4. Legacy cars won't send this frame.
+    // HW detection: GTW_carConfig 0x398 (920) — informational only, does NOT change hwMode
+    // User must manually select hwMode; this only shows what hardware is detected.
     if (frame.id == 920) {
         uint8_t das_hw = (frame.data[0] >> 6) & 0x03;
-        if (das_hw == 2) { cfg.hwMode = 1; cfg.hwAutoDetected = true; }
-        else if (das_hw == 3) { cfg.hwMode = 2; cfg.hwAutoDetected = true; }
+        if (das_hw == 2)      cfg.hwDetected = 1;  // HW3 detected
+        else if (das_hw == 3) cfg.hwDetected = 2;  // HW4 detected
         return;
     }
 

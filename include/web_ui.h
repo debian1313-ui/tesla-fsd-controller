@@ -97,7 +97,7 @@ select:focus{outline:none;border-color:#38bdf8}
       <option value="2" selected>HW4</option>
     </select>
     <div id="iHWHint" style="width:100%;font-size:11px;color:#64748b;padding:2px 0">HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3</div>
-    <div id="iHWAuto" style="width:100%;font-size:11px;color:#22c55e;padding:2px 0;display:none">✓ 已从 CAN 总线自动识别</div>
+    <div id="iHWAuto" style="width:100%;font-size:11px;color:#22c55e;padding:2px 0;display:none"></div>
   </div>
   <div class="row">
     <span class="row-label" id="iLblSpeed">速度模式</span>
@@ -293,7 +293,10 @@ function poll(){
     fsdEl.className=d.fsdTriggered?'status-yes':'status-no';
     document.getElementById('fsdEnable').checked=!!d.fsdEnable;
     document.getElementById('hwMode').value=d.hwMode;
-    document.getElementById('iHWAuto').style.display=d.hwAutoDetected?'':'none';
+    var hwAutoEl=document.getElementById('iHWAuto');
+    if(d.hwDetected===1){hwAutoEl.textContent='CAN 检测到：HW3';hwAutoEl.style.display='';}
+    else if(d.hwDetected===2){hwAutoEl.textContent='CAN 检测到：HW4';hwAutoEl.style.display='';}
+    else{hwAutoEl.style.display='none';}
     updateSpeedOptions(d.hwMode);
     document.getElementById('speedProfile').value=d.speedProfile;
     document.getElementById('profileMode').value=d.profileMode?'1':'0';

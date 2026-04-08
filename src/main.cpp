@@ -100,7 +100,7 @@ void setupWebServer() {
             "\"canOK\":%s,\"fsdTriggered\":%s,\"otaInProgress\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
-            "\"hw3Offset\":%d,\"precond\":%d,\"hwAutoDetected\":%d,"
+            "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
             "\"bmsSeen\":%s,\"bmsV\":%.2f,\"bmsA\":%.1f,\"bmsSoc\":%.1f,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
@@ -118,7 +118,7 @@ void setupWebServer() {
             (int)cfg.forceActivate,
             (int)cfg.hw3OffsetManual,
             (int)cfg.precondition,
-            (int)cfg.hwAutoDetected,
+            (int)cfg.hwDetected,
             cfg.bmsSeen ? "true" : "false",
             cfg.packVoltage_cV * 0.01f,
             cfg.packCurrent_dA * 0.1f,
