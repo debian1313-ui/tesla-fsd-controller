@@ -17,7 +17,9 @@
 // ── Single shared state instance ──────────────────────────────────────────
 // Accessed by Core0 (web/WiFi) and Core1 (CAN task).
 // Individual volatile 32-bit reads/writes are atomic on ESP32 Xtensa.
-static FSDConfig cfg;
+// Defined here (not static) so sub-modules can forward-declare via extern.
+// Safe: this project has a single translation unit (main.cpp). No ODR risk.
+FSDConfig cfg;  // NOLINT(misc-definitions-in-headers)
 
 // Sub-modules (included after cfg is defined so they can use it via extern)
 #include "mod_bms.h"
