@@ -27,8 +27,21 @@ def merge_firmware(source, target, env):
     )
     esptool = os.path.join(piohome, "packages", "tool-esptoolpy", "esptool.py")
 
-    merged_out = os.path.join(project_dir, f"firmware_{env_name}.bin")
-    ota_out    = os.path.join(project_dir, f"firmware_{env_name}_ota.bin")
+    # Read version from version.h
+    version = "unknown"
+    version_h = os.path.join(project_dir, "include", "version.h")
+    if os.path.exists(version_h):
+        with open(version_h) as f:
+            for line in f:
+                if "FIRMWARE_VERSION" in line:
+                    import re
+                    m = re.search(r'"([^"]+)"', line)
+                    if m:
+                        version = m.group(1)
+                    break
+
+    merged_out = os.path.join(project_dir, f"firmware_{env_name}_v{version}.bin")
+    ota_out    = os.path.join(project_dir, f"firmware_{env_name}_v{version}_ota.bin")
 
     # OTA binary = plain app image (no bootloader / partitions)
     shutil.copy(app_bin, ota_out)
