@@ -708,11 +708,11 @@ void setup() {
     // Start web server
     setupWebServer();
 
-    // mDNS — accessible via fsd-controller.local on both AP and LAN
-    if (MDNS.begin("fsd-controller")) {
+    // mDNS — accessible via fsd.local on both AP and LAN
+    if (MDNS.begin("fsd")) {
         MDNS.addService("http", "tcp", 80);
-        Serial.println("mDNS: fsd-controller.local");
-        addDiagLog(0, "mDNS: fsd-controller.local");
+        Serial.println("mDNS: fsd.local");
+        addDiagLog(0, "mDNS: fsd.local");
     } else {
         Serial.println("mDNS: start failed");
         addDiagLog(0, "mDNS start FAILED");

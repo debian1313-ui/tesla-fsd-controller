@@ -209,7 +209,7 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="status-row"><span id="iLblHeap">空闲内存</span><span id="sHeap" style="color:#64748b;font-weight:600">--</span></div>
   <div class="status-row"><span id="iLblVer">固件版本</span><span id="sVer" style="color:#64748b;font-weight:600">--</span></div>
   <div class="status-row" id="rowLanIP" style="display:none"><span id="iLblLanIP">内网 IP</span><span id="sLanIP" style="color:#22c55e;font-weight:600;font-family:monospace">--</span></div>
-  <div class="status-row"><span id="iLblMdns">本地域名</span><span style="color:#38bdf8;font-weight:600;font-family:monospace">fsd-controller.local</span></div>
+  <div class="status-row"><span id="iLblMdns">本地域名</span><span style="color:#38bdf8;font-weight:600;font-family:monospace">fsd.local</span></div>
 </div>
 
 <div class="card">
