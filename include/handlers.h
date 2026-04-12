@@ -109,6 +109,7 @@ inline bool isFilteredId(uint32_t id) {
 // ── Handler: Legacy ──
 static void handleLegacy(CanFrame& frame, CanDriver& driver) {
     if (frame.id == 69 && cfg.profileModeAuto) {
+        if (frame.dlc < 2) return;
         uint8_t pos = frame.data[1] >> 5;
         if      (pos <= 1) cfg.speedProfile = 2;
         else if (pos == 2) cfg.speedProfile = 1;
@@ -116,6 +117,7 @@ static void handleLegacy(CanFrame& frame, CanDriver& driver) {
         return;
     }
     if (frame.id == 1006) {
+        if (frame.dlc < 8) return;
         auto index = readMuxID(frame);
         if (index == 0) cfg.fsdTriggered = cfg.forceActivate || isFSDSelectedInUI(frame);
         if (index == 0 && cfg.fsdTriggered && cfg.fsdEnable) {
@@ -134,6 +136,7 @@ static void handleLegacy(CanFrame& frame, CanDriver& driver) {
 // ── Handler: HW3 ──
 static void handleHW3(CanFrame& frame, CanDriver& driver) {
     if (frame.id == 1016 && cfg.profileModeAuto) {
+        if (frame.dlc < 6) return;
         uint8_t fd = (frame.data[5] & 0b11100000) >> 5;
         switch (fd) {
             case 1: cfg.speedProfile = 2; break;
@@ -143,6 +146,7 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
         return;
     }
     if (frame.id == 1021) {
+        if (frame.dlc < 8) return;
         auto index = readMuxID(frame);
         if (index == 0) cfg.fsdTriggered = cfg.forceActivate || isFSDSelectedInUI(frame);
         if (index == 0 && cfg.fsdTriggered && cfg.fsdEnable) {
@@ -172,6 +176,7 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
 // ── Handler: HW4 ──
 static void handleHW4(CanFrame& frame, CanDriver& driver) {
     if (cfg.isaChimeSuppress && frame.id == 921) {
+        if (frame.dlc < 8) return;
         frame.data[1] |= 0x20;
         uint8_t sum = 0;
         for (int i = 0; i < 7; i++) sum += frame.data[i];
@@ -192,6 +197,7 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
         }
     }
     if (frame.id == 1021) {
+        if (frame.dlc < 8) return;
         auto index = readMuxID(frame);
         if (index == 0) {
             cfg.fsdTriggered = cfg.forceActivate || isFSDSelectedInUI(frame);
@@ -229,6 +235,7 @@ static void handleMessage(CanFrame& frame, CanDriver& driver) {
     // HW detection: GTW_carConfig 0x398 (920) — informational only, does NOT change hwMode
     // User must manually select hwMode; this only shows what hardware is detected.
     if (frame.id == 920) {
+        if (frame.dlc < 1) return;
         uint8_t das_hw = (frame.data[0] >> 6) & 0x03;
         if (das_hw == 2)      cfg.hwDetected = 1;  // HW3 detected
         else if (das_hw == 3) cfg.hwDetected = 2;  // HW4 detected
