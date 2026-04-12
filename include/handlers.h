@@ -4,11 +4,12 @@
 // It owns the single FSDConfig instance and wires up all sub-modules.
 //
 // Module layout:
-//   fsd_config.h   — FSDConfig struct (shared state, no logic)
-//   mod_bms.h      — BMS telemetry parsers (read-only, 0x132/0x292/0x312)
-//   mod_precond.h  — Battery preconditioning frame builder (0x082)
-//   mod_fsd.h      — FSD injection handlers: Legacy/HW3/HW4 + filter tables
-//   handlers.h     — cfg instance + handleMessage dispatch (this file)
+//   fsd_config.h    — FSDConfig struct (shared state, no logic)
+//   mod_bms.h       — BMS telemetry parsers (read-only, 0x132/0x292/0x312)
+//   mod_precond.h   — Battery preconditioning frame builder (0x082)
+//   mod_fsd.h       — FSD injection handlers: Legacy/HW3/HW4 + filter tables
+//   mod_telemetry.h — Ring buffer + parsers: 0x257/0x145/0x118/0x108 (read-only)
+//   handlers.h      — cfg instance + handleMessage dispatch (this file)
 
 #include "fsd_config.h"
 #include "can_frame_types.h"
@@ -25,6 +26,10 @@ FSDConfig cfg;  // NOLINT(misc-definitions-in-headers)
 #include "mod_bms.h"
 #include "mod_precond.h"
 #include "mod_fsd.h"
+#include "mod_telemetry.h"
+#include "mod_lighting.h"
+#include "mod_das_status.h"
+#include "mod_log.h"
 
 // ── Unified dispatch ───────────────────────────────────────────────────────
 // Called for every received CAN frame. Routes to the appropriate module.
@@ -45,6 +50,16 @@ static void handleMessage(CanFrame& frame, CanDriver& driver) {
     if (frame.id == 306) { handleBMSHV(frame);      return; }  // 0x132
     if (frame.id == 658) { handleBMSSOC(frame);     return; }  // 0x292
     if (frame.id == 786) { handleBMSThermal(frame); return; }  // 0x312
+
+    // Telemetry — read-only, opendbc tesla_model3_party.dbc verified signals
+    if (frame.id == 599) { handleSpeed(frame);  return; }  // 0x257 DI_speed (DI_vehicleSpeed)
+    if (frame.id == 325) { handleBrake(frame);  return; }  // 0x145 ESP_status (brake pedal)
+    if (frame.id == 280) { handleGear(frame);   return; }  // 0x118 DI_systemStatus (DI_gear)
+    if (frame.id == 264) { handleTorque(frame); return; }  // 0x108 DI_torque (cmd/actual)
+    if (frame.id == 659) { handleDASSettings(frame);          return; }  // 0x293 DAS_settings
+    if (frame.id == 923) { handleDASStatus(frame);            return; }  // 0x39B DAS_status
+    if (frame.id == 905) { handleDASStatus2(frame);           return; }  // 0x389 DAS_status2
+    if (frame.id == 585) { handleSCCMStalk(frame, driver);    return; }  // 0x249 SCCM_leftStalk
 
     // FSD injection — route to hardware-specific handler
     if (!isFilteredId(frame.id)) return;

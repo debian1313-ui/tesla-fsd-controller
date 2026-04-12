@@ -6,7 +6,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>FSD Controller</title>
+<title>Tesla Controller</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;background:#0b1120;color:#e2e8f0;min-height:100vh;padding:16px}
@@ -55,6 +55,10 @@ select:focus{outline:none;border-color:#38bdf8}
 .save-btn{background:#22c55e;color:#fff;border:none;border-radius:8px;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:10px;letter-spacing:1px}
 .save-btn:hover{background:#16a34a}
 .save-btn:disabled{opacity:.4;cursor:not-allowed}
+.hb-row .row-label{display:flex;flex-direction:column;gap:2px}
+.hb-hint{font-size:11px;color:#64748b;font-weight:400}
+.hb-hint.avail{color:#7a5a18}
+.hb-row .toggle input:disabled+.slider{background:#1e293b;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -92,9 +96,17 @@ select:focus{outline:none;border-color:#38bdf8}
 </div>
 
 <div class="title-wrap">
-  <h1 id="iTitle">FSD 控制器</h1>
+  <h1 id="iTitle">特斯拉控制器</h1>
   <button class="lang-btn" id="iLangBtn" onclick="toggleLang()">EN</button>
 </div>
+
+<button onclick="location.href='/dash'" style="
+  display:block;width:100%;margin-bottom:16px;padding:14px;
+  background:linear-gradient(135deg,#0d4f4f,#0a7a6a);
+  color:#00d4aa;border:1px solid #00d4aa44;border-radius:14px;
+  font-size:15px;font-weight:700;cursor:pointer;letter-spacing:1px;
+  text-align:center;
+" id="iDashBtn">⬤ 仪表盘 · DASHBOARD</button>
 
 <div class="card">
   <div class="card-title" id="iCardCtrl">控制</div>
@@ -124,7 +136,7 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <div class="row">
     <span class="row-label" id="iLblPMode">模式来源</span>
-    <select id="profileMode" onchange="setVal('profileMode',this.value)">
+    <select id="profileMode" onchange="setVal('profileMode',this.value);document.getElementById('speedProfile').disabled=this.value==='1';">
       <option value="1" data-zh="自动（拨杆）" data-en="Auto (Stalk)" selected>自动（拨杆）</option>
       <option value="0" data-zh="手动" data-en="Manual">手动</option>
     </select>
@@ -144,6 +156,18 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="row">
     <span class="row-label" id="iLblPrecond">电池预热</span>
     <label class="toggle"><input type="checkbox" id="precond" onchange="setVal('precond',this.checked?1:0)"><span class="slider"></span></label>
+  </div>
+  <div class="row hb-row">
+    <span class="row-label" id="iLblHB">强制远光<br><span class="hb-hint" id="iHBHint">需开启自适应灯光</span></span>
+    <label class="toggle"><input type="checkbox" id="hbForce" disabled onchange="toggleHighBeam(this.checked)"><span class="slider"></span></label>
+  </div>
+  <div class="row">
+    <span class="row-label" id="iLblAPRestart">AP 自动恢复</span>
+    <label class="toggle"><input type="checkbox" id="apRestart" onchange="setAPRestart(this.checked)"><span class="slider"></span></label>
+  </div>
+  <div class="row" id="rowHW3Cap" style="display:none">
+    <span class="row-label" id="iLblHW3Cap">限速保护（×1.2）</span>
+    <label class="toggle"><input type="checkbox" id="hw3Cap" onchange="setVal('hw3Cap',this.checked?1:0)"><span class="slider"></span></label>
   </div>
   <div class="row" id="rowHW3Offset" style="display:none">
     <span class="row-label" id="iLblHW3Off">速度偏移（HW3）</span>
@@ -181,6 +205,7 @@ select:focus{outline:none;border-color:#38bdf8}
     <span id="iLblBMS">电池 <span style="color:#64748b;font-size:11px">（数据未经车辆验证）</span></span>
     <span id="sBMS" style="color:#38bdf8;font-weight:600;font-size:13px">--</span>
   </div>
+  <div class="status-row"><span id="iLblTimeSync">时间同步</span><span id="sTimeSync" class="status-no">--</span></div>
   <div class="status-row"><span id="iLblHeap">空闲内存</span><span id="sHeap" style="color:#64748b;font-weight:600">--</span></div>
   <div class="status-row"><span id="iLblVer">固件版本</span><span id="sVer" style="color:#64748b;font-weight:600">--</span></div>
 </div>
@@ -207,6 +232,17 @@ select:focus{outline:none;border-color:#38bdf8}
 </div>
 
 <div class="card">
+  <div class="card-title" id="iCardLog">诊断日志</div>
+  <div style="font-size:11px;color:#64748b;padding:4px 0 8px" id="iLblLogNote">掉电清除 · 最近 80 条事件 · 遇到问题请复制发给我们</div>
+  <textarea id="diagLog" readonly style="width:100%;height:160px;background:#0f172a;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:8px;font-size:11px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+  <div style="display:flex;gap:10px;margin-top:8px">
+    <button class="save-btn" id="logCopyBtn" onclick="doLogCopy()" style="flex:3">复制日志</button>
+    <button class="save-btn" id="logClrBtn" onclick="doLogClear()" style="flex:1;background:#334155">清除</button>
+  </div>
+  <div class="msg" id="logMsg"></div>
+</div>
+
+<div class="card">
   <div class="card-title" id="iCardOTA">固件更新</div>
   <div class="ota-row">
     <label class="file-btn" id="iLblFile" for="fwFile">选择文件</label>
@@ -230,7 +266,7 @@ var token='';
 var pinRequired=false;
 try{token=sessionStorage.getItem('fsd_tok')||'';}catch(e){}
 var T={
-  zh:{title:'FSD 控制器',cardCtrl:'控制',cardStat:'状态',cardOTA:'固件更新',
+  zh:{title:'特斯拉控制器',cardCtrl:'控制',cardStat:'状态',cardOTA:'固件更新',
     lblFsdEn:'FSD 开关',lblHW:'硬件版本',lblSpeed:'速度模式',lblPMode:'模式来源',
     lblISA:'限速提示音抑制',lblEmg:'紧急车辆检测',lblCN:'强制激活',
     lblMod:'已修改',lblRX:'已接收',lblErr:'错误',lblUp:'运行时间',
@@ -242,13 +278,20 @@ var T={
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
     hwHint:'HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3',
     cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
-    lblHW3Off:'速度偏移（HW3）',lblPrecond:'电池预热',lblBMS:'电池',
+    lblHW3Cap:'限速保护（×1.2）',lblHW3Off:'速度偏移（HW3）',lblPrecond:'电池预热',lblBMS:'电池',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
-    wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空'},
-  en:{title:'FSD Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
+    wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空',
+    cardLog:'诊断日志',lblLogNote:'掉电清除 · 最近 80 条事件 · 遇到问题请复制发给我们',
+    logCopyBtn:'复制日志',logClrBtn:'清除',logCleared:'已清除',logCopied:'已复制',
+    lblTimeSync:'时间同步',timeSyncOK:'已同步',timeSyncNo:'未同步',
+    lblHB:'强制远光',hbHintOff:'需开启自适应灯光',hbHintOn:'自适应灯光已就绪',
+    lblAPRestart:'AP 自动恢复',
+    hwDetHW3:'CAN 检测到：HW3',hwDetHW4:'CAN 检测到：HW4',
+    hwDetNone:'未自动检测到，请手动选择（2020+ 车型不支持）'},
+  en:{title:'Tesla Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
     lblISA:'ISA Chime Suppress',lblEmg:'Emergency Detection',lblCN:'Force Activate',
-    lblHW3Off:'HW3 Speed Offset',lblPrecond:'Battery Preheat',lblBMS:'Battery',
+    lblHW3Cap:'Speed Limit Guard (×1.2)',lblHW3Off:'HW3 Speed Offset',lblPrecond:'Battery Preheat',lblBMS:'Battery',
     lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
     lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
@@ -259,7 +302,14 @@ var T={
     hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3',
     cardWifi:'WiFi Settings',lblSSID:'AP Name (SSID)',lblPass:'New Password (blank = keep current)',
     wifiSave:'Save & Restart',wifiOK:'Saved, rebooting...',wifiFail:'Save failed: ',
-    wifiPassErr:'Password must be ≥ 8 chars',wifiSSIDErr:'SSID cannot be empty'}
+    wifiPassErr:'Password must be ≥ 8 chars',wifiSSIDErr:'SSID cannot be empty',
+    cardLog:'Diagnostic Log',lblLogNote:'Cleared on power-off · last 80 events · copy and send if issues occur',
+    logCopyBtn:'Copy Log',logClrBtn:'Clear',logCleared:'Cleared',logCopied:'Copied',
+    lblTimeSync:'Time Sync',timeSyncOK:'Synced',timeSyncNo:'Not synced',
+    lblHB:'Force High Beam',hbHintOff:'Requires adaptive lighting',hbHintOn:'Adaptive lighting ready',
+    lblAPRestart:'AP Auto-Resume',
+    hwDetHW3:'CAN detected: HW3',hwDetHW4:'CAN detected: HW4',
+    hwDetNone:'Auto-detect failed — select manually (2020+ vehicles not supported)'}
 };
 function applyLang(){
   var t=T[lang];
@@ -276,6 +326,7 @@ function applyLang(){
   document.getElementById('iLblISA').textContent=t.lblISA;
   document.getElementById('iLblEmg').textContent=t.lblEmg;
   document.getElementById('iLblCN').textContent=t.lblCN;
+  document.getElementById('iLblHW3Cap').textContent=t.lblHW3Cap;
   document.getElementById('iLblHW3Off').textContent=t.lblHW3Off;
   document.getElementById('iLblPrecond').textContent=t.lblPrecond;
   document.getElementById('iLblBMS').textContent=t.lblBMS;
@@ -291,6 +342,13 @@ function applyLang(){
   document.getElementById('iLblSSID').textContent=t.lblSSID;
   document.getElementById('iLblPass').textContent=t.lblPass;
   document.getElementById('wifiSaveBtn').textContent=t.wifiSave;
+  document.getElementById('iLblHB').textContent=t.lblHB;
+  document.getElementById('iLblAPRestart').textContent=t.lblAPRestart;
+  document.getElementById('iLblTimeSync').textContent=t.lblTimeSync;
+  document.getElementById('iCardLog').textContent=t.cardLog;
+  document.getElementById('iLblLogNote').textContent=t.lblLogNote;
+  document.getElementById('logCopyBtn').textContent=t.logCopyBtn;
+  document.getElementById('logClrBtn').textContent=t.logClrBtn;
   document.getElementById('iLblFile').textContent=t.lblFile;
   document.getElementById('uploadBtn').textContent=t.uploadBtn;
   ['speedProfile','profileMode'].forEach(function(id){
@@ -314,17 +372,20 @@ function poll(){
     canEl.textContent=d.canOK?t.canOK:t.canErr;
     canEl.className=d.canOK?'status-ok':'status-err';
     var fsdEl=document.getElementById('sFSD');
-    fsdEl.textContent=d.fsdTriggered?t.fsdYes:t.fsdNo;
-    fsdEl.className=d.fsdTriggered?'status-yes':'status-no';
+    var fsdActive=d.fsdTriggered&&!!d.fsdEnable;
+    fsdEl.textContent=fsdActive?t.fsdYes:t.fsdNo;
+    fsdEl.className=fsdActive?'status-yes':'status-no';
     document.getElementById('fsdEnable').checked=!!d.fsdEnable;
     document.getElementById('hwMode').value=d.hwMode;
     var hwAutoEl=document.getElementById('iHWAuto');
-    if(d.hwDetected===1){hwAutoEl.textContent='CAN 检测到：HW3';hwAutoEl.style.display='';}
-    else if(d.hwDetected===2){hwAutoEl.textContent='CAN 检测到：HW4';hwAutoEl.style.display='';}
+    if(d.hwDetected===1){hwAutoEl.style.color='#22c55e';hwAutoEl.textContent=T[lang].hwDetHW3;hwAutoEl.style.display='';}
+    else if(d.hwDetected===2){hwAutoEl.style.color='#22c55e';hwAutoEl.textContent=T[lang].hwDetHW4;hwAutoEl.style.display='';}
+    else if(d.rxCount>0){hwAutoEl.style.color='#f59e0b';hwAutoEl.textContent=T[lang].hwDetNone;hwAutoEl.style.display='';}
     else{hwAutoEl.style.display='none';}
     updateSpeedOptions(d.hwMode);
     document.getElementById('speedProfile').value=d.speedProfile;
     document.getElementById('profileMode').value=d.profileMode?'1':'0';
+    document.getElementById('speedProfile').disabled=!!d.profileMode;
     document.getElementById('isaChime').checked=!!d.isaChime;
     document.getElementById('emergencyDet').checked=!!d.emergencyDet;
     document.getElementById('forceActivate').checked=!!d.forceActivate;
@@ -352,6 +413,20 @@ function poll(){
     }
     if(d.apSSID&&!wifiSSIDLoaded){document.getElementById('wifiSSID').value=d.apSSID;wifiSSIDLoaded=true;}
     if(d.version)document.getElementById('sVer').textContent='v'+d.version;
+    // AP auto-restart
+    document.getElementById('hw3Cap').checked=!!d.hw3Cap;
+    document.getElementById('apRestart').checked=!!d.apRestart;
+    // High beam control
+    var hbChk=document.getElementById('hbForce');
+    var hbHint=document.getElementById('iHBHint');
+    var adaptAvail=!!d.adaptLighting;
+    hbChk.disabled=!adaptAvail;
+    hbChk.checked=!!d.hbForce;
+    hbHint.textContent=adaptAvail?T[lang].hbHintOn:T[lang].hbHintOff;
+    hbHint.className=adaptAvail?'hb-hint avail':'hb-hint';
+    var tsEl=document.getElementById('sTimeSync');
+    if(d.timeSynced){tsEl.textContent=T[lang].timeSyncOK;tsEl.className='status-ok';}
+    else{tsEl.textContent=T[lang].timeSyncNo;tsEl.className='status-no';}
     if(d.dbg&&d.dbg.captured&&!document.getElementById('dbgCard')){
       var card=document.createElement('div');
       card.className='card';card.id='dbgCard';
@@ -368,15 +443,43 @@ function poll(){
       b30.style.color=d.dbg.bit30===1?'#ef4444':'#22c55e';
     }
   }).catch(()=>{});
+  logPollCount++;
+  if(logPollCount%5===1)refreshDiagLog();
+}
+function setAPRestart(want){
+  fetch('/api/aprestart?en='+(want?'1':'0')+(token?'&token='+token:''))
+    .then(function(r){return r.json();})
+    .then(function(res){if(res.ok)poll();});
+}
+function toggleHighBeam(want){
+  fetch('/api/highbeam?en='+(want?'1':'0')+(token?'&token='+token:''))
+    .then(function(r){return r.json();})
+    .then(function(res){if(res.ok)poll();});
 }
 var FW_VER=')rawliteral" FIRMWARE_VERSION R"rawliteral(';
 var appStarted=false;
+var logPollCount=0;
+function refreshDiagLog(){
+  var url='/api/log'+(token?'?token='+token:'');
+  fetch(url).then(function(r){return r.text();}).then(function(txt){
+    var el=document.getElementById('diagLog');
+    el.value=txt;
+    el.scrollTop=el.scrollHeight;
+  }).catch(function(){});
+}
+function syncTime(){
+  var ts=Math.floor(Date.now()/1000);
+  fetch('/api/time'+(token?'?token='+token:''),{method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'ts='+ts}).catch(function(){});
+}
 function startApp(){
   agreed=true;
   document.getElementById('disclaimer').style.display='none';
   if(appStarted)return;  // poll already running; only skip setInterval, not UI reset
   appStarted=true;
   setInterval(poll,1000);poll();
+  syncTime();  // push browser clock to ESP32 for real timestamps in CSV
 }
 function showPinStep(){
   document.getElementById('disclaimerContent').style.display='none';
@@ -452,7 +555,8 @@ function updateSpeedOptions(hwMode){
   });
   // If current selection is now invalid, clamp to 2
   if(!isHW4&&parseInt(sel.value)>2){sel.value='2';setVal('speedProfile',2);}
-  // Show HW3 offset row only for HW3 mode
+  // Show HW3 rows only for HW3 mode
+  document.getElementById('rowHW3Cap').style.display=(hwMode===1)?'':'none';
   document.getElementById('rowHW3Offset').style.display=(hwMode===1)?'':'none';
 }
 function setVal(key,val){
@@ -496,6 +600,40 @@ function doPin(){
       token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}
     }else{msg.textContent='设置失败（请确认当前已验证）';msg.className='msg err';}
   }).catch(function(){msg.textContent='连接失败';msg.className='msg err';});
+}
+function doLogCopy(){
+  var t=T[lang];
+  var txt=document.getElementById('diagLog').value;
+  var msg=document.getElementById('logMsg');
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(function(){
+      msg.textContent=t.logCopied;msg.className='msg ok';
+      setTimeout(function(){msg.textContent='';},2000);
+    }).catch(function(){
+      msg.textContent='复制失败';msg.className='msg err';
+      setTimeout(function(){msg.textContent='';},2000);
+    });
+  } else {
+    var ta=document.createElement('textarea');
+    ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.focus();ta.select();
+    try{document.execCommand('copy');msg.textContent=t.logCopied;msg.className='msg ok';}
+    catch(e){msg.textContent='复制失败';msg.className='msg err';}
+    document.body.removeChild(ta);
+    setTimeout(function(){msg.textContent='';},2000);
+  }
+}
+function doLogClear(){
+  var t=T[lang];
+  fetch('/api/log/clear'+(token?'?token='+token:''),{method:'POST'})
+  .then(function(r){
+    if(r.ok){
+      document.getElementById('diagLog').value='';
+      var msg=document.getElementById('logMsg');
+      msg.textContent=t.logCleared;msg.className='msg ok';
+      setTimeout(function(){msg.textContent='';},2000);
+    }
+  }).catch(function(){});
 }
 function doOTA(){
   var file=document.getElementById('fwFile').files[0];

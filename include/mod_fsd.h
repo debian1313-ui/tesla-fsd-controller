@@ -109,6 +109,11 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
         }
         if (index == 2 && cfg.fsdTriggered && cfg.fsdEnable) {
             int offset = (cfg.hw3OffsetManual >= 0) ? cfg.hw3OffsetManual : cfg.hw3SpeedOffset;
+            // 20% speed-limit cap: maxOffset = visionSpeedLimit×5×0.2 = visionSpeedLimit (km/h)
+            if (cfg.hw3SpeedCapEnable && cfg.visionSpeedLimit > 0) {
+                int maxOff = (int)cfg.visionSpeedLimit;
+                if (offset > maxOff) offset = maxOff;
+            }
             frame.data[0] &= ~(0b11000000);
             frame.data[1] &= ~(0b00111111);
             frame.data[0] |= (offset & 0x03) << 6;
@@ -144,6 +149,7 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
             case 4: cfg.speedProfile = 0; break;
             case 5: cfg.speedProfile = 4; break;
         }
+        return;
     }
     // 0x3FD (1021) — FSD activation frame (mux 0/1/2)
     if (frame.id == 1021) {

@@ -19,6 +19,7 @@
 #include "handlers.h"
 #include "version.h"
 #include "web_ui.h"
+#include "web_ui_dash.h"
 
 // ── WiFi AP config (NVS-overridable) ──
 static char apSSID[33] = "FSD-Controller";
@@ -30,6 +31,17 @@ static AsyncWebServer server(80);
 static Preferences    prefs;
 static volatile bool  otaPendingRestart = false;
 static bool           safeModeActive    = false;
+
+// ── Time sync (browser-pushed Unix timestamp) ──────────────────────
+static volatile uint32_t timeUnixBase   = 0;   // Unix time at sync point
+static volatile uint32_t timeMillisBase = 0;   // millis() at sync point
+static volatile bool     timeSynced     = false;
+
+// Returns Unix timestamp (when synced) or seconds-since-boot (fallback).
+static inline uint32_t getUnixTime() {
+    if (timeSynced) return timeUnixBase + (millis() - timeMillisBase) / 1000;
+    return (millis() - cfg.uptimeStart) / 1000;
+}
 
 // ── Auth ──────────────────────────────────────────────────────────
 static char sessionToken[17] = {0};  // 16 hex chars, reset on reboot
@@ -68,6 +80,7 @@ void loadConfig() {
     cfg.emergencyDetection = prefs.getBool("emDet", true);
     cfg.forceActivate      = prefs.getBool("cnMode", false);
     cfg.hw3OffsetManual    = prefs.getInt("hw3Off", -1);
+    cfg.hw3SpeedCapEnable  = prefs.getBool("hw3Cap", false);
     cfg.precondition       = prefs.getBool("precond", false);
     strlcpy(apSSID, prefs.getString("apSSID", "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass, prefs.getString("apPass", "12345678").c_str(), sizeof(apPass));
@@ -94,6 +107,7 @@ void saveConfig() {
     prefs.putBool("emDet",   cfg.emergencyDetection);
     prefs.putBool("cnMode",  cfg.forceActivate);
     prefs.putInt("hw3Off",   cfg.hw3OffsetManual);
+    prefs.putBool("hw3Cap",  cfg.hw3SpeedCapEnable);
     prefs.putBool("precond", cfg.precondition);
     prefs.end();
 }
@@ -106,6 +120,11 @@ void setupWebServer() {
     // Serve UI
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
         req->send_P(200, "text/html", INDEX_HTML);
+    });
+
+    // Dashboard page — instrument cluster view (token checked via JS)
+    server.on("/dash", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send_P(200, "text/html", DASH_HTML);
     });
 
     // Status JSON — use %u for uint32_t on ESP32
@@ -122,17 +141,24 @@ void setupWebServer() {
             *dst++ = *src++;
         }
 
-        char buf[1200];
-        static_assert(sizeof(buf) >= 1200, "JSON buffer too small");
+        char buf[1280];
+        static_assert(sizeof(buf) >= 1280, "JSON buffer too small");
         snprintf(buf, sizeof(buf),
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
             "\"canOK\":%s,\"fsdTriggered\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
-            "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
+            "\"hw3Offset\":%d,\"hw3Cap\":%s,\"precond\":%d,\"hwDetected\":%d,"
             "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
             "\"freeHeap\":%u,\"safeMode\":%s,\"pinRequired\":%s,"
+            "\"timeSynced\":%s,"
+            "\"speedD\":%u,\"gearRaw\":%u,\"torqueF\":%d,\"torqueR\":%d,"
+            "\"adaptLighting\":%s,\"hbForce\":%s,"
+            "\"visionLimit\":%u,\"nagLevel\":%u,\"fcw\":%u,\"accState\":%u,\"brake\":%s,"
+            "\"sideCol\":%u,\"laneWarn\":%u,\"laneChg\":%u,"
+            "\"autosteer\":%s,\"aeb\":%s,\"fcwOn\":%s,"
+            "\"apRestart\":%s,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
@@ -146,6 +172,7 @@ void setupWebServer() {
             (int)cfg.emergencyDetection,
             (int)cfg.forceActivate,
             (int)cfg.hw3OffsetManual,
+            cfg.hw3SpeedCapEnable ? "true" : "false",
             (int)cfg.precondition,
             (int)cfg.hwDetected,
             cfg.bmsSeen ? "true" : "false",
@@ -157,6 +184,23 @@ void setupWebServer() {
             (unsigned)esp_get_free_heap_size(),
             safeModeActive ? "true" : "false",
             (storedPin[0] != '\0') ? "true" : "false",
+            timeSynced ? "true" : "false",
+            (unsigned)telemSpeedRaw(), (unsigned)telemGear(),
+            (int)telemTorqueFront(), (int)telemTorqueRear(),
+            cfg.adaptiveLighting ? "true" : "false",
+            cfg.highBeamForce    ? "true" : "false",
+            (unsigned)cfg.visionSpeedLimit,
+            (unsigned)cfg.nagLevel,
+            (unsigned)cfg.fcwLevel,
+            (unsigned)cfg.accState,
+            telemBrake() ? "true" : "false",
+            (unsigned)cfg.sideCollision,
+            (unsigned)cfg.laneDeptWarning,
+            (unsigned)cfg.laneChangeState,
+            cfg.autosteerOn ? "true" : "false",
+            cfg.aebOn       ? "true" : "false",
+            cfg.fcwOn       ? "true" : "false",
+            cfg.apRestart   ? "true" : "false",
             escapedSSID, FIRMWARE_VERSION
         );
 
@@ -243,6 +287,10 @@ void setupWebServer() {
                 cfg.hw3OffsetManual = v; changed = true;
             }
         }
+        if (req->hasParam("hw3Cap")) {
+            bool v = req->getParam("hw3Cap")->value().toInt() != 0;
+            if (v != cfg.hw3SpeedCapEnable) { cfg.hw3SpeedCapEnable = v; changed = true; }
+        }
         if (req->hasParam("precond")) {
             bool v = req->getParam("precond")->value().toInt() != 0;
             if (v != cfg.precondition) { cfg.precondition = v; changed = true; }
@@ -277,6 +325,61 @@ void setupWebServer() {
         wPrefs.end();
         req->send(200, "text/plain", "OK");
         otaPendingRestart = true;
+    });
+
+    // Time sync — browser pushes its Unix timestamp so CSV rows carry real time
+    server.on("/api/time", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        if (!req->hasParam("ts", true)) { req->send(400, "text/plain", "Missing ts"); return; }
+        uint32_t ts = (uint32_t)req->getParam("ts", true)->value().toInt();
+        if (ts < 1700000000UL) { req->send(400, "text/plain", "Invalid"); return; }
+        timeUnixBase   = ts;
+        timeMillisBase = millis();
+        timeSynced     = true;
+        req->send(200, "text/plain", "OK");
+    });
+
+    // Diagnostic log — stream all entries as plain text (GET) or clear (POST /api/log/clear)
+    server.on("/api/log", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        AsyncResponseStream* resp = req->beginResponseStream("text/plain; charset=utf-8");
+        uint16_t cnt = diagLogCount();
+        if (cnt == 0) {
+            resp->print("(no log entries)\n");
+        } else {
+            for (uint16_t i = 0; i < cnt; i++) {
+                resp->print(diagLogAt(i));
+                resp->print('\n');
+            }
+        }
+        req->send(resp);
+    });
+
+    server.on("/api/log/clear", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        diagLogClear();
+        req->send(200, "text/plain", "OK");
+    });
+
+    // High beam force — only activatable when adaptive lighting is detected on bus
+    server.on("/api/highbeam", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        if (!req->hasParam("en")) { req->send(400, "text/plain", "Missing en"); return; }
+        bool en = req->getParam("en")->value().toInt() != 0;
+        if (en && !cfg.adaptiveLighting) {
+            req->send(200, "application/json", "{\"ok\":false,\"reason\":\"not_adaptive\"}");
+            return;
+        }
+        cfg.highBeamForce = en;
+        req->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    // AP auto-restart toggle
+    server.on("/api/aprestart", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        if (!req->hasParam("en")) { req->send(400, "text/plain", "Missing en"); return; }
+        cfg.apRestart = req->getParam("en")->value().toInt() != 0;
+        req->send(200, "application/json", "{\"ok\":true}");
     });
 
     // OTA firmware upload — flag-based restart (no delay in async context)
@@ -327,6 +430,16 @@ void canTask(void* param) {
     uint32_t precondTick  = 0;
     uint32_t busOffTick   = 0;
     uint32_t normalTick   = 0;   // counts up after init; clears crash counter at 10s
+    uint32_t logTick      = 0;   // counts up to 1000ms for 1 Hz event log check
+    uint8_t  prevAccState = 0;   // tracks AP state transitions for auto-restart
+
+    // Diagnostic log — state tracking for transition detection
+    bool     log_prevCanOK     = false;
+    bool     log_prevFsdEnable = cfg.fsdEnable;
+    bool     log_prevFsdTrig   = false;
+    bool     log_prevHB        = false;
+    uint32_t log_prevErrCount  = 0;
+    uint32_t log_fsdModAt      = 0;   // modifiedCount when FSD last triggered
 
     for (;;) {
         // Feed watchdog — if this task hangs, ESP32 resets after 5s
@@ -341,6 +454,7 @@ void canTask(void* param) {
                     busOffTick = 0;
                     twai_initiate_recovery();
                     Serial.println("[CAN] Bus-Off recovery initiated");
+                    addDiagLog((millis() - cfg.uptimeStart) / 1000, "CAN BUS-OFF recovery");
                 }
             } else if (twaiStatus.state == TWAI_STATE_RUNNING) {
                 busOffTick = 0;
@@ -355,6 +469,17 @@ void canTask(void* param) {
             handleMessage(frame, canDriver);
         }
 
+        // ── AP auto-restart on disengage ──────────────────────────────
+        if (prevAccState > 0 && cfg.accState == 0 && cfg.canOK) {
+            tryAPRestart(canDriver);
+            if (cfg.apRestart) {
+                uint32_t up = (millis() - cfg.uptimeStart) / 1000;
+                addDiagLog(up, cfg.apRestartValid ? "AP disengaged -> restart injected"
+                                                  : "AP disengaged -> no cache");
+            }
+        }
+        prevAccState = cfg.accState;
+
         // ── Precondition frame every ~1 s when enabled ─────────────
         if (cfg.precondition && cfg.canOK) {
             if (++precondTick >= 1000) {
@@ -367,11 +492,57 @@ void canTask(void* param) {
             precondTick = 0;
         }
 
+
         // ── Clear crash counter after 10s of normal operation ──────
-        if (++normalTick == 10000) {
+        // Cap at 10001 so this triggers exactly once per boot, not every 49 days
+        if (normalTick < 10001 && ++normalTick == 10000) {
             prefs.begin("sys", false);
             prefs.putInt("crashes", 0);
             prefs.end();
+        }
+
+        // ── Diagnostic log — 1 Hz event transition check ──────────
+        if (++logTick >= 1000) {
+            logTick = 0;
+            uint32_t up = (millis() - cfg.uptimeStart) / 1000;
+            char msg[64];
+
+            if (cfg.canOK != log_prevCanOK) {
+                addDiagLog(up, cfg.canOK ? "CAN OK" : "CAN ERROR");
+                log_prevCanOK = cfg.canOK;
+            }
+            if (cfg.fsdEnable != log_prevFsdEnable) {
+                addDiagLog(up, cfg.fsdEnable ? "FSD enable=ON" : "FSD enable=OFF");
+                log_prevFsdEnable = cfg.fsdEnable;
+            }
+            if (cfg.fsdTriggered != log_prevFsdTrig) {
+                if (cfg.fsdTriggered) {
+                    addDiagLog(up, "FSD triggered");
+                    log_fsdModAt = cfg.modifiedCount;
+                } else {
+                    snprintf(msg, sizeof(msg), "FSD released (injected %u)",
+                             (unsigned)(cfg.modifiedCount - log_fsdModAt));
+                    addDiagLog(up, msg);
+                }
+                log_prevFsdTrig = cfg.fsdTriggered;
+            }
+            if (cfg.highBeamForce != log_prevHB) {
+                if (cfg.highBeamForce) {
+                    snprintf(msg, sizeof(msg), "HB force ON adaptive=%s",
+                             cfg.adaptiveLighting ? "Y" : "N");
+                    addDiagLog(up, msg);
+                } else {
+                    addDiagLog(up, "HB force OFF");
+                }
+                log_prevHB = cfg.highBeamForce;
+            }
+            if (cfg.errorCount > log_prevErrCount) {
+                snprintf(msg, sizeof(msg), "errors +%u total=%u",
+                         (unsigned)(cfg.errorCount - log_prevErrCount),
+                         (unsigned)cfg.errorCount);
+                addDiagLog(up, msg);
+                log_prevErrCount = cfg.errorCount;
+            }
         }
 
         // LED: on during activity, off when idle
@@ -422,6 +593,15 @@ void setup() {
     Serial.printf("Config loaded: HW=%d, Profile=%d\n", cfg.hwMode, cfg.speedProfile);
 
     cfg.uptimeStart = millis();
+
+    // Boot log entry
+    {
+        char bootMsg[64];
+        snprintf(bootMsg, sizeof(bootMsg), "BOOT v%s HW%u fsd=%s",
+                 FIRMWARE_VERSION, (unsigned)cfg.hwMode,
+                 cfg.fsdEnable ? "ON" : "OFF");
+        addDiagLog(0, bootMsg);
+    }
 
     // Init CAN (skip in safe mode)
     if (!safeModeActive) {
