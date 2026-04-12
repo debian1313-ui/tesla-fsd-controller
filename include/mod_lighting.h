@@ -1,11 +1,12 @@
 #pragma once
 // ── Module: Adaptive lighting guard + high beam force ────────────────────────
 // Reads DAS_settings (0x293/659) to detect whether adaptive (auto) headlights
-// are enabled in the car's settings. When enabled and the user activates the
-// high-beam force feature, handleSCCMStalk() intercepts every incoming 0x249
-// frame from the physical SCCM, overwrites bits[5:4] with PUSH (2), and
-// retransmits — so the car sees a sustained PUSH level rather than repeated
-// toggle events (which would cause flickering at 10 Hz).
+// are enabled in the car's settings. handleSCCMStalk() intercepts every 0x249
+// frame and supports two modes:
+//   1. Gesture control: 2 quick PULL taps → force ON; 1 tap → force OFF
+//   2. Web UI toggle: /api/highbeam endpoint sets cfg.highBeamForce directly
+// When force is active, bits[5:4] are overwritten with PUSH (2) so the car
+// sees a sustained PUSH level. Mask 0xCF preserves washWipe and counter bits.
 //
 // Sources: opendbc tesla_model3_party.dbc, flipper-tesla-fsd fsd_handler.c.
 //
@@ -80,13 +81,54 @@ inline void tryAPRestart(CanDriver& driver) {
 // ── SCCM_leftStalk (0x249 / 585) interceptor ─────────────────────────────────
 // Intercepts each physical SCCM frame, optionally modifies stalk state, then
 // retransmits. Always forwards so the car's SCCM watchdog stays happy.
+//
+// Gesture control (requires adaptiveLighting):
+//   Force OFF → 2 quick PULL taps within 700 ms → Force ON
+//   Force ON  → 1 PULL tap                      → Force OFF
+//
+// Bit mask 0xCF = 1100_1111: preserves washWipe bits[7:6] and counter bits[3:0],
+// overwriting only highBeam bits[5:4].
+
+static constexpr uint32_t HB_GESTURE_WINDOW_MS = 700;
+static constexpr uint8_t  HB_GESTURE_TAPS_ON   = 2;
+
+static uint8_t  hbTapCount   = 0;
+static uint32_t hbLastTapMs  = 0;
+static bool     hbPullActive = false;   // true while stalk is held PULL
+
 inline void handleSCCMStalk(CanFrame& frame, CanDriver& driver) {
-    if (cfg.highBeamForce && cfg.adaptiveLighting && frame.dlc >= 3) {
-        // Overwrite stalk position to PUSH (2), keep counter bits intact
-        frame.data[1] = (frame.data[1] & 0x0F) | (2 << 4);
-        // Recalculate CRC
-        frame.data[0] = (uint8_t)(((0x249 & 0xFF) + ((0x249 >> 8) & 0xFF) +
-                                    frame.data[1] + frame.data[2]) & 0xFF);
+    if (cfg.adaptiveLighting && frame.dlc >= 3) {
+        uint8_t physHB = (frame.data[1] >> 4) & 0x03;
+        bool isPull = (physHB == 1);
+
+        // Detect rising edge (new tap)
+        if (isPull && !hbPullActive) {
+            uint32_t now = millis();
+            if (now - hbLastTapMs > HB_GESTURE_WINDOW_MS) hbTapCount = 0;
+            hbTapCount++;
+            hbLastTapMs = now;
+
+            uint32_t up = (now - cfg.uptimeStart) / 1000;
+            if (cfg.highBeamForce) {
+                // Any single tap while active → disable
+                cfg.highBeamForce = false;
+                hbTapCount = 0;
+                addDiagLog(up, "HB force: stalk OFF");
+            } else if (hbTapCount >= HB_GESTURE_TAPS_ON) {
+                // Double tap while inactive → enable
+                cfg.highBeamForce = true;
+                hbTapCount = 0;
+                addDiagLog(up, "HB force: stalk ON");
+            }
+        }
+        hbPullActive = isPull;
+
+        // Override outgoing frame if force is active
+        if (cfg.highBeamForce) {
+            frame.data[1] = (frame.data[1] & 0xCF) | (2 << 4);
+            frame.data[0] = (uint8_t)(((0x249 & 0xFF) + ((0x249 >> 8) & 0xFF) +
+                                        frame.data[1] + frame.data[2]) & 0xFF);
+        }
     }
     if (!driver.send(frame)) cfg.errorCount++;
 }
