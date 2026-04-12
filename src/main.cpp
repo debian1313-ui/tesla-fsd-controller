@@ -31,6 +31,25 @@ static Preferences    prefs;
 static volatile bool  otaPendingRestart = false;
 static bool           safeModeActive    = false;
 
+// ── Auth ──────────────────────────────────────────────────────────
+static char sessionToken[17] = {0};  // 16 hex chars, reset on reboot
+static char storedPin[17]    = {0};  // loaded from NVS; empty = no auth
+
+static void generateToken() {
+    uint32_t r1 = esp_random(), r2 = esp_random();
+    snprintf(sessionToken, sizeof(sessionToken), "%08X%08X", r1, r2);
+}
+
+// Returns true if request is authorised.
+// If no PIN is configured, always returns true (open access).
+static bool checkToken(AsyncWebServerRequest* req) {
+    if (storedPin[0] == '\0') return true;           // no PIN set → open
+    if (sessionToken[0] == '\0') return false;        // PIN set but no token yet
+    if (req->hasParam("token") &&
+        req->getParam("token")->value().equals(sessionToken)) return true;
+    return false;
+}
+
 #ifndef PIN_LED
 #define PIN_LED 2   // ESP32 DevKit onboard LED
 #endif
@@ -53,6 +72,12 @@ void loadConfig() {
     strlcpy(apSSID, prefs.getString("apSSID", "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass, prefs.getString("apPass", "12345678").c_str(), sizeof(apPass));
     prefs.end();
+
+    // Load PIN from separate namespace
+    Preferences secPrefs;
+    secPrefs.begin("sec", true);
+    strlcpy(storedPin, secPrefs.getString("pin", "").c_str(), sizeof(storedPin));
+    secPrefs.end();
 
     // Clamp values
     if (cfg.hwMode > 2)       cfg.hwMode = 2;
@@ -107,7 +132,7 @@ void setupWebServer() {
             "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
             "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
-            "\"freeHeap\":%u,\"safeMode\":%s,"
+            "\"freeHeap\":%u,\"safeMode\":%s,\"pinRequired\":%s,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
@@ -131,6 +156,7 @@ void setupWebServer() {
             (int)cfg.battTempMax,
             (unsigned)esp_get_free_heap_size(),
             safeModeActive ? "true" : "false",
+            (storedPin[0] != '\0') ? "true" : "false",
             escapedSSID, FIRMWARE_VERSION
         );
 
@@ -152,8 +178,34 @@ void setupWebServer() {
         req->send(200, "application/json", buf);
     });
 
+    // Auth — validate PIN, return session token
+    server.on("/api/auth", HTTP_POST, [](AsyncWebServerRequest* req) {
+        String pin = req->hasParam("pin", true) ? req->getParam("pin", true)->value() : "";
+        if (strcmp(pin.c_str(), storedPin) == 0) {
+            generateToken();
+            req->send(200, "text/plain", sessionToken);
+        } else {
+            req->send(403, "text/plain", "WRONG");
+        }
+    });
+
+    // Change PIN (requires current token)
+    server.on("/api/pin", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        String newPin = req->hasParam("pin", true) ? req->getParam("pin", true)->value() : "";
+        if (newPin.length() > 16) { req->send(400, "text/plain", "TOO_LONG"); return; }
+        strlcpy(storedPin, newPin.c_str(), sizeof(storedPin));
+        Preferences secPrefs;
+        secPrefs.begin("sec", false);
+        secPrefs.putString("pin", newPin);
+        secPrefs.end();
+        sessionToken[0] = '\0';  // invalidate existing tokens
+        req->send(200, "text/plain", "OK");
+    });
+
     // Set config — with input validation and NVS write-only-on-change
     server.on("/api/set", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         bool changed = false;
 
         if (req->hasParam("fsdEnable")) {
@@ -201,6 +253,7 @@ void setupWebServer() {
 
     // WiFi AP settings — save to NVS then restart
     server.on("/api/wifi", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         if (!req->hasParam("ssid", true)) {
             req->send(400, "text/plain", "Missing ssid");
             return;
@@ -228,12 +281,14 @@ void setupWebServer() {
     // OTA firmware upload — flag-based restart (no delay in async context)
     server.on("/api/ota", HTTP_POST,
         [](AsyncWebServerRequest* req) {
+            if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
             bool ok = !Update.hasError();
             req->send(200, "text/plain", ok ? "OK" : "FAIL");
             if (ok) otaPendingRestart = true;
         },
         [](AsyncWebServerRequest* req, const String& filename,
            size_t index, uint8_t* data, size_t len, bool final) {
+            if (!checkToken(req)) return;  // block unauthorized uploads
             if (index == 0) {
                 Serial.printf("OTA start: %s\n", filename.c_str());
                 if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {

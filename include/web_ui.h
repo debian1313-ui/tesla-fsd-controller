@@ -61,20 +61,33 @@ select:focus{outline:none;border-color:#38bdf8}
 
 <div id="disclaimer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px">
   <div style="background:#131d32;border-radius:16px;padding:24px;max-width:360px;width:100%;border:1px solid #ef4444">
-    <div style="color:#ef4444;font-weight:700;font-size:16px;margin-bottom:14px">⚠️ 免责声明</div>
-    <div style="font-size:13px;color:#94a3b8;line-height:1.8;margin-bottom:20px">
-      本工具<b style="color:#e2e8f0">仅限技术探讨</b>，<b style="color:#ef4444">严禁用于实际道路行驶</b>。<br><br>
-      操作涉及修改车辆 CAN 总线协议，可能导致：<br>
-      · 硬件损毁<br>
-      · 质量保修失效<br>
-      · 人身及财产安全事故<br><br>
-      <b style="color:#f59e0b">所有风险与法律责任由使用者自行承担，与开发者无关。</b>
+    <!-- 步骤1：免责声明 -->
+    <div id="disclaimerContent">
+      <div style="color:#ef4444;font-weight:700;font-size:16px;margin-bottom:14px">⚠️ 免责声明</div>
+      <div style="font-size:13px;color:#94a3b8;line-height:1.8;margin-bottom:20px">
+        本工具<b style="color:#e2e8f0">仅限技术探讨</b>，<b style="color:#ef4444">严禁用于实际道路行驶</b>。<br><br>
+        操作涉及修改车辆 CAN 总线协议，可能导致：<br>
+        · 硬件损毁<br>
+        · 质量保修失效<br>
+        · 人身及财产安全事故<br><br>
+        <b style="color:#f59e0b">所有风险与法律责任由使用者自行承担，与开发者无关。</b>
+      </div>
+      <div id="disclaimerBtns">
+        <button onclick="confirmDisclaimer()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:13px;width:100%;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px;margin-bottom:10px">我已了解，仅用于技术探讨</button>
+        <button onclick="rejectDisclaimer()" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:11px;width:100%;font-size:13px;cursor:pointer">不同意</button>
+      </div>
+      <div id="disclaimerRejected" style="display:none;text-align:center;color:#64748b;font-size:13px;padding:8px 0">您已拒绝，请关闭此页面。</div>
     </div>
-    <div id="disclaimerBtns">
-      <button onclick="confirmDisclaimer()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:13px;width:100%;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px;margin-bottom:10px">我已了解，仅用于技术探讨</button>
-      <button onclick="rejectDisclaimer()" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:11px;width:100%;font-size:13px;cursor:pointer">不同意</button>
+    <!-- 步骤2：PIN 验证（设置了密码才显示）-->
+    <div id="pinStep" style="display:none">
+      <div style="color:#38bdf8;font-weight:700;font-size:16px;margin-bottom:14px">🔒 访问验证</div>
+      <div style="color:#94a3b8;font-size:13px;margin-bottom:14px">请输入访问密码以继续</div>
+      <input type="password" id="pinInput" maxlength="16" placeholder="访问密码"
+        style="width:100%;background:#0b1120;border:1px solid #334155;border-radius:8px;padding:12px;color:#e2e8f0;font-size:15px;margin-bottom:10px;outline:none"
+        onkeydown="if(event.key==='Enter')submitPin()">
+      <button onclick="submitPin()" style="background:#38bdf8;color:#0b1120;border:none;border-radius:8px;padding:13px;width:100%;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">确认</button>
+      <div id="pinError" style="display:none;color:#ef4444;font-size:12px;text-align:center">密码错误，请重试</div>
     </div>
-    <div id="disclaimerRejected" style="display:none;text-align:center;color:#64748b;font-size:13px;padding:8px 0">您已拒绝，请关闭此页面。</div>
   </div>
 </div>
 
@@ -184,6 +197,13 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <button class="save-btn" id="wifiSaveBtn" onclick="doWifi()">保存并重启</button>
   <div class="msg" id="wifiMsg"></div>
+  <div style="margin-top:18px;padding-top:18px;border-top:1px solid #1e293b">
+    <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:12px" id="iLblPinSection">访问密码</div>
+    <div style="color:#64748b;font-size:12px;margin-bottom:10px" id="iLblPinDesc">设置后每次打开页面需要输入密码才能操作。留空则不设密码。</div>
+    <input type="password" id="accessPin" class="text-input" maxlength="16" placeholder="4~16 位，留空=不设密码" style="margin-bottom:10px">
+    <button class="save-btn" id="pinSaveBtn" onclick="doPin()">设置密码</button>
+    <div class="msg" id="pinMsg"></div>
+  </div>
 </div>
 
 <div class="card">
@@ -206,6 +226,9 @@ select:focus{outline:none;border-color:#38bdf8}
 <script>
 var lang='zh';
 var agreed=false;
+var token='';
+var pinRequired=false;
+try{token=sessionStorage.getItem('fsd_tok')||'';}catch(e){}
 var T={
   zh:{title:'FSD 控制器',cardCtrl:'控制',cardStat:'状态',cardOTA:'固件更新',
     lblFsdEn:'FSD 开关',lblHW:'硬件版本',lblSpeed:'速度模式',lblPMode:'模式来源',
@@ -352,14 +375,47 @@ function startApp(){
   document.getElementById('disclaimer').style.display='none';
   setInterval(poll,1000);poll();
 }
+function showPinStep(){
+  document.getElementById('disclaimerContent').style.display='none';
+  document.getElementById('pinStep').style.display='';
+  document.getElementById('disclaimer').style.display='flex';
+  setTimeout(function(){document.getElementById('pinInput').focus();},100);
+}
+function submitPin(){
+  var pin=document.getElementById('pinInput').value;
+  document.getElementById('pinError').style.display='none';
+  fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'pin='+encodeURIComponent(pin)})
+  .then(function(r){if(r.ok)return r.text();throw new Error('wrong');})
+  .then(function(tok){
+    token=tok;
+    try{sessionStorage.setItem('fsd_tok',tok);}catch(e){}
+    startApp();
+  })
+  .catch(function(){
+    document.getElementById('pinError').style.display='block';
+    document.getElementById('pinInput').value='';
+    document.getElementById('pinInput').focus();
+  });
+}
 function confirmDisclaimer(){
   try{localStorage.setItem('disclaimed',FW_VER);}catch(e){}
-  startApp();
+  if(pinRequired&&!token){showPinStep();}else{startApp();}
 }
 function rejectDisclaimer(){
   document.getElementById('disclaimerBtns').style.display='none';
   document.getElementById('disclaimerRejected').style.display='block';
 }
+// On load: pre-fetch status to get pinRequired, then decide flow
+fetch('/api/status').then(function(r){return r.json();}).then(function(d){
+  pinRequired=!!d.pinRequired;
+  var disclaimed=false;
+  try{disclaimed=localStorage.getItem('disclaimed')===FW_VER;}catch(e){}
+  if(disclaimed){
+    if(!pinRequired){startApp();}
+    else if(token){startApp();}  // poll() will catch 403 if token expired
+    else{showPinStep();}
+  }
+}).catch(function(){});
 try{if(localStorage.getItem('disclaimed')===FW_VER){startApp();}}catch(e){}
 var wifiSSIDLoaded=false;
 function updateSpeedOptions(hwMode){
@@ -396,7 +452,11 @@ function updateSpeedOptions(hwMode){
   // Show HW3 offset row only for HW3 mode
   document.getElementById('rowHW3Offset').style.display=(hwMode===1)?'':'none';
 }
-function setVal(key,val){if(!agreed)return;fetch('/api/set?'+key+'='+val).catch(()=>{});}
+function setVal(key,val){
+  if(!agreed)return;
+  var url='/api/set?'+key+'='+val+(token?'&token='+token:'');
+  fetch(url).then(function(r){if(r.status===403){token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}showPinStep();}}).catch(function(){});
+}
 function doWifi(){
   var t=T[lang];
   var ssid=document.getElementById('wifiSSID').value.trim();
@@ -407,7 +467,7 @@ function doWifi(){
   var btn=document.getElementById('wifiSaveBtn');
   btn.disabled=true;
   var body='ssid='+encodeURIComponent(ssid)+(pass.length>=8?'&pass='+encodeURIComponent(pass):'');
-  fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+  fetch('/api/wifi'+(token?'?token='+token:''),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
     .then(r=>r.text()).then(txt=>{
       if(txt==='OK'){msg.textContent=t.wifiOK;msg.className='msg ok';}
       else{msg.textContent=t.wifiFail+txt;msg.className='msg err';btn.disabled=false;}
@@ -418,6 +478,21 @@ function fileChosen(inp){
   if(inp.files[0]){fn.textContent=inp.files[0].name;fn.dataset.hasFile='1';}
   else{delete fn.dataset.hasFile;fn.textContent=T[lang].noFile;}
   document.getElementById('uploadBtn').disabled=!inp.files[0];
+}
+function doPin(){
+  var pin=document.getElementById('accessPin').value;
+  var msg=document.getElementById('pinMsg');
+  if(pin.length>0&&pin.length<4){msg.textContent='密码至少 4 位';msg.className='msg err';return;}
+  fetch('/api/pin'+(token?'?token='+token:''),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'pin='+encodeURIComponent(pin)})
+  .then(function(r){
+    if(r.ok){
+      pinRequired=pin.length>0;
+      msg.textContent=pin?'密码已设置，下次访问需要输入密码':'密码已清除';
+      msg.className='msg ok';
+      document.getElementById('accessPin').value='';
+      token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}
+    }else{msg.textContent='设置失败（请确认当前已验证）';msg.className='msg err';}
+  }).catch(function(){msg.textContent='连接失败';msg.className='msg err';});
 }
 function doOTA(){
   var file=document.getElementById('fwFile').files[0];
@@ -436,7 +511,7 @@ function doOTA(){
   };
   xhr.onerror=function(){msg.textContent=t.otaConn;msg.className='msg err';document.getElementById('uploadBtn').disabled=false;};
   var form=new FormData();form.append('firmware',file);
-  xhr.open('POST','/api/ota');xhr.send(form);
+  xhr.open('POST','/api/ota'+(token?'?token='+token:''));xhr.send(form);
 }
 </script>
 </body>
