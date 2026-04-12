@@ -97,7 +97,7 @@ void setupWebServer() {
         char buf[800];
         snprintf(buf, sizeof(buf),
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
-            "\"canOK\":%s,\"fsdTriggered\":%s,\"otaInProgress\":%s,"
+            "\"canOK\":%s,\"fsdTriggered\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
             "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
@@ -108,7 +108,6 @@ void setupWebServer() {
             (unsigned)cfg.errorCount, (unsigned)uptime,
             cfg.canOK ? "true" : "false",
             cfg.fsdTriggered ? "true" : "false",
-            cfg.otaInProgress ? "true" : "false",
             (int)cfg.fsdEnable,
             (int)cfg.hwMode,
             (int)cfg.speedProfile,
@@ -265,8 +264,8 @@ void canTask(void* param) {
             activity = true;
             handleMessage(frame, canDriver);
         }
-        // Send precondition frame every ~1 s when enabled (and not during OTA)
-        if (cfg.precondition && !cfg.otaInProgress) {
+        // Send precondition frame every ~1 s when enabled
+        if (cfg.precondition) {
             if (++precondTick >= 1000) {
                 precondTick = 0;
                 CanFrame pcFrame;

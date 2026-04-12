@@ -161,7 +161,6 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
-  <div class="status-row" id="rowOTA" style="display:none"><span id="iLblOTA">OTA 升级中</span><span style="color:#f59e0b;font-weight:700" id="sOTA">⚠️ 暂停注入</span></div>
   <div class="status-row" id="rowBMS" style="display:none">
     <span id="iLblBMS">电池</span>
     <span id="sBMS" style="color:#38bdf8;font-weight:600;font-size:13px">--</span>
@@ -216,13 +215,13 @@ var T={
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
     hwHint:'HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3',
     cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
-    lblHW3Off:'速度偏移（HW3）',lblOTA:'OTA 升级中',lblPrecond:'电池预热',lblBMS:'电池',
+    lblHW3Off:'速度偏移（HW3）',lblPrecond:'电池预热',lblBMS:'电池',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
     wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空'},
   en:{title:'FSD Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
     lblISA:'ISA Chime Suppress',lblEmg:'Emergency Detection',lblCN:'Force Activate',
-    lblHW3Off:'HW3 Speed Offset',lblOTA:'OTA In Progress',lblPrecond:'Battery Preheat',lblBMS:'Battery',
+    lblHW3Off:'HW3 Speed Offset',lblPrecond:'Battery Preheat',lblBMS:'Battery',
     lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
     lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
@@ -251,7 +250,6 @@ function applyLang(){
   document.getElementById('iLblEmg').textContent=t.lblEmg;
   document.getElementById('iLblCN').textContent=t.lblCN;
   document.getElementById('iLblHW3Off').textContent=t.lblHW3Off;
-  document.getElementById('iLblOTA').textContent=t.lblOTA;
   document.getElementById('iLblPrecond').textContent=t.lblPrecond;
   document.getElementById('iLblBMS').textContent=t.lblBMS;
   document.getElementById('iLblMod').textContent=t.lblMod;
@@ -306,7 +304,6 @@ function poll(){
     var hw3OffEl=document.getElementById('hw3Offset');
     if(hw3OffEl)hw3OffEl.value=String(d.hw3Offset!=null?d.hw3Offset:-1);
     document.getElementById('precond').checked=!!d.precond;
-    document.getElementById('rowOTA').style.display=d.otaInProgress?'':'none';
     if(d.bmsSeen){
       var bmsRow=document.getElementById('rowBMS');
       bmsRow.style.display='';

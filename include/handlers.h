@@ -15,8 +15,7 @@ struct FSDConfig {
     volatile bool     emergencyDetection  = true;
     volatile bool     forceActivate      = false;  // bypass isFSDSelectedInUI check (regions without TLSSC)
     volatile int      hw3SpeedOffset     = 0;      // cached from mux-0 frame, used in mux-2
-    volatile int      hw3OffsetManual    = -1;     // -1=auto(from CAN), 0-100=user override (%)
-    volatile bool     otaInProgress      = false;  // true when Tesla OTA update detected
+    volatile int      hw3OffsetManual    = -1;     // -1=auto(from CAN), 0-50=user override (%)
     volatile bool     precondition       = false;  // trigger battery preheating via 0x082
     volatile uint8_t  hwDetected        = 0;      // HW detected from 0x398: 0=unknown,1=HW3,2=HW4 (informational only, does NOT override hwMode)
 
@@ -236,20 +235,10 @@ static void handleMessage(CanFrame& frame, CanDriver& driver) {
         return;
     }
 
-    // OTA detection: GTW_carState 0x318
-    // byte[6] bits 0-1: GTW_updateInProgress. Any non-zero = OTA active.
-    if (frame.id == 792) {
-        cfg.otaInProgress = ((frame.data[6] & 0x03) != 0);
-        return;
-    }
-
     // BMS read-only sniff (no transmission)
     if (frame.id == 306) { handleBMSHV(frame);      return; }  // 0x132 BMS_hvBusStatus
     if (frame.id == 658) { handleBMSSOC(frame);     return; }  // 0x292 BMS_socStatus
     if (frame.id == 786) { handleBMSThermal(frame); return; }  // 0x312 BMS_thermalStatus
-
-    // Pause all CAN modifications during Tesla OTA update
-    if (cfg.otaInProgress) return;
 
     if (!isFilteredId(frame.id)) return;
     switch (cfg.hwMode) {
