@@ -227,7 +227,13 @@ select:focus{outline:none;border-color:#38bdf8}
     <div style="color:#64748b;font-size:12px;margin-bottom:10px" id="iLblStaDesc">填写后模块将同时连接路由器，可通过内网 IP 访问，热点仍保留。留空则只用热点。</div>
     <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:8px">
       <span class="row-label" id="iLblStaSSID">路由器 SSID</span>
-      <input type="text" id="staSSID" class="text-input" maxlength="32" placeholder="路由器名称">
+      <div style="display:flex;gap:8px;width:100%">
+        <input type="text" id="staSSID" class="text-input" maxlength="32" placeholder="路由器名称" style="flex:1">
+        <button class="save-btn" id="scanBtn" onclick="doScan()" style="flex:0 0 auto;padding:0 14px;background:#1e40af">扫描</button>
+      </div>
+      <select id="scanList" style="display:none;width:100%;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:13px;margin-top:4px" onchange="scanPick(this)">
+        <option value="" id="iScanPlaceholder">— 选择网络 —</option>
+      </select>
     </div>
     <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:8px">
       <span class="row-label" id="iLblStaPass">路由器密码</span>
@@ -306,6 +312,7 @@ var T={
     lblStaSSID:'路由器 SSID',lblStaPass:'路由器密码',lblStaStatus:'状态：',
     staConnected:'已连接',staDisconnected:'未连接',staSave:'保存并重启',staClear:'断开',
     staOK:'已保存，正在重启...',staFail:'保存失败',
+    scanBtn:'扫描',scanPlaceholder:'— 选择网络 —',scanScanning:'扫描中...',scanFail:'扫描失败',
     cardLog:'诊断日志',lblLogNote:'掉电清除 · 最近 80 条事件 · 遇到问题请复制发给我们',
     logCopyBtn:'复制日志',logClrBtn:'清除',logCleared:'已清除',logCopied:'已复制',
     lblTimeSync:'时间同步',timeSyncOK:'已同步',timeSyncNo:'未同步',
@@ -332,6 +339,7 @@ var T={
     lblStaSSID:'Router SSID',lblStaPass:'Router Password',lblStaStatus:'Status:',
     staConnected:'Connected',staDisconnected:'Not connected',staSave:'Save & Restart',staClear:'Disconnect',
     staOK:'Saved, rebooting...',staFail:'Save failed',
+    scanBtn:'Scan',scanPlaceholder:'— Select network —',scanScanning:'Scanning...',scanFail:'Scan failed',
     cardLog:'Diagnostic Log',lblLogNote:'Cleared on power-off · last 80 events · copy and send if issues occur',
     logCopyBtn:'Copy Log',logClrBtn:'Clear',logCleared:'Cleared',logCopied:'Copied',
     lblTimeSync:'Time Sync',timeSyncOK:'Synced',timeSyncNo:'Not synced',
@@ -378,6 +386,8 @@ function applyLang(){
   document.getElementById('iLblStaStatus').textContent=t.lblStaStatus;
   document.getElementById('staSaveBtn').textContent=t.staSave;
   document.getElementById('staClearBtn').textContent=t.staClear;
+  document.getElementById('scanBtn').textContent=t.scanBtn;
+  document.getElementById('iScanPlaceholder').textContent=t.scanPlaceholder;
   document.getElementById('iLblHB').textContent=t.lblHB;
   document.getElementById('iLblAPRestart').textContent=t.lblAPRestart;
   document.getElementById('iLblTimeSync').textContent=t.lblTimeSync;
@@ -621,6 +631,42 @@ function doWifi(){
       if(txt==='OK'){msg.textContent=t.wifiOK;msg.className='msg ok';}
       else{msg.textContent=t.wifiFail+txt;msg.className='msg err';btn.disabled=false;}
     }).catch(()=>{msg.textContent=t.wifiFail+'connection error';msg.className='msg err';btn.disabled=false;});
+}
+function doScan(){
+  var t=T[lang];
+  var btn=document.getElementById('scanBtn');
+  var list=document.getElementById('scanList');
+  btn.disabled=true;
+  btn.textContent=t.scanScanning;
+  list.style.display='none';
+  fetch('/api/scan'+(token?'?token='+token:''))
+    .then(r=>r.json()).then(function(nets){
+      // Sort by signal strength descending
+      nets.sort(function(a,b){return b.rssi-a.rssi;});
+      // Rebuild options
+      while(list.options.length>1)list.remove(1);
+      nets.forEach(function(n){
+        var o=document.createElement('option');
+        var bars=n.rssi>=-60?'▂▄▆█':n.rssi>=-75?'▂▄▆_':n.rssi>=-85?'▂▄__':'▂___';
+        o.value=n.ssid;
+        o.textContent=bars+' '+n.ssid;
+        list.appendChild(o);
+      });
+      list.value='';
+      list.style.display=nets.length?'':'none';
+      btn.disabled=false;
+      btn.textContent=t.scanBtn;
+    }).catch(function(){
+      var msg=document.getElementById('staMsg');
+      msg.textContent=t.scanFail;msg.className='msg err';
+      setTimeout(function(){msg.textContent='';},2000);
+      btn.disabled=false;
+      btn.textContent=t.scanBtn;
+    });
+}
+function scanPick(sel){
+  if(sel.value)document.getElementById('staSSID').value=sel.value;
+  sel.style.display='none';
 }
 function doSTA(){
   var t=T[lang];

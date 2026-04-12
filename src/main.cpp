@@ -339,6 +339,23 @@ void setupWebServer() {
         otaPendingRestart = true;
     });
 
+    // WiFi scan — returns nearby SSIDs as JSON array
+    server.on("/api/scan", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        int n = WiFi.scanNetworks(/*async=*/false, /*hidden=*/false);
+        String json = "[";
+        for (int i = 0; i < n; i++) {
+            if (i > 0) json += ",";
+            String ssid = WiFi.SSID(i);
+            ssid.replace("\\", "\\\\");
+            ssid.replace("\"", "\\\"");
+            json += "{\"ssid\":\"" + ssid + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+        }
+        json += "]";
+        WiFi.scanDelete();
+        req->send(200, "application/json", json);
+    });
+
     // WiFi STA settings — connect module to router
     server.on("/api/sta", HTTP_POST, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
