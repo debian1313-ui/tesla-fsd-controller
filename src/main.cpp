@@ -25,6 +25,11 @@
 static char apSSID[33] = "FSD-Controller";
 static char apPass[64] = "12345678";
 
+// ── WiFi STA config (connect to router) ──
+static char staSSID[33] = "";
+static char staPass[64] = "";
+static bool staConnected = false;
+
 // ── Globals ──
 static TWAIDriver     canDriver;
 static AsyncWebServer server(80);
@@ -84,6 +89,8 @@ void loadConfig() {
     cfg.precondition       = prefs.getBool("precond", false);
     strlcpy(apSSID, prefs.getString("apSSID", "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass, prefs.getString("apPass", "12345678").c_str(), sizeof(apPass));
+    strlcpy(staSSID, prefs.getString("staSSID", "").c_str(), sizeof(staSSID));
+    strlcpy(staPass, prefs.getString("staPass", "").c_str(), sizeof(staPass));
     prefs.end();
 
     // Load PIN from separate namespace
@@ -159,7 +166,8 @@ void setupWebServer() {
             "\"sideCol\":%u,\"laneWarn\":%u,\"laneChg\":%u,"
             "\"autosteer\":%s,\"aeb\":%s,\"fcwOn\":%s,"
             "\"apRestart\":%s,"
-            "\"apSSID\":\"%s\",\"version\":\"%s\"}",
+            "\"apSSID\":\"%s\",\"staSSID\":\"%s\",\"staIP\":\"%s\",\"staOK\":%s,"
+            "\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
             cfg.canOK ? "true" : "false",
@@ -201,7 +209,11 @@ void setupWebServer() {
             cfg.aebOn       ? "true" : "false",
             cfg.fcwOn       ? "true" : "false",
             cfg.apRestart   ? "true" : "false",
-            escapedSSID, FIRMWARE_VERSION
+            escapedSSID,
+            staSSID,
+            staConnected ? WiFi.localIP().toString().c_str() : "",
+            staConnected ? "true" : "false",
+            FIRMWARE_VERSION
         );
 
 #ifdef DEBUG_MODE
@@ -322,6 +334,28 @@ void setupWebServer() {
         wPrefs.begin("fsd", false);
         wPrefs.putString("apSSID", newSSID);
         if (newPass.length() >= 8) wPrefs.putString("apPass", newPass);
+        wPrefs.end();
+        req->send(200, "text/plain", "OK");
+        otaPendingRestart = true;
+    });
+
+    // WiFi STA settings — connect module to router
+    server.on("/api/sta", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        String newSSID = req->hasParam("ssid", true) ? req->getParam("ssid", true)->value() : "";
+        String newPass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
+        newSSID.trim();
+        Preferences wPrefs;
+        wPrefs.begin("fsd", false);
+        if (newSSID.length() == 0) {
+            // Clear STA config
+            wPrefs.putString("staSSID", "");
+            wPrefs.putString("staPass", "");
+        } else {
+            if (newSSID.length() > 32) { req->send(400, "text/plain", "SSID too long"); wPrefs.end(); return; }
+            wPrefs.putString("staSSID", newSSID);
+            wPrefs.putString("staPass", newPass);
+        }
         wPrefs.end();
         req->send(200, "text/plain", "OK");
         otaPendingRestart = true;
@@ -616,9 +650,28 @@ void setup() {
         cfg.canOK = false;
     }
 
-    // Start WiFi AP
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
+    // Start WiFi — AP always on; optionally also connect to router (STA)
+    if (staSSID[0] != '\0') {
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
+        WiFi.begin(staSSID, staPass[0] ? staPass : nullptr);
+        Serial.printf("WiFi AP+STA: connecting to '%s'...\n", staSSID);
+        uint32_t t0 = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - t0 < 10000) {
+            delay(200);
+        }
+        staConnected = (WiFi.status() == WL_CONNECTED);
+        if (staConnected) {
+            Serial.printf("WiFi STA connected  IP: %s\n", WiFi.localIP().toString().c_str());
+            addDiagLog(0, ("STA connected " + WiFi.localIP().toString()).c_str());
+        } else {
+            Serial.printf("WiFi STA connect failed (AP-only fallback)\n");
+            addDiagLog(0, "STA connect FAILED");
+        }
+    } else {
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
+    }
     Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
     // Start web server

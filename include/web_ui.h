@@ -223,6 +223,27 @@ select:focus{outline:none;border-color:#38bdf8}
   <button class="save-btn" id="wifiSaveBtn" onclick="doWifi()">保存并重启</button>
   <div class="msg" id="wifiMsg"></div>
   <div style="margin-top:18px;padding-top:18px;border-top:1px solid #1e293b">
+    <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:12px" id="iLblStaSection">连接路由器（内网访问）</div>
+    <div style="color:#64748b;font-size:12px;margin-bottom:10px" id="iLblStaDesc">填写后模块将同时连接路由器，可通过内网 IP 访问，热点仍保留。留空则只用热点。</div>
+    <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:8px">
+      <span class="row-label" id="iLblStaSSID">路由器 SSID</span>
+      <input type="text" id="staSSID" class="text-input" maxlength="32" placeholder="路由器名称">
+    </div>
+    <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:8px">
+      <span class="row-label" id="iLblStaPass">路由器密码</span>
+      <input type="password" id="staPass" class="text-input" maxlength="63" placeholder="WiFi 密码">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <span style="font-size:12px;color:#64748b" id="iLblStaStatus">状态：</span>
+      <span style="font-size:12px;font-family:monospace" id="staStatus">--</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="save-btn" id="staSaveBtn" onclick="doSTA()" style="flex:3" id="staSaveBtn">保存并重启</button>
+      <button class="save-btn" id="staClearBtn" onclick="doSTAClear()" style="flex:1;background:#334155">断开</button>
+    </div>
+    <div class="msg" id="staMsg"></div>
+  </div>
+  <div style="margin-top:18px;padding-top:18px;border-top:1px solid #1e293b">
     <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:12px" id="iLblPinSection">访问密码</div>
     <div style="color:#64748b;font-size:12px;margin-bottom:10px" id="iLblPinDesc">设置后每次打开页面需要输入密码才能操作。留空则不设密码。</div>
     <input type="password" id="accessPin" class="text-input" maxlength="16" placeholder="4~16 位，留空=不设密码" style="margin-bottom:10px">
@@ -281,6 +302,10 @@ var T={
     lblHW3Cap:'限速保护（×1.2）',lblHW3Off:'速度偏移（HW3）',lblPrecond:'电池预热',lblBMS:'电池',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
     wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空',
+    lblStaSection:'连接路由器（内网访问）',lblStaDesc:'填写后模块将同时连接路由器，可通过内网 IP 访问，热点仍保留。留空则只用热点。',
+    lblStaSSID:'路由器 SSID',lblStaPass:'路由器密码',lblStaStatus:'状态：',
+    staConnected:'已连接',staDisconnected:'未连接',staSave:'保存并重启',staClear:'断开',
+    staOK:'已保存，正在重启...',staFail:'保存失败',
     cardLog:'诊断日志',lblLogNote:'掉电清除 · 最近 80 条事件 · 遇到问题请复制发给我们',
     logCopyBtn:'复制日志',logClrBtn:'清除',logCleared:'已清除',logCopied:'已复制',
     lblTimeSync:'时间同步',timeSyncOK:'已同步',timeSyncNo:'未同步',
@@ -303,6 +328,10 @@ var T={
     cardWifi:'WiFi Settings',lblSSID:'AP Name (SSID)',lblPass:'New Password (blank = keep current)',
     wifiSave:'Save & Restart',wifiOK:'Saved, rebooting...',wifiFail:'Save failed: ',
     wifiPassErr:'Password must be ≥ 8 chars',wifiSSIDErr:'SSID cannot be empty',
+    lblStaSection:'Connect to Router (LAN access)',lblStaDesc:'Module will also connect to your router — access via LAN IP. Hotspot remains as fallback. Leave blank for hotspot-only.',
+    lblStaSSID:'Router SSID',lblStaPass:'Router Password',lblStaStatus:'Status:',
+    staConnected:'Connected',staDisconnected:'Not connected',staSave:'Save & Restart',staClear:'Disconnect',
+    staOK:'Saved, rebooting...',staFail:'Save failed',
     cardLog:'Diagnostic Log',lblLogNote:'Cleared on power-off · last 80 events · copy and send if issues occur',
     logCopyBtn:'Copy Log',logClrBtn:'Clear',logCleared:'Cleared',logCopied:'Copied',
     lblTimeSync:'Time Sync',timeSyncOK:'Synced',timeSyncNo:'Not synced',
@@ -342,6 +371,13 @@ function applyLang(){
   document.getElementById('iLblSSID').textContent=t.lblSSID;
   document.getElementById('iLblPass').textContent=t.lblPass;
   document.getElementById('wifiSaveBtn').textContent=t.wifiSave;
+  document.getElementById('iLblStaSection').textContent=t.lblStaSection;
+  document.getElementById('iLblStaDesc').textContent=t.lblStaDesc;
+  document.getElementById('iLblStaSSID').textContent=t.lblStaSSID;
+  document.getElementById('iLblStaPass').textContent=t.lblStaPass;
+  document.getElementById('iLblStaStatus').textContent=t.lblStaStatus;
+  document.getElementById('staSaveBtn').textContent=t.staSave;
+  document.getElementById('staClearBtn').textContent=t.staClear;
   document.getElementById('iLblHB').textContent=t.lblHB;
   document.getElementById('iLblAPRestart').textContent=t.lblAPRestart;
   document.getElementById('iLblTimeSync').textContent=t.lblTimeSync;
@@ -412,6 +448,11 @@ function poll(){
       heapEl.style.color=heapColor;
     }
     if(d.apSSID&&!wifiSSIDLoaded){document.getElementById('wifiSSID').value=d.apSSID;wifiSSIDLoaded=true;}
+    if(d.staSSID!=null&&!staSSIDLoaded){document.getElementById('staSSID').value=d.staSSID;staSSIDLoaded=true;}
+    var staEl=document.getElementById('staStatus');
+    if(d.staOK){staEl.textContent=T[lang].staConnected+' '+d.staIP;staEl.style.color='#22c55e';}
+    else if(d.staSSID){staEl.textContent=T[lang].staDisconnected;staEl.style.color='#ef4444';}
+    else{staEl.textContent='--';staEl.style.color='#64748b';}
     if(d.version)document.getElementById('sVer').textContent='v'+d.version;
     // AP auto-restart
     document.getElementById('hw3Cap').checked=!!d.hw3Cap;
@@ -524,6 +565,7 @@ fetch('/api/status').then(function(r){return r.json();}).then(function(d){
 }).catch(function(){});
 try{if(localStorage.getItem('disclaimed')===FW_VER){startApp();}}catch(e){}
 var wifiSSIDLoaded=false;
+var staSSIDLoaded=false;
 function updateSpeedOptions(hwMode){
   // HW3/Legacy: 3 profiles (0-2) with different labels than HW4
   // HW4: 5 profiles (0-4) — Sloth/Chill/Standard/Hurry/Mad Max
@@ -579,6 +621,34 @@ function doWifi(){
       if(txt==='OK'){msg.textContent=t.wifiOK;msg.className='msg ok';}
       else{msg.textContent=t.wifiFail+txt;msg.className='msg err';btn.disabled=false;}
     }).catch(()=>{msg.textContent=t.wifiFail+'connection error';msg.className='msg err';btn.disabled=false;});
+}
+function doSTA(){
+  var t=T[lang];
+  var ssid=document.getElementById('staSSID').value.trim();
+  var pass=document.getElementById('staPass').value;
+  var msg=document.getElementById('staMsg');
+  var btn=document.getElementById('staSaveBtn');
+  btn.disabled=true;
+  var body='ssid='+encodeURIComponent(ssid)+'&pass='+encodeURIComponent(pass);
+  fetch('/api/sta'+(token?'?token='+token:''),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+    .then(r=>r.text()).then(txt=>{
+      if(txt==='OK'){msg.textContent=t.staOK;msg.className='msg ok';}
+      else{msg.textContent=t.staFail+': '+txt;msg.className='msg err';btn.disabled=false;}
+    }).catch(()=>{msg.textContent=t.staFail;msg.className='msg err';btn.disabled=false;});
+}
+function doSTAClear(){
+  var t=T[lang];
+  var msg=document.getElementById('staMsg');
+  var body='ssid=&pass=';
+  fetch('/api/sta'+(token?'?token='+token:''),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+    .then(r=>r.text()).then(txt=>{
+      if(txt==='OK'){
+        document.getElementById('staSSID').value='';
+        document.getElementById('staPass').value='';
+        staSSIDLoaded=false;
+        msg.textContent=t.staOK;msg.className='msg ok';
+      }
+    }).catch(()=>{});
 }
 function fileChosen(inp){
   var fn=document.getElementById('fileName');
