@@ -194,6 +194,7 @@ void setupWebServer() {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         String newPin = req->hasParam("pin", true) ? req->getParam("pin", true)->value() : "";
         if (newPin.length() > 16) { req->send(400, "text/plain", "TOO_LONG"); return; }
+        if (newPin.length() > 0 && newPin.length() < 4) { req->send(400, "text/plain", "TOO_SHORT"); return; }
         strlcpy(storedPin, newPin.c_str(), sizeof(storedPin));
         Preferences secPrefs;
         secPrefs.begin("sec", false);
@@ -399,14 +400,18 @@ void setup() {
         Preferences sysPrefs;
         sysPrefs.begin("sys", false);
         int crashes = sysPrefs.getInt("crashes", 0) + 1;
-        sysPrefs.putInt("crashes", crashes);
-        sysPrefs.end();
         if (crashes >= 3) {
             safeModeActive = true;
-            Serial.printf("[SAFE MODE] crash count=%d, CAN disabled\n", crashes);
+            // Reset counter now so next boot (after reflash) can escape safe mode.
+            // canTask does not run in safe mode, so the counter would never be
+            // cleared by the normal 10 s path — device would be permanently stuck.
+            sysPrefs.putInt("crashes", 0);
         } else {
-            Serial.printf("[Boot] crash count=%d\n", crashes);
+            sysPrefs.putInt("crashes", crashes);
         }
+        sysPrefs.end();
+        Serial.printf(safeModeActive ? "[SAFE MODE] crash count=%d, counter reset, CAN disabled\n"
+                                     : "[Boot] crash count=%d\n", crashes);
     }
 
     // ── Watchdog: 5-second timeout ─────────────────────────────────

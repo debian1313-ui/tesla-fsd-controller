@@ -370,7 +370,10 @@ function poll(){
   }).catch(()=>{});
 }
 var FW_VER=')rawliteral" FIRMWARE_VERSION R"rawliteral(';
+var appStarted=false;
 function startApp(){
+  if(appStarted)return;
+  appStarted=true;
   agreed=true;
   document.getElementById('disclaimer').style.display='none';
   setInterval(poll,1000);poll();
