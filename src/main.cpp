@@ -343,6 +343,18 @@ void setupWebServer() {
     server.on("/api/scan", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         int n = WiFi.scanNetworks(/*async=*/false, /*hidden=*/false);
+        uint32_t up = (millis() - cfg.uptimeStart) / 1000;
+        if (n <= 0) {
+            char logMsg[48];
+            snprintf(logMsg, sizeof(logMsg), "WiFi scan: %d networks (err=%d)", n, n);
+            addDiagLog(up, logMsg);
+            WiFi.scanDelete();
+            req->send(200, "application/json", "[]");
+            return;
+        }
+        char logMsg[48];
+        snprintf(logMsg, sizeof(logMsg), "WiFi scan: %d networks found", n);
+        addDiagLog(up, logMsg);
         String json = "[";
         for (int i = 0; i < n; i++) {
             if (i > 0) json += ",";
@@ -667,12 +679,15 @@ void setup() {
         cfg.canOK = false;
     }
 
-    // Start WiFi — AP always on; optionally also connect to router (STA)
+    // Always use AP+STA mode so WiFi scanning is available even without a router configured
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
+    Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
+
+    // Connect to router if configured
     if (staSSID[0] != '\0') {
-        WiFi.mode(WIFI_AP_STA);
-        WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
         WiFi.begin(staSSID, staPass[0] ? staPass : nullptr);
-        Serial.printf("WiFi AP+STA: connecting to '%s'...\n", staSSID);
+        Serial.printf("WiFi STA: connecting to '%s'...\n", staSSID);
         uint32_t t0 = millis();
         while (WiFi.status() != WL_CONNECTED && millis() - t0 < 10000) {
             delay(200);
@@ -682,14 +697,10 @@ void setup() {
             Serial.printf("WiFi STA connected  IP: %s\n", WiFi.localIP().toString().c_str());
             addDiagLog(0, ("STA connected " + WiFi.localIP().toString()).c_str());
         } else {
-            Serial.printf("WiFi STA connect failed (AP-only fallback)\n");
+            Serial.printf("WiFi STA connect failed\n");
             addDiagLog(0, "STA connect FAILED");
         }
-    } else {
-        WiFi.mode(WIFI_AP);
-        WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
     }
-    Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
     // Start web server
     setupWebServer();
