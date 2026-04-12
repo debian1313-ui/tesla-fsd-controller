@@ -23,13 +23,13 @@
 FSDConfig cfg;  // NOLINT(misc-definitions-in-headers)
 
 // Sub-modules (included after cfg is defined so they can use it via extern)
+#include "mod_log.h"
 #include "mod_bms.h"
 #include "mod_precond.h"
 #include "mod_fsd.h"
 #include "mod_telemetry.h"
 #include "mod_lighting.h"
 #include "mod_das_status.h"
-#include "mod_log.h"
 
 // ── Unified dispatch ───────────────────────────────────────────────────────
 // Called for every received CAN frame. Routes to the appropriate module.
