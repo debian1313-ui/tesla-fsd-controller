@@ -229,9 +229,9 @@ select:focus{outline:none;border-color:#38bdf8}
       <span class="row-label" id="iLblStaSSID">路由器 SSID</span>
       <div style="display:flex;gap:8px;width:100%">
         <input type="text" id="staSSID" class="text-input" maxlength="32" placeholder="路由器名称" style="flex:1">
-        <button class="save-btn" id="scanBtn" onclick="doScan()" style="flex:0 0 auto;padding:0 14px;background:#1e40af">扫描</button>
+        <button id="scanBtn" onclick="doScan()" style="flex:0 0 52px;height:40px;background:#1e40af;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap">扫描</button>
       </div>
-      <select id="scanList" style="display:none;width:100%;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:13px;margin-top:4px" onchange="scanPick(this)">
+      <select id="scanList" style="display:none;width:100%;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:15px;margin-top:4px" onchange="scanPick(this)">
         <option value="" id="iScanPlaceholder">— 选择网络 —</option>
       </select>
     </div>
