@@ -11,6 +11,8 @@
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
 #include <Preferences.h>
+#include <esp_task_wdt.h>
+#include <driver/twai.h>
 
 #include "can_frame_types.h"
 #include "drivers/twai_driver.h"
@@ -27,6 +29,7 @@ static TWAIDriver     canDriver;
 static AsyncWebServer server(80);
 static Preferences    prefs;
 static volatile bool  otaPendingRestart = false;
+static bool           safeModeActive    = false;
 
 #ifndef PIN_LED
 #define PIN_LED 2   // ESP32 DevKit onboard LED
@@ -94,7 +97,8 @@ void setupWebServer() {
             *dst++ = *src++;
         }
 
-        char buf[800];
+        char buf[1200];
+        static_assert(sizeof(buf) >= 1200, "JSON buffer too small");
         snprintf(buf, sizeof(buf),
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
             "\"canOK\":%s,\"fsdTriggered\":%s,"
@@ -103,6 +107,7 @@ void setupWebServer() {
             "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
             "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
+            "\"freeHeap\":%u,\"safeMode\":%s,"
             "\"apSSID\":\"%s\",\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
             (unsigned)cfg.errorCount, (unsigned)uptime,
@@ -124,6 +129,8 @@ void setupWebServer() {
             (unsigned)cfg.socPercent_d,     // ÷10  = %  (done in JS)
             (int)cfg.battTempMin,
             (int)cfg.battTempMax,
+            (unsigned)esp_get_free_heap_size(),
+            safeModeActive ? "true" : "false",
             escapedSSID, FIRMWARE_VERSION
         );
 
@@ -145,45 +152,47 @@ void setupWebServer() {
         req->send(200, "application/json", buf);
     });
 
-    // Set config — with input validation
+    // Set config — with input validation and NVS write-only-on-change
     server.on("/api/set", HTTP_GET, [](AsyncWebServerRequest* req) {
         bool changed = false;
 
         if (req->hasParam("fsdEnable")) {
-            cfg.fsdEnable = req->getParam("fsdEnable")->value().toInt() != 0;
-            changed = true;
+            bool v = req->getParam("fsdEnable")->value().toInt() != 0;
+            if (v != cfg.fsdEnable) { cfg.fsdEnable = v; changed = true; }
         }
         if (req->hasParam("hwMode")) {
             uint8_t v = req->getParam("hwMode")->value().toInt();
-            if (v <= 2) { cfg.hwMode = v; changed = true; }
+            if (v <= 2 && v != cfg.hwMode) { cfg.hwMode = v; changed = true; }
         }
         if (req->hasParam("speedProfile")) {
             uint8_t v = req->getParam("speedProfile")->value().toInt();
-            if (v <= 4) { cfg.speedProfile = v; changed = true; }
+            if (v <= 4 && v != cfg.speedProfile) { cfg.speedProfile = v; changed = true; }
         }
         if (req->hasParam("profileMode")) {
-            cfg.profileModeAuto = req->getParam("profileMode")->value().toInt() != 0;
-            changed = true;
+            bool v = req->getParam("profileMode")->value().toInt() != 0;
+            if (v != cfg.profileModeAuto) { cfg.profileModeAuto = v; changed = true; }
         }
         if (req->hasParam("isaChime")) {
-            cfg.isaChimeSuppress = req->getParam("isaChime")->value().toInt() != 0;
-            changed = true;
+            bool v = req->getParam("isaChime")->value().toInt() != 0;
+            if (v != cfg.isaChimeSuppress) { cfg.isaChimeSuppress = v; changed = true; }
         }
         if (req->hasParam("emergencyDet")) {
-            cfg.emergencyDetection = req->getParam("emergencyDet")->value().toInt() != 0;
-            changed = true;
+            bool v = req->getParam("emergencyDet")->value().toInt() != 0;
+            if (v != cfg.emergencyDetection) { cfg.emergencyDetection = v; changed = true; }
         }
         if (req->hasParam("forceActivate")) {
-            cfg.forceActivate = req->getParam("forceActivate")->value().toInt() != 0;
-            changed = true;
+            bool v = req->getParam("forceActivate")->value().toInt() != 0;
+            if (v != cfg.forceActivate) { cfg.forceActivate = v; changed = true; }
         }
         if (req->hasParam("hw3Offset")) {
             int v = req->getParam("hw3Offset")->value().toInt();
-            if (v == -1 || (v >= 0 && v <= 50)) { cfg.hw3OffsetManual = v; changed = true; }
+            if ((v == -1 || (v >= 0 && v <= 50)) && v != cfg.hw3OffsetManual) {
+                cfg.hw3OffsetManual = v; changed = true;
+            }
         }
         if (req->hasParam("precond")) {
-            cfg.precondition = req->getParam("precond")->value().toInt() != 0;
-            changed = true;
+            bool v = req->getParam("precond")->value().toInt() != 0;
+            if (v != cfg.precondition) { cfg.precondition = v; changed = true; }
         }
 
         if (changed) saveConfig();
@@ -255,17 +264,43 @@ void setupWebServer() {
 // ═══════════════════════════════════════════
 
 void canTask(void* param) {
+    // Register this task with the watchdog (5 second timeout)
+    esp_task_wdt_add(NULL);
+
     CanFrame frame;
-    uint32_t precondTick = 0;
+    uint32_t precondTick  = 0;
+    uint32_t busOffTick   = 0;
+    uint32_t normalTick   = 0;   // counts up after init; clears crash counter at 10s
+
     for (;;) {
+        // Feed watchdog — if this task hangs, ESP32 resets after 5s
+        esp_task_wdt_reset();
+
+        // ── Bus-Off auto-recovery ──────────────────────────────────
+        twai_status_info_t twaiStatus;
+        if (twai_get_status_info(&twaiStatus) == ESP_OK) {
+            if (twaiStatus.state == TWAI_STATE_BUS_OFF) {
+                cfg.canOK = false;
+                if (++busOffTick >= 500) {   // ~500ms in bus-off → trigger recovery
+                    busOffTick = 0;
+                    twai_initiate_recovery();
+                    Serial.println("[CAN] Bus-Off recovery initiated");
+                }
+            } else if (twaiStatus.state == TWAI_STATE_RUNNING) {
+                busOffTick = 0;
+            }
+        }
+
+        // ── Normal frame processing ────────────────────────────────
         bool activity = false;
         while (canDriver.read(frame)) {
             cfg.canOK = true;
             activity = true;
             handleMessage(frame, canDriver);
         }
-        // Send precondition frame every ~1 s when enabled
-        if (cfg.precondition) {
+
+        // ── Precondition frame every ~1 s when enabled ─────────────
+        if (cfg.precondition && cfg.canOK) {
             if (++precondTick >= 1000) {
                 precondTick = 0;
                 CanFrame pcFrame;
@@ -275,9 +310,16 @@ void canTask(void* param) {
         } else {
             precondTick = 0;
         }
+
+        // ── Clear crash counter after 10s of normal operation ──────
+        if (++normalTick == 10000) {
+            prefs.begin("sys", false);
+            prefs.putInt("crashes", 0);
+            prefs.end();
+        }
+
         // LED: on during activity, off when idle
         digitalWrite(PIN_LED, activity ? HIGH : LOW);
-        // Yield to avoid starving watchdog
         vTaskDelay(1);
     }
 }
@@ -295,19 +337,43 @@ void setup() {
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, LOW);
 
+    // ── Crash counter / safe mode ──────────────────────────────────
+    // If the device crashes 3+ times in a row within 10s, enter safe mode
+    // (WiFi only, no CAN) so the user can re-flash firmware.
+    {
+        Preferences sysPrefs;
+        sysPrefs.begin("sys", false);
+        int crashes = sysPrefs.getInt("crashes", 0) + 1;
+        sysPrefs.putInt("crashes", crashes);
+        sysPrefs.end();
+        if (crashes >= 3) {
+            safeModeActive = true;
+            Serial.printf("[SAFE MODE] crash count=%d, CAN disabled\n", crashes);
+        } else {
+            Serial.printf("[Boot] crash count=%d\n", crashes);
+        }
+    }
+
+    // ── Watchdog: 5-second timeout ─────────────────────────────────
+    esp_task_wdt_init(5, true);  // 5s timeout, panic on trigger
+
     // Load saved config from NVS
     loadConfig();
     Serial.printf("Config loaded: HW=%d, Profile=%d\n", cfg.hwMode, cfg.speedProfile);
 
     cfg.uptimeStart = millis();
 
-    // Init CAN
-    if (canDriver.init()) {
-        cfg.canOK = true;
-        Serial.println("ESP32 TWAI ready @ 500k");
+    // Init CAN (skip in safe mode)
+    if (!safeModeActive) {
+        if (canDriver.init()) {
+            cfg.canOK = true;
+            Serial.println("ESP32 TWAI ready @ 500k");
+        } else {
+            cfg.canOK = false;
+            Serial.println("CAN init failed!");
+        }
     } else {
         cfg.canOK = false;
-        Serial.println("CAN init failed!");
     }
 
     // Start WiFi AP
@@ -318,8 +384,10 @@ void setup() {
     // Start web server
     setupWebServer();
 
-    // Pin CAN processing to Core 1 (8KB stack for safety)
-    xTaskCreatePinnedToCore(canTask, "CAN", 8192, NULL, 2, NULL, 1);
+    // Pin CAN processing to Core 1 — skip in safe mode
+    if (!safeModeActive) {
+        xTaskCreatePinnedToCore(canTask, "CAN", 8192, NULL, 2, NULL, 1);
+    }
 }
 
 void loop() {

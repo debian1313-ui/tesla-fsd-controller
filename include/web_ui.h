@@ -159,12 +159,16 @@ select:focus{outline:none;border-color:#38bdf8}
     <div class="stat"><div class="stat-val amber" id="sErrors">0</div><div class="stat-label" id="iLblErr">错误</div></div>
     <div class="stat"><div class="stat-val" id="sUptime">0秒</div><div class="stat-label" id="iLblUp">运行时间</div></div>
   </div>
+  <div id="rowSafeMode" style="display:none;background:#7f1d1d;border-radius:8px;padding:10px 12px;margin-bottom:8px;color:#fca5a5;font-size:13px;font-weight:600">
+    ⚠️ 安全模式：设备连续崩溃，CAN 已禁用。请重新刷写固件。
+  </div>
   <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
   <div class="status-row" id="rowBMS" style="display:none">
-    <span id="iLblBMS">电池</span>
+    <span id="iLblBMS">电池 <span style="color:#64748b;font-size:11px">（数据未经车辆验证）</span></span>
     <span id="sBMS" style="color:#38bdf8;font-weight:600;font-size:13px">--</span>
   </div>
+  <div class="status-row"><span id="iLblHeap">空闲内存</span><span id="sHeap" style="color:#64748b;font-weight:600">--</span></div>
   <div class="status-row"><span id="iLblVer">固件版本</span><span id="sVer" style="color:#64748b;font-weight:600">--</span></div>
 </div>
 
@@ -312,6 +316,16 @@ function poll(){
       var tmin=d.bmsMinT!=null?d.bmsMinT+'°C':'--';
       var tmax=d.bmsMaxT!=null?d.bmsMaxT+'°C':'--';
       document.getElementById('sBMS').textContent=soc+' '+volt+' '+tmin+'~'+tmax;
+    }
+    // Safe mode banner
+    document.getElementById('rowSafeMode').style.display=d.safeMode?'':'none';
+    // Free heap
+    if(d.freeHeap!=null){
+      var kb=(d.freeHeap/1024).toFixed(1);
+      var heapColor=d.freeHeap<20000?'#f87171':d.freeHeap<50000?'#fbbf24':'#64748b';
+      var heapEl=document.getElementById('sHeap');
+      heapEl.textContent=kb+' KB';
+      heapEl.style.color=heapColor;
     }
     if(d.apSSID&&!wifiSSIDLoaded){document.getElementById('wifiSSID').value=d.apSSID;wifiSSIDLoaded=true;}
     if(d.version)document.getElementById('sVer').textContent='v'+d.version;
