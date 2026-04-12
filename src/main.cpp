@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
 #include <Preferences.h>
@@ -681,6 +682,8 @@ void setup() {
 
     // Always use AP+STA mode so WiFi scanning is available even without a router configured
     WiFi.mode(WIFI_AP_STA);
+    // Use 192.168.99.1 for AP to avoid subnet conflict with common routers (192.168.0/1/4.x)
+    WiFi.softAPConfig(IPAddress(192,168,99,1), IPAddress(192,168,99,1), IPAddress(255,255,255,0));
     WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
     Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
@@ -704,6 +707,16 @@ void setup() {
 
     // Start web server
     setupWebServer();
+
+    // mDNS — accessible via fsd-controller.local on both AP and LAN
+    if (MDNS.begin("fsd-controller")) {
+        MDNS.addService("http", "tcp", 80);
+        Serial.println("mDNS: fsd-controller.local");
+        addDiagLog(0, "mDNS: fsd-controller.local");
+    } else {
+        Serial.println("mDNS: start failed");
+        addDiagLog(0, "mDNS start FAILED");
+    }
 
     // Pin CAN processing to Core 1 — skip in safe mode
     if (!safeModeActive) {

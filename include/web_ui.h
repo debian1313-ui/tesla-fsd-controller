@@ -208,6 +208,8 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="status-row"><span id="iLblTimeSync">时间同步</span><span id="sTimeSync" class="status-no">--</span></div>
   <div class="status-row"><span id="iLblHeap">空闲内存</span><span id="sHeap" style="color:#64748b;font-weight:600">--</span></div>
   <div class="status-row"><span id="iLblVer">固件版本</span><span id="sVer" style="color:#64748b;font-weight:600">--</span></div>
+  <div class="status-row" id="rowLanIP" style="display:none"><span id="iLblLanIP">内网 IP</span><span id="sLanIP" style="color:#22c55e;font-weight:600;font-family:monospace">--</span></div>
+  <div class="status-row"><span id="iLblMdns">本地域名</span><span style="color:#38bdf8;font-weight:600;font-family:monospace">fsd-controller.local</span></div>
 </div>
 
 <div class="card">
@@ -308,6 +310,7 @@ var T={
     lblHW3Cap:'限速保护（×1.2）',lblHW3Off:'速度偏移（HW3）',lblPrecond:'电池预热',lblBMS:'电池',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
     wifiPassErr:'密码至少 8 位',wifiSSIDErr:'SSID 不能为空',
+    lblLanIP:'内网 IP',lblMdns:'本地域名',
     lblStaSection:'连接路由器（内网访问）',lblStaDesc:'填写后模块将同时连接路由器，可通过内网 IP 访问，热点仍保留。留空则只用热点。',
     lblStaSSID:'路由器 SSID',lblStaPass:'路由器密码',lblStaStatus:'状态：',
     staConnected:'已连接',staDisconnected:'未连接',staSave:'保存并重启',staClear:'断开',
@@ -335,6 +338,7 @@ var T={
     cardWifi:'WiFi Settings',lblSSID:'AP Name (SSID)',lblPass:'New Password (blank = keep current)',
     wifiSave:'Save & Restart',wifiOK:'Saved, rebooting...',wifiFail:'Save failed: ',
     wifiPassErr:'Password must be ≥ 8 chars',wifiSSIDErr:'SSID cannot be empty',
+    lblLanIP:'LAN IP',lblMdns:'Local Domain',
     lblStaSection:'Connect to Router (LAN access)',lblStaDesc:'Module will also connect to your router — access via LAN IP. Hotspot remains as fallback. Leave blank for hotspot-only.',
     lblStaSSID:'Router SSID',lblStaPass:'Router Password',lblStaStatus:'Status:',
     staConnected:'Connected',staDisconnected:'Not connected',staSave:'Save & Restart',staClear:'Disconnect',
@@ -375,6 +379,8 @@ function applyLang(){
   document.getElementById('iLblFSDTrig').textContent=t.lblFSDTrig;
   document.getElementById('iLblVer').textContent=t.lblVer;
   document.getElementById('iHWHint').textContent=t.hwHint;
+  document.getElementById('iLblLanIP').textContent=t.lblLanIP;
+  document.getElementById('iLblMdns').textContent=t.lblMdns;
   document.getElementById('iCardWifi').textContent=t.cardWifi;
   document.getElementById('iLblSSID').textContent=t.lblSSID;
   document.getElementById('iLblPass').textContent=t.lblPass;
@@ -463,6 +469,9 @@ function poll(){
     if(d.staOK){staEl.textContent=T[lang].staConnected+' '+d.staIP;staEl.style.color='#22c55e';}
     else if(d.staSSID){staEl.textContent=T[lang].staDisconnected;staEl.style.color='#ef4444';}
     else{staEl.textContent='--';staEl.style.color='#64748b';}
+    var lanRow=document.getElementById('rowLanIP');
+    if(d.staOK&&d.staIP){document.getElementById('sLanIP').textContent=d.staIP;lanRow.style.display='';}
+    else{lanRow.style.display='none';}
     if(d.version)document.getElementById('sVer').textContent='v'+d.version;
     // AP auto-restart
     document.getElementById('hw3Cap').checked=!!d.hw3Cap;
