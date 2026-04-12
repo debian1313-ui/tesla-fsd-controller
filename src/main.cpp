@@ -682,13 +682,13 @@ void setup() {
 
     // Always use AP+STA mode so WiFi scanning is available even without a router configured
     WiFi.mode(WIFI_AP_STA);
-    // Use 192.168.99.1 for AP to avoid subnet conflict with common routers (192.168.0/1/4.x)
-    WiFi.softAPConfig(IPAddress(192,168,99,1), IPAddress(192,168,99,1), IPAddress(255,255,255,0));
-    WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
-    Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
-    // Connect to router if configured
+    // Connect to router first (if configured) so we can read the assigned STA IP
+    // and pick a non-conflicting AP subnet
     if (staSSID[0] != '\0') {
+        // Bring up AP temporarily on 192.168.99.1 while STA connects
+        WiFi.softAPConfig(IPAddress(192,168,99,1), IPAddress(192,168,99,1), IPAddress(255,255,255,0));
+        WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
         WiFi.begin(staSSID, staPass[0] ? staPass : nullptr);
         Serial.printf("WiFi STA: connecting to '%s'...\n", staSSID);
         uint32_t t0 = millis();
@@ -697,13 +697,30 @@ void setup() {
         }
         staConnected = (WiFi.status() == WL_CONNECTED);
         if (staConnected) {
-            Serial.printf("WiFi STA connected  IP: %s\n", WiFi.localIP().toString().c_str());
-            addDiagLog(0, ("STA connected " + WiFi.localIP().toString()).c_str());
+            // Pick an AP subnet that doesn't overlap the router's subnet
+            // Router subnet third octet → avoid it; try 99, then 98, 97...
+            uint8_t routerOctet = WiFi.localIP()[2];  // e.g. 1 for 192.168.1.x
+            uint8_t apOctet = 99;
+            if (apOctet == routerOctet) apOctet = 98;
+            if (apOctet == routerOctet) apOctet = 97;
+            IPAddress apIP(192, 168, apOctet, 1);
+            WiFi.softAPConfig(apIP, apIP, IPAddress(255,255,255,0));
+            WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);  // re-apply with new subnet
+            char logMsg[64];
+            snprintf(logMsg, sizeof(logMsg), "STA connected %s  AP: 192.168.%u.1",
+                     WiFi.localIP().toString().c_str(), (unsigned)apOctet);
+            Serial.println(logMsg);
+            addDiagLog(0, logMsg);
         } else {
             Serial.printf("WiFi STA connect failed\n");
             addDiagLog(0, "STA connect FAILED");
         }
+    } else {
+        // No router configured — use 192.168.99.1 (avoids common 0/1/4.x subnets)
+        WiFi.softAPConfig(IPAddress(192,168,99,1), IPAddress(192,168,99,1), IPAddress(255,255,255,0));
+        WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
     }
+    Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
     // Start web server
     setupWebServer();
