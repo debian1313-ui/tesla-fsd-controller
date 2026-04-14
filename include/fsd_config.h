@@ -7,7 +7,7 @@
 // Multi-field compound updates are NOT atomic; see handlers.h for usage notes.
 struct FSDConfig {
     // FSD control
-    volatile bool     fsdEnable           = true;
+    volatile bool     fsdEnable           = false;
     volatile uint8_t  hwMode              = 2;       // 0=LEGACY, 1=HW3, 2=HW4
     volatile uint8_t  speedProfile        = 1;       // 0-4
     volatile bool     profileModeAuto     = true;    // true=auto from stalk, false=manual
@@ -72,6 +72,14 @@ struct FSDConfig {
     volatile uint32_t perfAccelMs         = 0;   // result ms
     volatile uint32_t perfBrakeMs         = 0;   // result ms
     volatile uint8_t  perfBrakeEntryKph   = 0;   // actual speed (kph) when braking started
+
+#ifdef DUAL_CAN_ENABLED
+    // Dual CAN bus status (MCP2517FD ×2)
+    volatile bool     vhCanOK      = false;  // Vehicle CAN (VH connector, pins 9/10)
+    volatile bool     prtyCanOK    = false;  // Chassis CAN (PRTY connector, pins 2/3)
+    volatile uint32_t vhRxCount    = 0;
+    volatile uint32_t prtyRxCount  = 0;
+#endif
 
     // Statistics
     volatile uint32_t rxCount             = 0;

@@ -70,7 +70,7 @@ select:focus{outline:none;border-color:#38bdf8}
 </style>
 </head>
 <body>
-<div id="disclaimer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px">
+<div id="disclaimer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:999;display:none;align-items:center;justify-content:center;padding:20px">
   <div style="background:#131d32;border-radius:16px;padding:24px;max-width:360px;width:100%;border:1px solid #ef4444">
     <!-- 步骤1：免责声明 -->
     <div id="disclaimerContent">
@@ -177,7 +177,7 @@ select:focus{outline:none;border-color:#38bdf8}
     <span class="row-label" id="iLblISA">限速提示音抑制</span>
     <label class="toggle"><input type="checkbox" id="isaChime" onchange="setVal('isaChime',this.checked?1:0)"><span class="slider"></span></label>
   </div>
-  <div class="row">
+  <div class="row" id="rowEmgDet">
     <span class="row-label" id="iLblEmg">紧急车辆检测</span>
     <label class="toggle"><input type="checkbox" id="emergencyDet" checked onchange="setVal('emergencyDet',this.checked?1:0)"><span class="slider"></span></label>
   </div>
@@ -225,14 +225,14 @@ select:focus{outline:none;border-color:#38bdf8}
         <span class="km">km/h</span>
       </div>
       <div class="smart-rule">
-        <span id="iSmR2L">限速 T1 ~</span>
+        <span id="iSmR2L"><span id="sSmT1Val">60</span> ~</span>
         <input type="number" id="hw3SmT2" min="20" max="200" value="100" style="width:50px" onchange="saveSmartRules()">
         <span>kph &rarr; +</span>
         <input type="number" id="hw3SmO2" min="0" max="20" value="15" style="width:44px" onchange="saveSmartRules()">
         <span class="km">km/h</span>
       </div>
       <div class="smart-rule">
-        <span id="iSmR3L">限速 &ge; T2 &rarr; +</span>
+        <span id="iSmR3L">&ge; <span id="sSmT2Val">100</span> kph &rarr; +</span>
         <input type="number" id="hw3SmO3" min="0" max="20" value="10" style="width:44px" onchange="saveSmartRules()">
         <span class="km">km/h</span>
       </div>
@@ -255,6 +255,10 @@ select:focus{outline:none;border-color:#38bdf8}
     ⚠️ 安全模式：设备连续崩溃，CAN 已禁用。请重新刷写固件。
   </div>
   <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
+  <div id="rowDualCAN" style="display:none">
+    <div class="status-row"><span id="iLblCANVH">整车 CAN</span><span id="sCANVH" class="status-no">--</span></div>
+    <div class="status-row"><span id="iLblCANChassis">底盘 CAN</span><span id="sCANChassis" class="status-no">--</span></div>
+  </div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
   <div class="status-row" id="rowBMS" style="display:none">
     <span id="iLblBMS">电池 <span style="color:#64748b;font-size:11px">（数据未经车辆验证）</span></span>
@@ -337,9 +341,23 @@ select:focus{outline:none;border-color:#38bdf8}
   <button class="upload-btn" id="uploadBtn" disabled onclick="doOTA()">上传固件</button>
   <div class="progress" id="progWrap"><div class="progress-bar" id="progBar"></div></div>
   <div class="msg" id="otaMsg"></div>
-  <button class="save-btn" id="rebootBtn" onclick="doReboot()" style="background:#b91c1c;margin-top:14px" id="iRebootBtn">重启设备</button>
+  <button class="save-btn" id="rebootBtn" onclick="showRebootConfirm()" style="background:#b91c1c;margin-top:14px">重启设备</button>
+  <div id="rebootConfirmBox" style="display:none;background:#1e293b;border:1px solid #b91c1c;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;color:#fca5a5">
+    <div id="iRebootConfirmMsg" style="margin-bottom:10px">确定要重启吗？</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="doReboot()" style="flex:1;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:7px 0;font-size:13px;cursor:pointer" id="iRebootConfirmBtn">确认重启</button>
+      <button onclick="hideRebootConfirm()" style="flex:1;background:#334155;color:#94a3b8;border:none;border-radius:6px;padding:7px 0;font-size:13px;cursor:pointer">取消</button>
+    </div>
+  </div>
   <div class="msg" id="rebootMsg"></div>
-  <button class="save-btn" id="iResetAllBtn" onclick="doResetAll()" style="background:#1e293b;border:1px solid #b91c1c;color:#ef4444;margin-top:8px">恢复出厂设置</button>
+  <button class="save-btn" id="iResetAllBtn" onclick="showResetConfirm()" style="background:#1e293b;border:1px solid #b91c1c;color:#ef4444;margin-top:8px">恢复出厂设置</button>
+  <div id="resetAllConfirmBox" style="display:none;background:#1e293b;border:1px solid #b91c1c;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;color:#fca5a5">
+    <div id="iResetAllConfirmMsg" style="margin-bottom:10px">将清除所有配置（WiFi、PIN、所有参数），确定吗？</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="doResetAll()" style="flex:1;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:7px 0;font-size:13px;cursor:pointer" id="iResetAllConfirmBtn">确认重置</button>
+      <button onclick="hideResetConfirm()" style="flex:1;background:#334155;color:#94a3b8;border:none;border-radius:6px;padding:7px 0;font-size:13px;cursor:pointer">取消</button>
+    </div>
+  </div>
   <div class="msg" id="resetAllMsg"></div>
 </div>
 
@@ -359,11 +377,12 @@ var T={
     lblFsdEn:'FSD 开关',lblHW:'硬件版本',lblSpeed:'速度模式',lblPMode:'模式来源',
     lblISA:'限速提示音抑制',lblEmg:'紧急车辆检测',lblCN:'强制激活',
     lblMod:'已修改',lblRX:'已接收',lblErr:'错误',lblUp:'运行时间',
-    lblCAN:'CAN 总线',lblFSDTrig:'FSD 已触发',
+    lblCAN:'Party CAN',lblFSDTrig:'FSD 已触发',
+    lblCANVH:'整车 CAN',lblCANChassis:'底盘 CAN',
     lblFile:'选择文件',noFile:'未选择文件',uploadBtn:'上传固件',
     lblVer:'固件版本',
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
-    otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',rebootBtn:'重启设备',rebootConfirm:'确定要重启吗？',rebootOK:'正在重启...',rebootFail:'重启失败',resetAllBtn:'恢复出厂设置',resetAllConfirm:'将清除所有配置（包括 WiFi、PIN、所有参数），确定吗？',resetAllOK:'已重置，正在重启...',resetAllFail:'重置失败',
+    otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',rebootBtn:'重启设备',rebootConfirm:'确定要重启吗？',rebootConfirmBtn:'确认重启',rebootOK:'正在重启...',rebootFail:'重启失败',resetAllBtn:'恢复出厂设置',resetAllConfirm:'将清除所有配置（包括 WiFi、PIN、所有参数），确定吗？',resetAllConfirmBtn:'确认重置',resetAllOK:'已重置，正在重启...',resetAllFail:'重置失败',
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
     hwHint:'HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3',
     cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
@@ -392,11 +411,12 @@ var T={
     lblHW3Off:'HW3 Speed Offset (km/h)',lblHW3Smart:'Smart Speed Offset',
     smR1L:'Limit <',smR2L:'Limit T1 ~',smR3L:'Limit ≥ T2 → +',lblBMS:'Battery',
     lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
-    lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
+    lblCAN:'Party CAN',lblFSDTrig:'FSD Triggered',
+    lblCANVH:'Vehicle CAN',lblCANChassis:'Chassis CAN',
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
     lblVer:'Firmware Version',
     canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
-    otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',rebootBtn:'Restart Device',rebootConfirm:'Restart the device?',rebootOK:'Rebooting...',rebootFail:'Reboot failed',resetAllBtn:'Factory Reset',resetAllConfirm:'This will erase all settings (WiFi, PIN, all config). Continue?',resetAllOK:'Reset done, rebooting...',resetAllFail:'Reset failed',
+    otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',rebootBtn:'Restart Device',rebootConfirm:'Restart the device?',rebootConfirmBtn:'Confirm Restart',rebootOK:'Rebooting...',rebootFail:'Reboot failed',resetAllBtn:'Factory Reset',resetAllConfirm:'This will erase all settings (WiFi, PIN, all config). Continue?',resetAllConfirmBtn:'Confirm Reset',resetAllOK:'Reset done, rebooting...',resetAllFail:'Reset failed',
     uptH:'h',uptM:'m',uptS:'s',langBtn:'中文',
     hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3',
     cardWifi:'WiFi Settings',lblSSID:'AP Name (SSID)',lblPass:'New Password (blank = keep current)',
@@ -472,7 +492,11 @@ function applyLang(){
   document.getElementById('iLblFile').textContent=t.lblFile;
   document.getElementById('uploadBtn').textContent=t.uploadBtn;
   document.getElementById('rebootBtn').textContent=t.rebootBtn;
+  document.getElementById('iRebootConfirmMsg').textContent=t.rebootConfirm;
+  document.getElementById('iRebootConfirmBtn').textContent=t.rebootConfirmBtn;
   document.getElementById('iResetAllBtn').textContent=t.resetAllBtn;
+  document.getElementById('iResetAllConfirmMsg').textContent=t.resetAllConfirm;
+  document.getElementById('iResetAllConfirmBtn').textContent=t.resetAllConfirmBtn;
   ['speedProfile','profileMode'].forEach(function(id){
     Array.from(document.getElementById(id).options).forEach(function(o){
       if(o.dataset[lang])o.textContent=o.dataset[lang];
@@ -504,6 +528,18 @@ function poll(){
     var canEl=document.getElementById('sCAN');
     canEl.textContent=d.canOK?t.canOK:t.canErr;
     canEl.className=d.canOK?'status-ok':'status-err';
+    document.getElementById('iLblCAN').textContent=t.lblCAN;
+    if(typeof d.vhOK!=='undefined'){
+      document.getElementById('rowDualCAN').style.display='';
+      document.getElementById('iLblCANVH').textContent=t.lblCANVH;
+      document.getElementById('iLblCANChassis').textContent=t.lblCANChassis;
+      var vhEl=document.getElementById('sCANVH');
+      vhEl.textContent=d.vhOK?t.canOK:t.canErr;
+      vhEl.className=d.vhOK?'status-ok':'status-err';
+      var prtyEl=document.getElementById('sCANChassis');
+      prtyEl.textContent=d.prtyOK?t.canOK:t.canErr;
+      prtyEl.className=d.prtyOK?'status-ok':'status-err';
+    }
     var fsdEl=document.getElementById('sFSD');
     var fsdActive=d.fsdTriggered&&!!d.fsdEnable;
     fsdEl.textContent=fsdActive?t.fsdYes:t.fsdNo;
@@ -524,7 +560,7 @@ function poll(){
     document.getElementById('forceActivate').checked=!!d.forceActivate;
     var hw3OffEl=document.getElementById('hw3Offset');
     if(hw3OffEl)hw3OffEl.value=String(d.hw3Offset!=null?d.hw3Offset:-1);
-    document.getElementById('precond').checked=!!d.precond;
+    var precondEl=document.getElementById('precond');if(precondEl)precondEl.checked=!!d.precond;
     if(d.bmsSeen){
       var bmsRow=document.getElementById('rowBMS');
       bmsRow.style.display='';
@@ -558,8 +594,8 @@ function poll(){
     var smartEl=document.getElementById('hw3Smart');
     if(smartEl){
       smartEl.checked=!!d.hw3Smart;
-      if(d.hw3SmT1!=null)document.getElementById('hw3SmT1').value=d.hw3SmT1;
-      if(d.hw3SmT2!=null)document.getElementById('hw3SmT2').value=d.hw3SmT2;
+      if(d.hw3SmT1!=null){document.getElementById('hw3SmT1').value=d.hw3SmT1;document.getElementById('sSmT1Val').textContent=d.hw3SmT1;}
+      if(d.hw3SmT2!=null){document.getElementById('hw3SmT2').value=d.hw3SmT2;document.getElementById('sSmT2Val').textContent=d.hw3SmT2;}
       if(d.hw3SmO1!=null)document.getElementById('hw3SmO1').value=d.hw3SmO1;
       if(d.hw3SmO2!=null)document.getElementById('hw3SmO2').value=d.hw3SmO2;
       if(d.hw3SmO3!=null)document.getElementById('hw3SmO3').value=d.hw3SmO3;
@@ -605,7 +641,7 @@ function poll(){
     } else {
       tierRow.style.display='none';
     }
-    var offVal=d.hwMode===1?(d.hw3Smart?d.smartKmh:(d.hw3Offset>=0?d.hw3Offset:null)):null;
+    var offVal=d.hwMode===1?(d.hw3Smart?d.smartKmh:(d.hw3Offset>=0?d.hw3Offset:(d.hw3AutoOffset>0?d.hw3AutoOffset:null))):null;
     document.getElementById('liveOffset').textContent=offVal!=null?'+'+offVal:'--';
     // ── Torque / Gear / AP / Brake ───────────────────────────────────────
     var tq=(d.torqueR||0)*2;
@@ -686,18 +722,23 @@ function rejectDisclaimer(){
   document.getElementById('disclaimerBtns').style.display='none';
   document.getElementById('disclaimerRejected').style.display='block';
 }
-// On load: pre-fetch status to get pinRequired, then decide flow
+// On load: fetch status to get pinRequired, then decide whether to skip disclaimer.
+// Skip only if user already agreed to this exact firmware version.
+// Factory reset clears localStorage.disclaimed so the disclaimer reappears after reset.
 fetch('/api/status').then(function(r){return r.json();}).then(function(d){
   pinRequired=!!d.pinRequired;
   var disclaimed=false;
   try{disclaimed=localStorage.getItem('disclaimed')===FW_VER;}catch(e){}
   if(disclaimed){
     if(!pinRequired){startApp();}
-    else if(token){startApp();}  // poll() will catch 403 if token expired
+    else if(token){startApp();}
     else{showPinStep();}
+  }else{
+    document.getElementById('disclaimer').style.display='flex';
   }
-}).catch(function(){});
-try{if(localStorage.getItem('disclaimed')===FW_VER){startApp();}}catch(e){}
+}).catch(function(){
+  document.getElementById('disclaimer').style.display='flex';
+});
 var wifiSSIDLoaded=false;
 var staSSIDLoaded=false;
 function updateSpeedOptions(hwMode){
@@ -737,6 +778,12 @@ function updateSpeedOptions(hwMode){
   document.getElementById('rowHW3Smart').style.display=isHW3?'':'none';
   var smartOn=isHW3&&document.getElementById('hw3Smart').checked;
   document.getElementById('rowHW3SmartRules').style.display=smartOn?'':'none';
+  // Emergency detection is HW4-only — hide and force OFF on HW3/Legacy
+  document.getElementById('rowEmgDet').style.display=isHW4?'':'none';
+  if(!isHW4){
+    var emgEl=document.getElementById('emergencyDet');
+    if(emgEl&&emgEl.checked){emgEl.checked=false;setVal('emergencyDet',0);}
+  }
 }
 function setVal(key,val){
   if(!agreed)return;
@@ -782,6 +829,8 @@ function saveSmartRules(){
   o1=Math.max(0,Math.min(o1,20));
   o2=Math.max(0,Math.min(o2,20));
   o3=Math.max(0,Math.min(o3,20));
+  document.getElementById('sSmT1Val').textContent=t1;
+  document.getElementById('sSmT2Val').textContent=t2;
   var url='/api/set?hw3SmT1='+t1+'&hw3SmT2='+t2+'&hw3SmO1='+o1+'&hw3SmO2='+o2+'&hw3SmO3='+o3+(token?'&token='+token:'');
   fetch(url).then(function(r){if(r.status===403){token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}showPinStep();}}).catch(function(){});
 }
@@ -817,29 +866,47 @@ function doScan(){
   btn.disabled=true;
   btn.textContent=t.scanScanning;
   list.style.display='none';
+  // Kick off async scan — returns immediately, no server blocking
   fetch('/api/scan'+(token?'?token='+token:''))
-    .then(r=>r.json()).then(function(nets){
-      // Sort by signal strength descending
+    .then(function(){pollScanResult(0);})
+    .catch(function(){
+      var msg=document.getElementById('staMsg');
+      msg.textContent=t.scanFail;msg.className='msg err';
+      setTimeout(function(){msg.textContent='';},2000);
+      btn.disabled=false;btn.textContent=t.scanBtn;
+    });
+}
+function pollScanResult(attempt){
+  var t=T[lang];
+  var btn=document.getElementById('scanBtn');
+  var list=document.getElementById('scanList');
+  if(attempt>20){// 20×500ms = 10s timeout
+    btn.disabled=false;btn.textContent=t.scanBtn;
+    var msg=document.getElementById('staMsg');
+    msg.textContent=t.scanFail;msg.className='msg err';
+    setTimeout(function(){msg.textContent='';},2000);
+    return;
+  }
+  fetch('/api/scan/result'+(token?'?token='+token:''))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.scanning){setTimeout(function(){pollScanResult(attempt+1);},500);return;}
+      // Got results array
+      var nets=data;
       nets.sort(function(a,b){return b.rssi-a.rssi;});
-      // Rebuild options
       while(list.options.length>1)list.remove(1);
       nets.forEach(function(n){
         var o=document.createElement('option');
         var bars=n.rssi>=-60?'▂▄▆█':n.rssi>=-75?'▂▄▆_':n.rssi>=-85?'▂▄__':'▂___';
-        o.value=n.ssid;
-        o.textContent=bars+' '+n.ssid;
+        o.value=n.ssid;o.textContent=bars+' '+n.ssid;
         list.appendChild(o);
       });
       list.value='';
       list.style.display=nets.length?'':'none';
-      btn.disabled=false;
-      btn.textContent=t.scanBtn;
-    }).catch(function(){
-      var msg=document.getElementById('staMsg');
-      msg.textContent=t.scanFail;msg.className='msg err';
-      setTimeout(function(){msg.textContent='';},2000);
-      btn.disabled=false;
-      btn.textContent=t.scanBtn;
+      btn.disabled=false;btn.textContent=t.scanBtn;
+    })
+    .catch(function(){
+      btn.disabled=false;btn.textContent=t.scanBtn;
     });
 }
 function scanPick(sel){
@@ -954,33 +1021,56 @@ function doOTA(){
   var form=new FormData();form.append('firmware',file);
   xhr.open('POST','/api/ota'+(token?'?token='+token:''));xhr.send(form);
 }
+function showRebootConfirm(){
+  document.getElementById('rebootConfirmBox').style.display='';
+  document.getElementById('rebootBtn').style.display='none';
+}
+function hideRebootConfirm(){
+  document.getElementById('rebootConfirmBox').style.display='none';
+  document.getElementById('rebootBtn').style.display='';
+}
 function doReboot(){
   var t=T[lang];
-  if(!confirm(t.rebootConfirm))return;
   var msg=document.getElementById('rebootMsg');
-  var btn=document.getElementById('rebootBtn');
+  document.getElementById('iRebootConfirmBtn').disabled=true;
   msg.textContent='';msg.className='msg';
-  btn.disabled=true;
   fetch('/api/reboot'+(token?'?token='+token:''))
     .then(function(r){
+      document.getElementById('rebootConfirmBox').style.display='none';
       if(r.ok){msg.textContent=t.rebootOK;msg.className='msg ok';}
-      else{msg.textContent=t.rebootFail;msg.className='msg err';btn.disabled=false;}
+      else{msg.textContent=t.rebootFail;msg.className='msg err';hideRebootConfirm();}
     })
-    .catch(function(){msg.textContent=t.rebootOK;msg.className='msg ok';});
+    .catch(function(){
+      document.getElementById('rebootConfirmBox').style.display='none';
+      msg.textContent=t.rebootOK;msg.className='msg ok';
+    });
+}
+function showResetConfirm(){
+  document.getElementById('resetAllConfirmBox').style.display='';
+  document.getElementById('iResetAllBtn').style.display='none';
+}
+function hideResetConfirm(){
+  document.getElementById('resetAllConfirmBox').style.display='none';
+  document.getElementById('iResetAllBtn').style.display='';
 }
 function doResetAll(){
   var t=T[lang];
-  if(!confirm(t.resetAllConfirm))return;
   var msg=document.getElementById('resetAllMsg');
-  var btn=document.getElementById('iResetAllBtn');
+  document.getElementById('iResetAllConfirmBtn').disabled=true;
   msg.textContent='';msg.className='msg';
-  btn.disabled=true;
   fetch('/api/reset'+(token?'?token='+token:''),{method:'POST'})
     .then(function(r){
-      if(r.ok){msg.textContent=t.resetAllOK;msg.className='msg ok';}
-      else{msg.textContent=t.resetAllFail;msg.className='msg err';btn.disabled=false;}
+      document.getElementById('resetAllConfirmBox').style.display='none';
+      if(r.ok){
+        try{localStorage.removeItem('disclaimed');}catch(e){}
+        msg.textContent=t.resetAllOK;msg.className='msg ok';
+      }else{msg.textContent=t.resetAllFail;msg.className='msg err';hideResetConfirm();}
     })
-    .catch(function(){msg.textContent=t.resetAllOK;msg.className='msg ok';});
+    .catch(function(){
+      document.getElementById('resetAllConfirmBox').style.display='none';
+      try{localStorage.removeItem('disclaimed');}catch(e){}
+      msg.textContent=t.resetAllOK;msg.className='msg ok';
+    });
 }
 </script>
 </body>

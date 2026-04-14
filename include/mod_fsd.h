@@ -104,8 +104,7 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
         }
         if (index == 1) {
             setBit(frame, 19, false);
-            if (driver.send(frame)) cfg.modifiedCount++;
-            else                    cfg.errorCount++;
+            driver.send(frame);  // nag suppression only, not counted as FSD modification
         }
         if (index == 2 && cfg.fsdTriggered && cfg.fsdEnable) {
             int offset;

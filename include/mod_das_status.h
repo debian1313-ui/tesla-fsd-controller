@@ -5,7 +5,8 @@
 // Bit extraction: byte = bit/8, shift = bit%8, value = (data[byte]>>shift)&mask
 //
 // 0x39B (923) DAS_status — DLC >= 7:
-//   DAS_visionOnlySpeedLimit    bit16|5  data[2] & 0x1F            ×5 kph
+//   DAS_fusedSpeedLimit         bit8|5   data[1] & 0x1F            ×5 kph  (0=SNA, 31=NONE)
+//   DAS_visionOnlySpeedLimit    bit16|5  data[2] & 0x1F            ×5 kph  (0=SNA, 31=NONE)
 //   DAS_forwardCollisionWarning bit22|2  (data[2]>>6) & 0x03
 //   DAS_autoparkReady           bit24|1  data[3] & 0x01
 //   DAS_sideCollisionAvoid      bit30|2  (data[3]>>6) & 0x03
@@ -25,7 +26,8 @@ extern FSDConfig cfg;
 // ── DAS_status (0x39B / 923) ─────────────────────────────────────────────────
 inline void handleDASStatus(const CanFrame& frame) {
     if (frame.dlc < 7) return;
-    cfg.visionSpeedLimit = frame.data[2] & 0x1F;                                      // bit16|5
+    cfg.fusedSpeedLimit  = frame.data[1] & 0x1F;                                      // bit8|5  DAS_fusedSpeedLimit ×5=kph
+    cfg.visionSpeedLimit = frame.data[2] & 0x1F;                                      // bit16|5 DAS_visionOnlySpeedLimit ×5=kph
     cfg.fcwLevel         = (frame.data[2] >> 6) & 0x03;                               // bit22|2
     cfg.sideCollision    = frame.data[4] & 0x03;                                       // bit32|2
     cfg.laneDeptWarning  = (frame.data[4] >> 5) & 0x07;                               // bit37|3

@@ -20,6 +20,10 @@
 
 #include "can_frame_types.h"
 #include "drivers/twai_driver.h"
+#ifdef DUAL_CAN_ENABLED
+#include <SPI.h>
+#include "drivers/mcp2517fd_driver.h"
+#endif
 #include "handlers.h"
 #include "version.h"
 #include "web_ui.h"
@@ -39,6 +43,15 @@ static bool staConnected = false;
 static DNSServer      dnsServer;
 static TWAIDriver     canDriver;
 static AsyncWebServer server(80);
+
+#ifdef DUAL_CAN_ENABLED
+// Shared SPI bus for both MCP2517FD modules (HSPI, custom pins)
+static SPIClass       mcpSPI(HSPI);
+// Module 1: Vehicle CAN (VH connector pins 9/10)
+static MCP2517FDDriver vhDriver(MCP_CS1, mcpSPI, MCP_INT1);
+// Module 2: Chassis/PRTY CAN (connector pins 2/3)
+static MCP2517FDDriver prtyDriver(MCP_CS2, mcpSPI, MCP_INT2);
+#endif
 static Preferences    prefs;
 static volatile bool  otaPendingRestart = false;
 static bool           safeModeActive    = false;
@@ -82,8 +95,8 @@ static bool checkToken(AsyncWebServerRequest* req) {
 // ═══════════════════════════════════════════
 
 void loadConfig() {
-    prefs.begin("fsd", true);  // read-only
-    cfg.fsdEnable          = prefs.getBool("fsdEn", true);
+    prefs.begin("fsd", false);  // read-write so namespace is created if absent (e.g. after factory reset)
+    cfg.fsdEnable          = prefs.getBool("fsdEn", false);
     cfg.hwMode             = prefs.getUChar("hwMode", 2);
     cfg.speedProfile       = prefs.getUChar("spPro", 1);
     cfg.profileModeAuto    = prefs.getBool("proAuto", true);
@@ -108,7 +121,7 @@ void loadConfig() {
 
     // Load PIN from separate namespace
     Preferences secPrefs;
-    secPrefs.begin("sec", true);
+    secPrefs.begin("sec", false);  // read-write so namespace is created if absent
     strlcpy(storedPin, secPrefs.getString("pin", "").c_str(), sizeof(storedPin));
     secPrefs.end();
 
@@ -258,19 +271,33 @@ void setupWebServer() {
         req->send(200, "text/plain", "Microsoft NCSI");
     });
 
-    // Serve UI
+    // Serve UI — use beginResponse_P (AsyncProgmemResponse) to stream from flash
+    // in chunks; avoids the 60 KB contiguous heap allocation that AsyncBasicResponse
+    // would need, which fails after WiFi starts and causes a memmove(NULL) crash.
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send_P(200, "text/html", INDEX_HTML);
+        req->send(req->beginResponse_P(200, "text/html",
+            (const uint8_t*)INDEX_HTML, sizeof(INDEX_HTML) - 1));
     });
 
     // Dashboard page — instrument cluster view (token checked via JS)
     server.on("/dash", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send_P(200, "text/html", DASH_HTML);
+        req->send(req->beginResponse_P(200, "text/html",
+            (const uint8_t*)DASH_HTML, sizeof(DASH_HTML) - 1));
     });
 
     // Performance test page
     server.on("/perf", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send_P(200, "text/html", PERF_HTML);
+        req->send(req->beginResponse_P(200, "text/html",
+            (const uint8_t*)PERF_HTML, sizeof(PERF_HTML) - 1));
+    });
+
+    server.on("/manifest.json", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "application/manifest+json",
+            "{\"name\":\"FSD Controller\",\"short_name\":\"FSD\","
+            "\"display\":\"fullscreen\",\"orientation\":\"landscape\","
+            "\"background_color\":\"#05080f\",\"theme_color\":\"#05080f\","
+            "\"start_url\":\"/dash\",\"scope\":\"/\","
+            "\"icons\":[]}");
     });
 
     // Performance test control API
@@ -309,7 +336,7 @@ void setupWebServer() {
             "\"canOK\":%s,\"fsdTriggered\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
-            "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
+            "\"hw3Offset\":%d,\"hw3AutoOffset\":%d,\"precond\":%d,\"hwDetected\":%d,"
             "\"hw3Smart\":%d,\"hw3SmT1\":%d,\"hw3SmT2\":%d,"
             "\"hw3SmO1\":%d,\"hw3SmO2\":%d,\"hw3SmO3\":%d,"
             "\"fusedLimit\":%u,\"smartTier\":%u,\"smartKmh\":%u,"
@@ -338,6 +365,7 @@ void setupWebServer() {
             (int)cfg.emergencyDetection,
             (int)cfg.forceActivate,
             (int)cfg.hw3OffsetManual,
+            (int)cfg.hw3SpeedOffset,
             (int)cfg.precondition,
             (int)cfg.hwDetected,
             (int)cfg.hw3SmartEnable,
@@ -393,6 +421,21 @@ void setupWebServer() {
             size_t len = strlen(buf);
             buf[len - 1] = '\0';
             strlcat(buf, dbg, sizeof(buf));
+            strlcat(buf, "}", sizeof(buf));
+        }
+#endif
+#ifdef DUAL_CAN_ENABLED
+        {
+            char dualBuf[80];
+            snprintf(dualBuf, sizeof(dualBuf),
+                ",\"vhOK\":%s,\"prtyOK\":%s,\"vhRx\":%u,\"prtyRx\":%u",
+                cfg.vhCanOK   ? "true" : "false",
+                cfg.prtyCanOK ? "true" : "false",
+                (unsigned)cfg.vhRxCount,
+                (unsigned)cfg.prtyRxCount);
+            size_t len = strlen(buf);
+            buf[len - 1] = '\0';   // strip trailing }
+            strlcat(buf, dualBuf, sizeof(buf));
             strlcat(buf, "}", sizeof(buf));
         }
 #endif
@@ -525,18 +568,24 @@ void setupWebServer() {
         otaPendingRestart = true;
     });
 
-    // WiFi scan — returns nearby SSIDs as JSON array
-    // Uses async scan + polling to avoid blocking the WiFi driver in AP+STA mode.
+    // WiFi scan — two-endpoint non-blocking design:
+    //   GET /api/scan        → kick off async scan, return immediately
+    //   GET /api/scan/result → poll for completion; returns {"scanning":true} while
+    //                          in progress, or the SSID array when done.
+    // This keeps the async_service_task free during the ~1-2 s channel sweep.
     server.on("/api/scan", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         WiFi.scanDelete();
         WiFi.scanNetworks(/*async=*/true, /*hidden=*/false);
-        // Poll up to 6 s for results (channel hopping takes ~100 ms/channel)
-        uint32_t t0 = millis();
-        int n = WIFI_SCAN_RUNNING;
-        while (n == WIFI_SCAN_RUNNING && millis() - t0 < 6000) {
-            delay(100);
-            n = WiFi.scanComplete();
+        req->send(200, "application/json", "{\"scanning\":true}");
+    });
+
+    server.on("/api/scan/result", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        int n = WiFi.scanComplete();
+        if (n == WIFI_SCAN_RUNNING) {
+            req->send(200, "application/json", "{\"scanning\":true}");
+            return;
         }
         uint32_t up = (millis() - cfg.uptimeStart) / 1000;
         if (n <= 0) {
@@ -791,6 +840,21 @@ void canTask(void* param) {
             }
         }
 
+#ifdef DUAL_CAN_ENABLED
+        // ── Vehicle CAN (MCP2517FD #1) — read-only telemetry ──────
+        while (vhDriver.read(frame)) {
+            activity = true;
+            cfg.vhRxCount++;
+            handleMessage(frame, vhDriver);
+        }
+        // ── Chassis/PRTY CAN (MCP2517FD #2) — read-only telemetry ─
+        while (prtyDriver.read(frame)) {
+            activity = true;
+            cfg.prtyRxCount++;
+            handleMessage(frame, prtyDriver);
+        }
+#endif
+
         // ── AP auto-restart on disengage ──────────────────────────────
         if (prevAccState > 0 && cfg.accState == 0 && cfg.canOK) {
             tryAPRestart(canDriver);
@@ -819,9 +883,12 @@ void canTask(void* param) {
         // ── Clear crash counter after 10s of normal operation ──────
         if (!crashCleared && millis() - normalStartMs >= 10000) {
             crashCleared = true;
-            prefs.begin("sys", false);
-            prefs.putInt("crashes", 0);
-            prefs.end();
+            // Use a local Preferences object — avoids racing with the global
+            // `prefs` used by saveConfig() on Core 0.
+            Preferences sysPrefs;
+            sysPrefs.begin("sys", false);
+            sysPrefs.putInt("crashes", 0);
+            sysPrefs.end();
         }
 
         // ── CAN ID scan: log all IDs at 30s sorted by ID number ──────
@@ -961,6 +1028,27 @@ void setup() {
             cfg.canOK = false;
             Serial.println("CAN init failed!");
         }
+
+#ifdef DUAL_CAN_ENABLED
+        // Init shared SPI bus for MCP2517FD modules
+        mcpSPI.begin(MCP_SCK, MCP_MISO, MCP_MOSI, -1);
+        cfg.vhCanOK = vhDriver.init();
+        if (cfg.vhCanOK) {
+            Serial.println("MCP2517FD #1 (Vehicle CAN) ready @ 500k");
+            addDiagLog(0, "VH CAN init OK");
+        } else {
+            Serial.println("MCP2517FD #1 (Vehicle CAN) init failed");
+            addDiagLog(0, "VH CAN init FAILED");
+        }
+        cfg.prtyCanOK = prtyDriver.init();
+        if (cfg.prtyCanOK) {
+            Serial.println("MCP2517FD #2 (Chassis CAN) ready @ 500k");
+            addDiagLog(0, "PRTY CAN init OK");
+        } else {
+            Serial.println("MCP2517FD #2 (Chassis CAN) init failed");
+            addDiagLog(0, "PRTY CAN init FAILED");
+        }
+#endif
     } else {
         cfg.canOK = false;
     }

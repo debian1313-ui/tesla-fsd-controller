@@ -29,6 +29,12 @@ const char DASH_HTML[] PROGMEM = R"dash(<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FSD Dash">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#05080f">
+<link rel="manifest" href="/manifest.json">
 <title>FSD · Dash</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -240,14 +246,14 @@ html,body{
 <body>
 
 <!-- Portrait overlay — hidden in landscape via CSS @media -->
-<div id="rotate-hint">
+<div id="rotate-hint" onclick="enterImmersive()">
   <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
     <rect x="10" y="4" width="28" height="40" rx="4" stroke="#445566" stroke-width="2"/>
     <path d="M40 22 C40 14 34 8 24 8" stroke="#00d4aa" stroke-width="2" stroke-linecap="round"/>
     <polyline points="20,4 24,8 28,4" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linejoin="round"/>
   </svg>
   <p>请横向握持设备</p>
-  <small>ROTATE TO LANDSCAPE</small>
+  <small>点击进入全屏 · TAP TO FULLSCREEN</small>
 </div>
 
 <!-- Top bar -->
@@ -632,7 +638,7 @@ function poll() {
         tBat = 0;
         document.getElementById('tb-temp').textContent = '--/-- °C';
         // Fused speed limit (0=SNA, 31=NONE, 1-30=valid ×5 kph)
-        var fl = d.speedLimit || 0;
+        var fl = d.fusedLimit || 0;
         var flOk = fl > 0 && fl < 31;
         var fe = document.getElementById('das-fused');
         fe.textContent = flOk ? fl * 5 : '--';
@@ -710,18 +716,30 @@ function poll() {
 }
 
 
-// ── Fullscreen ────────────────────────────────────────────────
-function toggleFS() {
-  var el = document.documentElement;
-  if (!document.fullscreenElement) {
-    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
-    if (req) {
-      req.call(el).catch(function() {});
-    } else {
-      // iOS Safari: no Fullscreen API — suggest Add to Home Screen
-      document.body.classList.add('no-fs');
-      alert('iOS 不支持网页全屏。\n请点击 Safari 分享按钮 → 添加到主屏幕，从主屏幕打开即可全屏显示。');
+// ── Fullscreen + orientation lock ────────────────────────────
+function lockLandscape() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(function() {});
     }
+  } catch(e) {}
+}
+
+function enterImmersive() {
+  var el = document.documentElement;
+  var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+  if (req) {
+    req.call(el).then(function() { lockLandscape(); }).catch(function() {});
+  } else {
+    // iOS Safari: no Fullscreen API
+    document.body.classList.add('no-fs');
+    lockLandscape();
+  }
+}
+
+function toggleFS() {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    enterImmersive();
   } else {
     var ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
     if (ex) ex.call(document);
@@ -733,6 +751,12 @@ document.addEventListener('fullscreenchange', function() {
 });
 document.addEventListener('webkitfullscreenchange', function() {
   document.getElementById('fs-btn').textContent = document.webkitFullscreenElement ? '✕' : '⛶';
+});
+
+// Auto-fullscreen on first user tap (requires gesture — browser policy)
+document.addEventListener('click', function autoFs() {
+  document.removeEventListener('click', autoFs);
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) enterImmersive();
 });
 
 // ── Wake Lock — prevent screen sleep ─────────────────────────
