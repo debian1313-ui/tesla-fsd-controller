@@ -43,7 +43,7 @@ html,body{
 /* ── Top bar ───────────────────────────────────────────────── */
 #topbar{
   display:flex;align-items:center;justify-content:space-between;
-  height:50px;
+  height:64px;
   padding-top:env(safe-area-inset-top);
   padding-left:max(18px, env(safe-area-inset-left));
   padding-right:max(18px, env(safe-area-inset-right));
@@ -52,11 +52,11 @@ html,body{
 }
 #tb-time{
   flex:1;
-  font-size:13px;font-weight:300;letter-spacing:2px;
+  font-size:22px;font-weight:300;letter-spacing:2px;
   color:#6677aa;
 }
 #tb-gear{
-  font-size:34px;font-weight:800;letter-spacing:5px;
+  font-size:56px;font-weight:800;letter-spacing:5px;
   transition:color 0.3s,text-shadow 0.3s;
 }
 #tb-gear.P{color:#8899cc;text-shadow:0 0 14px rgba(136,153,204,0.4)}
@@ -68,10 +68,10 @@ html,body{
   display:flex;align-items:center;gap:10px;
   justify-content:flex-end;
 }
-#tb-temp{font-size:11px;color:#44556a;white-space:nowrap}
+#tb-temp{font-size:18px;color:#44556a;white-space:nowrap}
 #can-warn,#net-warn{
   display:none;
-  font-size:10px;font-weight:700;letter-spacing:1.5px;
+  font-size:16px;font-weight:700;letter-spacing:1.5px;
   padding:3px 8px;border-radius:3px;white-space:nowrap;
   background:rgba(255,40,40,0.15);color:#ff4444;
   border:1px solid rgba(255,40,40,0.4);
@@ -91,8 +91,8 @@ html,body{
 @supports not (will-change: transform) {}
 .no-fs #fs-btn{display:none}
 .fsd-badge{
-  font-size:9px;font-weight:700;letter-spacing:1.5px;
-  padding:3px 7px;border-radius:3px;
+  font-size:15px;font-weight:700;letter-spacing:1.5px;
+  padding:5px 11px;border-radius:3px;
   background:rgba(255,255,255,0.05);color:#445566;
   border:1px solid rgba(255,255,255,0.07);
   transition:all 0.3s;white-space:nowrap;
@@ -105,7 +105,7 @@ html,body{
 /* ── AP / FCW / Brake badges ───────────────────────────────── */
 #fcw-warn{
   display:none;
-  font-size:10px;font-weight:700;letter-spacing:1px;
+  font-size:16px;font-weight:700;letter-spacing:1px;
   padding:3px 8px;border-radius:3px;white-space:nowrap;
   background:rgba(255,170,0,0.15);color:#ffaa00;
   border:1px solid rgba(255,170,0,0.45);
@@ -117,7 +117,7 @@ html,body{
   border-color:rgba(0,212,170,0.35);
 }
 #brake-dot{
-  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  width:16px;height:16px;border-radius:50%;flex-shrink:0;
   background:#1a2530;border:1px solid rgba(255,255,255,0.06);
   transition:background 0.15s,box-shadow 0.15s;
 }
@@ -128,7 +128,7 @@ html,body{
 /* ── Blind spot / lane warning indicators ──────────────────── */
 .bsd{
   display:none;
-  font-size:10px;font-weight:700;letter-spacing:1px;
+  font-size:16px;font-weight:700;letter-spacing:1px;
   padding:3px 7px;border-radius:3px;white-space:nowrap;
   background:rgba(255,170,0,0.15);color:#ffaa00;
   border:1px solid rgba(255,170,0,0.45);
@@ -136,7 +136,7 @@ html,body{
 .bsd.on{display:inline-block}
 #ldw-warn{
   display:none;
-  font-size:10px;font-weight:700;letter-spacing:1px;
+  font-size:16px;font-weight:700;letter-spacing:1px;
   padding:3px 7px;border-radius:3px;white-space:nowrap;
   background:rgba(255,100,0,0.15);color:#ff7700;
   border:1px solid rgba(255,100,0,0.4);
@@ -156,7 +156,7 @@ html,body{
 /* ── Main layout ───────────────────────────────────────────── */
 #panels{
   display:flex;align-items:center;
-  width:100%;height:calc(100vh - 50px);
+  width:100%;height:calc(100vh - 64px);
   padding-top:8px;
   padding-bottom:max(10px, env(safe-area-inset-bottom));
   padding-left:max(6px, env(safe-area-inset-left));
@@ -173,32 +173,47 @@ html,body{
 
 /* ── Common gauge elements ─────────────────────────────────── */
 .glabel{
-  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
+  font-size:15px;letter-spacing:2.5px;text-transform:uppercase;
   color:#2e3f50;margin-bottom:4px;font-weight:500;
   text-align:center;line-height:1.4;
 }
 .glabel span{
-  display:block;font-size:9px;letter-spacing:1.5px;
+  display:block;font-size:13px;letter-spacing:1.5px;
   color:#1e2e3c;text-transform:none;font-weight:400;margin-top:1px;
 }
-.gnum{font-size:30px;font-weight:700;letter-spacing:-.5px;transition:color 0.3s}
-.gunit{font-size:10px;color:#3a4f5f;letter-spacing:1.5px;margin-top:1px}
+.gnum{font-size:50px;font-weight:700;letter-spacing:-.5px;transition:color 0.3s}
+.gunit{font-size:18px;color:#3a4f5f;letter-spacing:1.5px;margin-top:1px}
 .gsub{
   display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
   margin-top:12px;align-items:baseline;
-  font-size:12px;color:#4a6070;
+  font-size:17px;color:#4a6070;
 }
-.gsub b{font-size:15px;font-weight:600;color:#7a9aaa}
-.gsub small{font-size:10px;color:#3a4f5f;letter-spacing:.8px}
-
-/* ── Power colors ──────────────────────────────────────────── */
-#pwr-val.pos{color:#ff8844}
-#pwr-val.neg{color:#22ccff}
-#pwr-val.zero{color:#2e3f50}
+.gsub b{font-size:24px;font-weight:600;color:#7a9aaa}
+.gsub small{font-size:15px;color:#3a4f5f;letter-spacing:.8px}
 
 /* ── Battery color ─────────────────────────────────────────── */
 #bat-pct{color:#00d4aa}
 #bat-v{color:#3a5060}
+
+/* ── Torque bars (left panel) ──────────────────────────────── */
+.torq-wrap{width:100%;padding:0 6px;margin-top:10px}
+.torq-row-lbl{font-size:9px;color:#2e3f50;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
+.torq-track{position:relative;width:100%;height:12px;background:#0b111c;border-radius:6px;overflow:hidden}
+.torq-track::after{content:'';position:absolute;left:50%;top:0;width:1px;height:100%;background:#1a2a3a}
+.torq-neg{position:absolute;right:50%;top:0;height:100%;width:0;background:linear-gradient(270deg,#22ccff,#0077aa);border-radius:6px 0 0 6px;transition:width .12s linear}
+.torq-pos{position:absolute;left:50%;top:0;height:100%;width:0;background:linear-gradient(90deg,#ff8833,#ffcc00);border-radius:0 6px 6px 0;transition:width .12s linear}
+.torq-num{font-size:22px;font-weight:700;color:#6a8aaa;margin:5px 0 14px;letter-spacing:-.5px}
+.torq-num span{font-size:10px;color:#2e3f50;letter-spacing:1px;font-weight:400;margin-left:2px}
+.torq-axis{display:flex;justify-content:space-between;font-size:9px;color:#1e2e3e;margin-top:-6px;padding:0 2px}
+
+/* ── DAS status grid (right panel fallback) ────────────────── */
+.das-grid{width:100%;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.das-item{background:#0b111c;border-radius:10px;padding:10px 10px 8px}
+.das-lbl{font-size:14px;color:#2e3f50;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+.das-big{font-size:44px;font-weight:700;color:#3a5060;line-height:1;transition:color .3s}
+.das-big.on{color:#00d4aa}
+.das-big.warn{color:#ff8800}
+.das-unit{font-size:15px;color:#1e2e3e;letter-spacing:1px;margin-top:3px}
 
 /* ── SVG wrapper sizes — constrained by both width and height ─ */
 /* Speed SVG: square ViewBox, must not exceed panel height.     */
@@ -259,52 +274,58 @@ html,body{
 <!-- Panels -->
 <div id="panels">
 
-  <!-- LEFT: Power gauge -->
+  <!-- LEFT: Torque gauge (concentric arcs) -->
   <div class="panel" id="left-panel">
-    <div class="glabel">POWER<span>功率</span></div>
+    <div class="glabel">TORQUE<span>扭矩</span></div>
     <div class="side-wrap">
       <svg viewBox="0 0 260 260" style="width:100%">
         <defs>
-          <filter id="glow3">
+          <filter id="glowT">
             <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-        <!-- Background track -->
+        <!-- Background tracks -->
         <path d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
-              fill="none" stroke="#0b111c" stroke-width="14" stroke-linecap="round"/>
-        <!-- Regen arc — fills from lower-right counterclockwise (mirrored) -->
-        <path id="pwr-regen" d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
-              fill="none" stroke="#22ccff" stroke-width="11" stroke-linecap="round"
-              stroke-dasharray="0 509"
-              filter="url(#glow3)"
+              fill="none" stroke="#0b111c" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 72.0 188.0 A 82 82 0 1 1 188.0 188.0"
+              fill="none" stroke="#090e18" stroke-width="9" stroke-linecap="round"/>
+        <!-- Command regen (outer, mirrored = fills from right CCW) -->
+        <path id="tq-cmd-regen" d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
+              fill="none" stroke="#22ccff" stroke-width="9" stroke-linecap="round"
+              stroke-dasharray="0 509" filter="url(#glowT)"
               transform="scale(-1,1) translate(-260,0)"/>
-        <!-- Discharge arc — fills from lower-left clockwise -->
-        <path id="pwr-disch" d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
-              fill="none" stroke="#ff7733" stroke-width="11" stroke-linecap="round"
-              stroke-dasharray="0 509"
-              filter="url(#glow3)"/>
-        <!-- Zero tick at top (130, 22) -->
-        <line x1="130" y1="12" x2="130" y2="27" stroke="#1a2a3a" stroke-width="2"/>
-        <!-- Small label hints -->
-        <text x="42"  y="218" font-family="Arial" font-size="9" fill="#1e2e3e" text-anchor="middle">REGEN</text>
-        <text x="42"  y="229" font-family="Arial" font-size="9" fill="#162430" text-anchor="middle">回收</text>
-        <text x="218" y="218" font-family="Arial" font-size="9" fill="#1e2e3e" text-anchor="middle">OUT</text>
-        <text x="218" y="229" font-family="Arial" font-size="9" fill="#162430" text-anchor="middle">输出</text>
+        <!-- Command drive (outer, fills from left CW) -->
+        <path id="tq-cmd-drive" d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
+              fill="none" stroke="#ff8833" stroke-width="9" stroke-linecap="round"
+              stroke-dasharray="0 509" filter="url(#glowT)"/>
+        <!-- Actual regen (inner, mirrored) -->
+        <path id="tq-act-regen" d="M 72.0 188.0 A 82 82 0 1 1 188.0 188.0"
+              fill="none" stroke="#44ddff" stroke-width="7" stroke-linecap="round"
+              stroke-dasharray="0 386" filter="url(#glowT)"
+              transform="scale(-1,1) translate(-260,0)"/>
+        <!-- Actual drive (inner) -->
+        <path id="tq-act-drive" d="M 72.0 188.0 A 82 82 0 1 1 188.0 188.0"
+              fill="none" stroke="#ffcc44" stroke-width="7" stroke-linecap="round"
+              stroke-dasharray="0 386" filter="url(#glowT)"/>
+        <!-- Axis labels -->
+        <text x="42"  y="224" font-family="Arial" font-size="15" fill="#1e2e3e" text-anchor="middle">REGEN</text>
+        <text x="218" y="224" font-family="Arial" font-size="15" fill="#1e2e3e" text-anchor="middle">DRIVE</text>
+        <!-- Command value -->
+        <text id="tq-cmd-txt" x="130" y="146"
+              text-anchor="middle"
+              font-family="-apple-system,'Helvetica Neue',Arial,sans-serif"
+              font-size="58" font-weight="800" fill="#e0eaf4">0</text>
+        <text x="130" y="168" text-anchor="middle"
+              font-family="Arial" font-size="14" fill="#2e3f50" letter-spacing="2">指令 Nm</text>
+        <!-- Actual value -->
+        <text id="tq-act-txt" x="130" y="194"
+              text-anchor="middle"
+              font-family="-apple-system,'Helvetica Neue',Arial,sans-serif"
+              font-size="36" font-weight="600" fill="#4a6a7a">0</text>
+        <text x="130" y="212" text-anchor="middle"
+              font-family="Arial" font-size="14" fill="#1e2e3e" letter-spacing="2">实际 Nm</text>
       </svg>
-    </div>
-    <div class="gnum zero" id="pwr-val">0</div>
-    <div class="gunit">kW</div>
-    <div class="gsub">
-      <span><small>后轴指令 </small><b id="tf-val">--</b><small> Nm</small></span>
-      <span><small>后轴实际 </small><b id="tr-val">--</b><small> Nm</small></span>
-    </div>
-    <div id="nag-row">
-      <div class="nag-dot" id="nd0"></div>
-      <div class="nag-dot" id="nd1"></div>
-      <div class="nag-dot" id="nd2"></div>
-      <div class="nag-dot" id="nd3"></div>
-      <div class="nag-dot" id="nd4"></div>
     </div>
   </div>
 
@@ -349,17 +370,17 @@ html,body{
         <!-- Speed number -->
         <text id="spd-txt" x="250" y="290" text-anchor="middle"
               font-family="-apple-system,'Helvetica Neue',Arial,sans-serif"
-              font-size="104" font-weight="800" fill="#ffffff" letter-spacing="-6">0</text>
+              font-size="140" font-weight="800" fill="#ffffff" letter-spacing="-6">0</text>
 
         <!-- km/h unit -->
-        <text x="250" y="318" text-anchor="middle"
+        <text x="250" y="328" text-anchor="middle"
               font-family="-apple-system,'Helvetica Neue',Arial,sans-serif"
-              font-size="11" fill="#3a5060" letter-spacing="3">km/h · 公里/时</text>
+              font-size="19" fill="#3a5060" letter-spacing="3">km/h · 公里/时</text>
 
         <!-- Scale endpoints -->
-        <text x="100" y="400" text-anchor="middle" font-family="Arial" font-size="11" fill="#1e2e3e">0</text>
-        <text x="400" y="400" text-anchor="middle" font-family="Arial" font-size="11" fill="#1e2e3e">200</text>
-        <text x="250" y="52"  text-anchor="middle" font-family="Arial" font-size="11" fill="#1e2e3e">100</text>
+        <text x="100" y="400" text-anchor="middle" font-family="Arial" font-size="16" fill="#1e2e3e">0</text>
+        <text x="400" y="400" text-anchor="middle" font-family="Arial" font-size="16" fill="#1e2e3e">200</text>
+        <text x="250" y="52"  text-anchor="middle" font-family="Arial" font-size="16" fill="#1e2e3e">100</text>
 
         <!-- Speed limit sign — camera-detected, shown in arc gap below -->
         <g id="spd-limit-g" visibility="hidden">
@@ -376,42 +397,71 @@ html,body{
 
   <div class="vdiv"></div>
 
-  <!-- RIGHT: Battery gauge -->
+  <!-- RIGHT: Adaptive — BMS when available, DAS status otherwise -->
   <div class="panel" id="right-panel">
-    <div class="glabel">BATTERY<span>电量</span></div>
-    <div class="side-wrap">
-      <svg viewBox="0 0 260 260" style="width:100%">
-        <defs>
-          <linearGradient id="batGrad" x1="53.6" y1="0" x2="206.4" y2="0" gradientUnits="userSpaceOnUse">
-            <stop offset="0%"   stop-color="#ff2244"/>
-            <stop offset="22%"  stop-color="#ff8800"/>
-            <stop offset="58%"  stop-color="#44dd88"/>
-            <stop offset="100%" stop-color="#00d4aa"/>
-          </linearGradient>
-          <filter id="glow3b">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <!-- Background track -->
-        <path d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
-              fill="none" stroke="#0b111c" stroke-width="14" stroke-linecap="round"/>
-        <!-- Battery fill -->
-        <path id="bat-arc" d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
-              fill="none" stroke="url(#batGrad)" stroke-width="11" stroke-linecap="round"
-              stroke-dasharray="0 509"
-              filter="url(#glow3b)"/>
-        <!-- Scale hints -->
-        <text x="42" y="222" font-family="Arial" font-size="9" fill="#1e2e3e" text-anchor="middle">0%</text>
-        <text x="218" y="222" font-family="Arial" font-size="9" fill="#1e2e3e" text-anchor="middle">100%</text>
-      </svg>
+
+    <!-- BMS mode -->
+    <div id="rp-bms" style="display:none;flex-direction:column;align-items:center;width:100%">
+      <div class="glabel">BATTERY<span>电量</span></div>
+      <div class="side-wrap">
+        <svg viewBox="0 0 260 260" style="width:100%">
+          <defs>
+            <linearGradient id="batGrad" x1="53.6" y1="0" x2="206.4" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#ff2244"/>
+              <stop offset="22%"  stop-color="#ff8800"/>
+              <stop offset="58%"  stop-color="#44dd88"/>
+              <stop offset="100%" stop-color="#00d4aa"/>
+            </linearGradient>
+            <filter id="glow3b">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <path d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
+                fill="none" stroke="#0b111c" stroke-width="14" stroke-linecap="round"/>
+          <path id="bat-arc" d="M 53.6 206.4 A 108 108 0 1 1 206.4 206.4"
+                fill="none" stroke="url(#batGrad)" stroke-width="11" stroke-linecap="round"
+                stroke-dasharray="0 509" filter="url(#glow3b)"/>
+          <text x="42"  y="222" font-family="Arial" font-size="14" fill="#1e2e3e" text-anchor="middle">0%</text>
+          <text x="218" y="222" font-family="Arial" font-size="14" fill="#1e2e3e" text-anchor="middle">100%</text>
+        </svg>
+      </div>
+      <div class="gnum" id="bat-pct">--%</div>
+      <div class="gunit" id="bat-v">-- V</div>
+      <div class="gsub">
+        <span><small>功率 </small><b id="bat-pwr">--</b><small> kW</small></span>
+        <span><small>电流 </small><b id="bat-a">--</b><small> A</small></span>
+        <span><small>温度 </small><b id="bat-t">--/--</b><small> °C</small></span>
+      </div>
     </div>
-    <div class="gnum" id="bat-pct">--%</div>
-    <div class="gunit" id="bat-v">-- V</div>
-    <div class="gsub">
-      <span><small>电流 </small><b id="bat-a">--</b><small> A</small></span>
-      <span><small>温度 </small><b id="bat-t">--/--</b><small> °C</small></span>
+
+    <!-- DAS mode (shown when BMS unavailable) -->
+    <div id="rp-das" style="width:100%;display:flex;flex-direction:column;align-items:center">
+      <div class="glabel">DAS STATUS<span>驾驶辅助</span></div>
+      <div class="das-grid">
+        <div class="das-item">
+          <div class="das-lbl">融合限速</div>
+          <div class="das-big" id="das-fused">--</div>
+          <div class="das-unit">km/h</div>
+        </div>
+        <div class="das-item">
+          <div class="das-lbl">摄像限速</div>
+          <div class="das-big" id="das-vis">--</div>
+          <div class="das-unit">km/h</div>
+        </div>
+        <div class="das-item">
+          <div class="das-lbl">AP 状态</div>
+          <div class="das-big" id="das-ap">--</div>
+          <div class="das-unit" id="das-ap-sub"></div>
+        </div>
+        <div class="das-item">
+          <div class="das-lbl">车道偏离</div>
+          <div class="das-big" id="das-ldw">--</div>
+          <div class="das-unit" id="das-ldw-sub"></div>
+        </div>
+      </div>
     </div>
+
   </div>
 
 </div><!-- /panels -->
@@ -424,14 +474,33 @@ var tok = sessionStorage.getItem('fsd_tok') || '';
 var SA = 895;          // speed arc total stroke-length px
 var GA = 509;          // side gauge arc total stroke-length px
 var MAX_SPD   = 200;   // kph at full scale
-var MAX_PWR_D = 150;   // kW discharge full scale
-var MAX_PWR_R = 60;    // kW regen full scale
 
 // ── Lerp state ────────────────────────────────────────────────
 var tSpd=0, cSpd=0;
 var tBat=0, cBat=0;
-var tPwr=0, cPwr=0;
+var tTqC=0, cTqC=0;   // torque command (Nm)
+var tTqA=0, cTqA=0;   // torque actual  (Nm)
 var K = 0.10;
+
+// ── Torque arc helper ─────────────────────────────────────────
+var MAX_TQ = 500;
+var TQ_CMD_LEN = 509;
+var TQ_ACT_LEN = 386;
+function setTorqArc(nm, isCmd) {
+  var len   = isCmd ? TQ_CMD_LEN : TQ_ACT_LEN;
+  var fill  = Math.min(Math.abs(nm) / MAX_TQ, 1) * len;
+  var da    = fill.toFixed(1) + ' ' + (len - fill).toFixed(1);
+  var zero  = '0 ' + len;
+  var s     = isCmd ? 'cmd' : 'act';
+  if (nm >= 0) {
+    document.getElementById('tq-' + s + '-drive').setAttribute('stroke-dasharray', da);
+    document.getElementById('tq-' + s + '-regen').setAttribute('stroke-dasharray', zero);
+  } else {
+    document.getElementById('tq-' + s + '-regen').setAttribute('stroke-dasharray', da);
+    document.getElementById('tq-' + s + '-drive').setAttribute('stroke-dasharray', zero);
+  }
+  document.getElementById('tq-' + s + '-txt').textContent = Math.round(nm);
+}
 
 // ── Network health ────────────────────────────────────────────
 var pollFails = 0;
@@ -501,7 +570,8 @@ function frame() {
   requestAnimationFrame(frame);
   cSpd = lerp(cSpd, tSpd, K);
   cBat = lerp(cBat, tBat, K);
-  cPwr = lerp(cPwr, tPwr, K);
+  cTqC = lerp(cTqC, tTqC, K);
+  cTqA = lerp(cTqA, tTqA, K);
 
   // Speed arc
   var sf = clamp(cSpd / MAX_SPD, 0, 1) * SA;
@@ -509,31 +579,14 @@ function frame() {
     .setAttribute('stroke-dasharray', sf.toFixed(1) + ' ' + (SA - sf).toFixed(1));
   document.getElementById('spd-txt').textContent = Math.round(cSpd);
 
-  // Battery arc
+  // Battery arc (only meaningful when rp-bms is visible)
   var bf = clamp(cBat / 100, 0, 1) * GA;
-  document.getElementById('bat-arc')
-    .setAttribute('stroke-dasharray', bf.toFixed(1) + ' ' + (GA - bf).toFixed(1));
+  var batArc = document.getElementById('bat-arc');
+  if (batArc) batArc.setAttribute('stroke-dasharray', bf.toFixed(1) + ' ' + (GA - bf).toFixed(1));
 
-  // Power arcs — show only the active direction
-  var pv = document.getElementById('pwr-val');
-  if (cPwr >= 0) {
-    var df = clamp(cPwr / MAX_PWR_D, 0, 1) * GA;
-    document.getElementById('pwr-disch')
-      .setAttribute('stroke-dasharray', df.toFixed(1) + ' ' + (GA - df).toFixed(1));
-    document.getElementById('pwr-regen')
-      .setAttribute('stroke-dasharray', '0 509');
-    var pv_int = Math.round(cPwr);
-    pv.textContent = (pv_int > 0 ? '+' : '') + pv_int;
-    pv.className = 'gnum ' + (pv_int > 1 ? 'pos' : 'zero');
-  } else {
-    var rf = clamp(-cPwr / MAX_PWR_R, 0, 1) * GA;
-    document.getElementById('pwr-regen')
-      .setAttribute('stroke-dasharray', rf.toFixed(1) + ' ' + (GA - rf).toFixed(1));
-    document.getElementById('pwr-disch')
-      .setAttribute('stroke-dasharray', '0 509');
-    pv.textContent = Math.round(cPwr);
-    pv.className = 'gnum neg';
-  }
+  // Torque arcs
+  setTorqArc(cTqC, true);
+  setTorqArc(cTqA, false);
 }
 
 // ── Data poll ─────────────────────────────────────────────────
@@ -554,35 +607,55 @@ function poll() {
       tSpd = d.canOK ? (d.speedD || 0) / 10 : 0;
       setGear(d.canOK ? d.gearRaw : 0);
 
-      // Power (from BMS — valid only when bmsSeen)
-      if (d.bmsSeen) {
-        var v = (d.bmsV || 0) / 100, a = (d.bmsA || 0) / 10;
-        tPwr = parseFloat((v * a / 1000).toFixed(2));
-        tBat = (d.bmsSoc || 0) / 10;
-        document.getElementById('bat-pct').textContent =
-          ((d.bmsSoc || 0) / 10).toFixed(1) + '%';
-        document.getElementById('bat-v').textContent =
-          ((d.bmsV || 0) / 100).toFixed(1) + ' V';
-        document.getElementById('bat-a').textContent =
-          ((d.bmsA || 0) / 10).toFixed(1);
-        document.getElementById('bat-t').textContent =
-          d.bmsMinT + '/' + d.bmsMaxT;
-        document.getElementById('tb-temp').textContent =
-          d.bmsMinT + '/' + d.bmsMaxT + ' °C';
-      } else {
-        tPwr = 0;
-        document.getElementById('bat-pct').textContent = '--%';
-        document.getElementById('bat-v').textContent   = '-- V';
-        document.getElementById('bat-a').textContent   = '--';
-        document.getElementById('bat-t').textContent   = '--/--';
-        document.getElementById('tb-temp').textContent = '--/-- °C';
-      }
+      // Torque (always available when CAN is online)
+      tTqC = d.canOK ? (d.torqueF || 0) * 2 : 0;
+      tTqA = d.canOK ? (d.torqueR || 0) * 2 : 0;
 
-      // Torque
-      document.getElementById('tf-val').textContent =
-        d.canOK ? Math.round((d.torqueF || 0) * 2) : '--';
-      document.getElementById('tr-val').textContent =
-        d.canOK ? Math.round((d.torqueR || 0) * 2) : '--';
+      // Right panel: BMS mode or DAS mode
+      var rpBms = document.getElementById('rp-bms');
+      var rpDas = document.getElementById('rp-das');
+      if (d.bmsSeen) {
+        rpBms.style.display = 'flex';
+        rpDas.style.display = 'none';
+        var v = (d.bmsV || 0) / 100, a = (d.bmsA || 0) / 10;
+        var kw = parseFloat((v * a / 1000).toFixed(1));
+        tBat = (d.bmsSoc || 0) / 10;
+        document.getElementById('bat-pct').textContent = tBat.toFixed(1) + '%';
+        document.getElementById('bat-v').textContent   = v.toFixed(1) + ' V';
+        document.getElementById('bat-pwr').textContent = (kw > 0 ? '+' : '') + kw;
+        document.getElementById('bat-a').textContent   = a.toFixed(1);
+        document.getElementById('bat-t').textContent   = d.bmsMinT + '/' + d.bmsMaxT;
+        document.getElementById('tb-temp').textContent = d.bmsMinT + '/' + d.bmsMaxT + ' °C';
+      } else {
+        rpBms.style.display = 'none';
+        rpDas.style.display = 'flex';
+        tBat = 0;
+        document.getElementById('tb-temp').textContent = '--/-- °C';
+        // Fused speed limit (0=SNA, 31=NONE, 1-30=valid ×5 kph)
+        var fl = d.speedLimit || 0;
+        var flOk = fl > 0 && fl < 31;
+        var fe = document.getElementById('das-fused');
+        fe.textContent = flOk ? fl * 5 : '--';
+        fe.className = 'das-big' + (flOk ? ' on' : '');
+        // Vision speed limit (0=SNA, 31=NONE, 1-30=valid ×5 kph)
+        var vl = d.visionLimit || 0;
+        var vlOk = vl > 0 && vl < 31;
+        var ve = document.getElementById('das-vis');
+        ve.textContent = vlOk ? vl * 5 : '--';
+        ve.className = 'das-big' + (vlOk ? ' on' : '');
+        // AP/ACC state
+        var ac = d.accState || 0;
+        var ae = document.getElementById('das-ap');
+        ae.textContent = ac > 0 ? 'ON' : 'OFF';
+        ae.className = 'das-big' + (ac > 0 ? ' on' : '');
+        document.getElementById('das-ap-sub').textContent = ac > 0 ? 'ACC/AP 激活' : '';
+        // Lane departure
+        var lw = d.laneWarn || 0;
+        var le = document.getElementById('das-ldw');
+        le.textContent = lw > 0 ? '⚠' : 'OK';
+        le.className = 'das-big' + (lw > 0 ? ' warn' : '');
+        document.getElementById('das-ldw-sub').textContent = lw > 0 ? '车道偏离' : '';
+      }
 
       // AP / FSD badge — show only one: AP takes priority when ACC/AP is engaged
       // fsdTriggered alone only means "UI selected FSD"; actual injection requires fsdEnable too
@@ -610,13 +683,12 @@ function poll() {
       document.getElementById('brake-dot').className =
         d.brake ? 'brake-dot on' : 'brake-dot';
 
-      // Nag level dots
-      updateNag(d.nagLevel || 0);
 
-      // Vision speed limit sign
+      // Vision speed limit sign (0=SNA, 31=NONE, 1-30=valid)
       var lim = d.visionLimit || 0;
+      var limOk = lim > 0 && lim < 31;
       var sg = document.getElementById('spd-limit-g');
-      if (lim > 0) {
+      if (limOk) {
         document.getElementById('spd-limit-txt').textContent = lim * 5;
         sg.setAttribute('visibility', 'visible');
       } else {

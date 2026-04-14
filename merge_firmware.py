@@ -40,8 +40,13 @@ def merge_firmware(source, target, env):
                         version = m.group(1)
                     break
 
-    merged_out = os.path.join(project_dir, f"firmware_{env_name}_v{version}.bin")
-    ota_out    = os.path.join(project_dir, f"firmware_{env_name}_v{version}_ota.bin")
+    # Debug builds go into the debug/ subfolder; release builds stay in root.
+    is_debug = "debug" in env_name
+    out_dir  = os.path.join(project_dir, "debug") if is_debug else project_dir
+    os.makedirs(out_dir, exist_ok=True)
+
+    merged_out = os.path.join(out_dir, f"firmware_{env_name}_v{version}.bin")
+    ota_out    = os.path.join(out_dir, f"firmware_{env_name}_v{version}_ota.bin")
 
     # OTA binary = plain app image (no bootloader / partitions)
     shutil.copy(app_bin, ota_out)

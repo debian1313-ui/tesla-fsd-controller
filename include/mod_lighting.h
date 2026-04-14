@@ -83,27 +83,42 @@ inline void tryAPRestart(CanDriver& driver) {
 // retransmits. Always forwards so the car's SCCM watchdog stays happy.
 //
 // Gesture control (requires adaptiveLighting):
-//   Force OFF → 2 quick PULL taps within 700 ms → Force ON
-//   Force ON  → 1 PULL tap                      → Force OFF
+//   Force OFF → 3 quick PULL taps within 1000 ms → Force ON
+//   Force ON  → 1 PULL tap                       → Force OFF
 //
 // Bit mask 0xCF = 1100_1111: preserves washWipe bits[7:6] and counter bits[3:0],
 // overwriting only highBeam bits[5:4].
 
-static constexpr uint32_t HB_GESTURE_WINDOW_MS = 700;
-static constexpr uint8_t  HB_GESTURE_TAPS_ON   = 2;
+static constexpr uint32_t HB_GESTURE_WINDOW_MS = 1000;
+static constexpr uint8_t  HB_GESTURE_TAPS_ON   = 3;
 
 static uint8_t  hbTapCount   = 0;
 static uint32_t hbLastTapMs  = 0;
 static bool     hbPullActive = false;   // true while stalk is held PULL
 
+// Call on CAN bus-off to prevent spurious frames during recovery from
+// completing a partially-accumulated gesture.
+inline void resetStalkGestureState() {
+    hbTapCount   = 0;
+    hbLastTapMs  = 0;
+    hbPullActive = false;
+}
+
 inline void handleSCCMStalk(CanFrame& frame, CanDriver& driver) {
-    if (cfg.adaptiveLighting && frame.dlc >= 3) {
+    if (frame.dlc >= 3) {
         uint8_t physHB = (frame.data[1] >> 4) & 0x03;
         bool isPull = (physHB == 1);
 
+        // Expire gesture window proactively so a stale partial count
+        // cannot be completed by spurious frames after CAN recovery.
+        uint32_t now = millis();
+        if (hbTapCount > 0 && hbLastTapMs > 0 &&
+            now - hbLastTapMs > HB_GESTURE_WINDOW_MS) {
+            hbTapCount = 0;
+        }
+
         // Detect rising edge (new tap)
         if (isPull && !hbPullActive) {
-            uint32_t now = millis();
             if (now - hbLastTapMs > HB_GESTURE_WINDOW_MS) hbTapCount = 0;
             hbTapCount++;
             hbLastTapMs = now;

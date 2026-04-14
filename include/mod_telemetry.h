@@ -1,12 +1,11 @@
 #pragma once
 // ── Module: Telemetry ring buffer ────────────────────────────────────────────
 // Parses additional CAN frames for vehicle state (speed, gear, torque, brake).
-// Provides a 600-record circular buffer sampled at 1 Hz from canTask.
-// CSV download served via /api/log in main.cpp.
+// Provides live-state accessors for /api/status JSON.
+// TODO: 600-record 1Hz ring buffer + /api/csv export not yet implemented.
 //
 // Single-TU project — static buffer lives here, not duplicated. No ODR risk.
-// NOLINT(misc-definitions-in-headers) applies to the logBuf/logHead/logCount
-// statics below.
+// NOLINT(misc-definitions-in-headers) applies to the telem_* statics below.
 //
 // Newly parsed IDs (opendbc tesla_model3_party.dbc, verified):
 //   0x257 (599) — DI_speed         [DI_vehicleSpeed bit12|12 ×0.08−40 kph; stored ×10]

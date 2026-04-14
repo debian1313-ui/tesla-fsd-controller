@@ -96,7 +96,7 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
         auto index = readMuxID(frame);
         if (index == 0) cfg.fsdTriggered = cfg.forceActivate || isFSDSelectedInUI(frame);
         if (index == 0 && cfg.fsdTriggered && cfg.fsdEnable) {
-            cfg.hw3SpeedOffset = std::max(std::min(((int)((frame.data[3] >> 1) & 0x3F) - 30) * 5, 50), 0);
+            cfg.hw3SpeedOffset = std::max(std::min(((int)((frame.data[3] >> 1) & 0x3F) - 30) * 5, 100), 0);
             setBit(frame, 46, true);
             setSpeedProfileV12V13(frame, cfg.speedProfile);
             if (driver.send(frame)) cfg.modifiedCount++;
@@ -108,12 +108,30 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
             else                    cfg.errorCount++;
         }
         if (index == 2 && cfg.fsdTriggered && cfg.fsdEnable) {
-            int offset = (cfg.hw3OffsetManual >= 0) ? cfg.hw3OffsetManual : cfg.hw3SpeedOffset;
-            // 20% speed-limit cap: maxOffset = visionSpeedLimit×5×0.2 = visionSpeedLimit (km/h)
-            if (cfg.hw3SpeedCapEnable && cfg.visionSpeedLimit > 0) {
-                int maxOff = (int)cfg.visionSpeedLimit;
-                if (offset > maxOff) offset = maxOff;
+            int offset;
+            if (cfg.hw3SmartEnable) {
+                // Smart mode: pick offset tier based on current speed limit
+                uint8_t lim = cfg.fusedSpeedLimit > 0 ? cfg.fusedSpeedLimit : cfg.visionSpeedLimit;
+                if (lim > 0) {
+                    int speedKph = lim * 5;
+                    uint8_t tier = (speedKph < cfg.hw3SmartT1) ? 1 :
+                                   (speedKph < cfg.hw3SmartT2) ? 2 : 3;
+                    int kmh = (tier == 1) ? cfg.hw3SmartO1 :
+                              (tier == 2) ? cfg.hw3SmartO2 : cfg.hw3SmartO3;
+                    cfg.hw3SmartActiveTier = tier;
+                    cfg.hw3SmartLastKmh    = (uint8_t)kmh;
+                    offset = kmh * 5;
+                } else {
+                    // Speed limit unknown — hold last valid offset, do not drop to zero
+                    offset = cfg.hw3SmartLastKmh * 5;
+                    // tier stays at last known value (do not reset to 0)
+                }
+            } else {
+                // Manual mode: fixed offset (or auto from mux-0)
+                cfg.hw3SmartActiveTier = 0;
+                offset = (cfg.hw3OffsetManual >= 0) ? cfg.hw3OffsetManual : cfg.hw3SpeedOffset;
             }
+            offset = std::max(std::min(offset, 100), 0);
             frame.data[0] &= ~(0b11000000);
             frame.data[1] &= ~(0b00111111);
             frame.data[0] |= (offset & 0x03) << 6;
@@ -126,9 +144,12 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
 
 // ── Handler: HW4 (0x3FD / 0x3F8 / 0x399) ────────────────────────────────
 static void handleHW4(CanFrame& frame, CanDriver& driver) {
-    // 0x399 (921) — ISA speed-limit chime suppression
-    if (cfg.isaChimeSuppress && frame.id == 921) {
+    // 0x399 (921) — ISA speed-limit chime suppression + fused speed limit read
+    if (frame.id == 921) {
         if (frame.dlc < 8) return;
+        cfg.fusedSpeedLimit  = frame.data[1] & 0x1F;  // DAS_fusedSpeedLimit  byte1[4:0] ×5=kph
+        cfg.visionSpeedLimit = frame.data[2] & 0x1F;  // DAS_visionOnlySpeedLimit byte2[4:0] ×5=kph
+        if (!cfg.isaChimeSuppress) return;
         frame.data[1] |= 0x20;
         uint8_t sum = 0;
         for (int i = 0; i < 7; i++) sum += frame.data[i];

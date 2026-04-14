@@ -15,8 +15,7 @@ struct FSDConfig {
     volatile bool     emergencyDetection  = true;
     volatile bool     forceActivate       = false;   // bypass isFSDSelectedInUI (regions without TLSSC)
     volatile int      hw3SpeedOffset      = 0;       // cached from mux-0 frame, used in mux-2
-    volatile int      hw3OffsetManual     = -1;      // -1=auto(from CAN), 0-50=user override (km/h)
-    volatile bool     hw3SpeedCapEnable   = false;   // cap offset to 20% of visionSpeedLimit
+    volatile int      hw3OffsetManual     = -1;      // -1=auto(from CAN), 0-100=user override (CAN units, ÷5=km/h)
     volatile bool     precondition        = false;   // trigger battery preheating via 0x082
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
 
@@ -30,10 +29,11 @@ struct FSDConfig {
 
     // Lighting — read from 0x293 (DAS_settings)
     volatile bool     adaptiveLighting    = false;  // DAS_adaptiveHeadlights bit 22
-    volatile bool     highBeamForce       = false;  // user override (only when adaptiveLighting)
+    volatile bool     highBeamForce       = false;  // user override via UI or stalk gesture
 
-    // DAS status — read from 0x39B (DAS_status) and 0x389 (DAS_status2)
-    volatile uint8_t  visionSpeedLimit    = 0;   // DAS_visionOnlySpeedLimit   bit16|5  ×5=kph; 0=none
+    // DAS status — read from 0x39B (DAS_status), 0x399 (DAS_status ISA) and 0x389 (DAS_status2)
+    volatile uint8_t  fusedSpeedLimit     = 0;   // DAS_fusedSpeedLimit        0x399 byte1[4:0]  ×5=kph; 0=none (camera+map)
+    volatile uint8_t  visionSpeedLimit    = 0;   // DAS_visionOnlySpeedLimit   0x39B bit16|5     ×5=kph; 0=none (camera only)
     volatile uint8_t  nagLevel            = 0;   // DAS_autopilotHandsOnState  bit42|4  0=ok, 1-15=nag
     volatile uint8_t  fcwLevel            = 0;   // DAS_forwardCollisionWarning bit22|2  0=none
     volatile uint8_t  accState            = 0;   // DAS_ACC_report             bit26|5  0=off, >0=AP active
@@ -50,6 +50,28 @@ struct FSDConfig {
     volatile bool     apRestart           = false;
     volatile uint8_t  apRestartCache[8]   = {};    // last received 0x293 raw bytes
     volatile bool     apRestartValid      = false; // cache has at least one frame
+
+    // HW3 Smart Speed Offset
+    volatile bool    hw3SmartEnable       = false; // auto-adjust offset by speed tier
+    volatile uint8_t hw3SmartT1           = 60;    // kph: below this → tier 1
+    volatile uint8_t hw3SmartT2           = 100;   // kph: below this → tier 2, else tier 3
+    volatile uint8_t hw3SmartO1           = 20;    // km/h offset for tier 1 (<T1)
+    volatile uint8_t hw3SmartO2           = 15;    // km/h offset for tier 2 (T1~T2)
+    volatile uint8_t hw3SmartO3           = 10;    // km/h offset for tier 3 (>T2)
+    volatile uint8_t hw3SmartLastKmh      = 15;    // last valid computed offset (fallback when limit=0); init=tier2 default
+    volatile uint8_t hw3SmartActiveTier  = 0;     // currently active tier: 1/2/3; 0=smart disabled or limit unknown
+
+    // Nag killer — echo 0x370 EPAS3S_sysStatus with counter+1
+    // Makes AP think EPAS is continuously providing fresh data.
+    // WARNING: bypasses hands-on detection. Use with extreme caution.
+    volatile bool     nagKiller           = false;
+
+    // Performance test — 0→100 acceleration and 100→0 braking
+    volatile uint8_t  perfAccelState      = 0;   // 0=idle,1=armed,2=running,3=done
+    volatile uint8_t  perfBrakeState      = 0;
+    volatile uint32_t perfAccelMs         = 0;   // result ms
+    volatile uint32_t perfBrakeMs         = 0;   // result ms
+    volatile uint8_t  perfBrakeEntryKph   = 0;   // actual speed (kph) when braking started
 
     // Statistics
     volatile uint32_t rxCount             = 0;

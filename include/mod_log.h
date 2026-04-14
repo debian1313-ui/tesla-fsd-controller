@@ -22,6 +22,11 @@ static char     diagBuf[DIAG_CAP][DIAG_LINE_MAX];  // NOLINT
 static uint16_t diagHead  = 0;                      // NOLINT — next write slot
 static uint16_t diagCount = 0;                      // NOLINT — entries stored (≤ DIAG_CAP)
 
+// SPIFFS flush cursor — total entries ever written (never wraps).
+// Core 0 compares against diagTotal to find entries not yet flushed to flash.
+static volatile uint32_t diagTotal    = 0;  // NOLINT — incremented by addDiagLog
+static          uint32_t diagFlushed  = 0;  // NOLINT — updated by flushLogsToSpiffs (Core 0 only)
+
 inline void addDiagLog(uint32_t uptime_s, const char* msg) {
     uint32_t h = uptime_s / 3600;
     uint32_t m = (uptime_s % 3600) / 60;
@@ -30,6 +35,7 @@ inline void addDiagLog(uint32_t uptime_s, const char* msg) {
              "[%02u:%02u:%02u] %s", (unsigned)h, (unsigned)m, (unsigned)s, msg);
     diagHead  = (uint16_t)((diagHead + 1) % DIAG_CAP);
     if (diagCount < DIAG_CAP) diagCount++;
+    diagTotal++;  // monotonic counter — signals Core 0 that a new entry needs flushing
 }
 
 inline uint16_t diagLogCount() { return diagCount; }
@@ -39,4 +45,4 @@ inline const char* diagLogAt(uint16_t i) {
     return diagBuf[(uint16_t)((start + i) % DIAG_CAP)];
 }
 
-inline void diagLogClear() { diagHead = 0; diagCount = 0; }
+inline void diagLogClear() { diagHead = 0; diagCount = 0; diagTotal = 0; diagFlushed = 0; }

@@ -30,6 +30,8 @@ FSDConfig cfg;  // NOLINT(misc-definitions-in-headers)
 #include "mod_telemetry.h"
 #include "mod_lighting.h"
 #include "mod_das_status.h"
+#include "mod_perf.h"
+#include "mod_nag.h"
 
 // ── Unified dispatch ───────────────────────────────────────────────────────
 // Called for every received CAN frame. Routes to the appropriate module.
@@ -60,6 +62,15 @@ static void handleMessage(CanFrame& frame, CanDriver& driver) {
     if (frame.id == 923) { handleDASStatus(frame);            return; }  // 0x39B DAS_status
     if (frame.id == 905) { handleDASStatus2(frame);           return; }  // 0x389 DAS_status2
     if (frame.id == 585) { handleSCCMStalk(frame, driver);    return; }  // 0x249 SCCM_leftStalk
+    if (frame.id == 880) { handleEPASNag(frame, driver);      return; }  // 0x370 EPAS3S_sysStatus
+    // 0x399 speed limits for HW3/Legacy — HW4 handles this inside handleHW4 via filter
+    if (frame.id == 921 && cfg.hwMode != 2) {
+        if (frame.dlc >= 3) {
+            cfg.fusedSpeedLimit  = frame.data[1] & 0x1F;  // DAS_fusedSpeedLimit  ×5=kph
+            cfg.visionSpeedLimit = frame.data[2] & 0x1F;  // DAS_visionOnlySpeedLimit ×5=kph
+        }
+        return;
+    }
 
     // FSD injection — route to hardware-specific handler
     if (!isFilteredId(frame.id)) return;

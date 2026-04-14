@@ -8,12 +8,15 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <DNSServer.h>
 #include <ESPmDNS.h>
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 #include <driver/twai.h>
+#include <esp_netif.h>
+#include <SPIFFS.h>
 
 #include "can_frame_types.h"
 #include "drivers/twai_driver.h"
@@ -21,6 +24,7 @@
 #include "version.h"
 #include "web_ui.h"
 #include "web_ui_dash.h"
+#include "web_perf.h"
 
 // ── WiFi AP config (NVS-overridable) ──
 static char apSSID[33] = "FSD-Controller";
@@ -32,6 +36,7 @@ static char staPass[64] = "";
 static bool staConnected = false;
 
 // ── Globals ──
+static DNSServer      dnsServer;
 static TWAIDriver     canDriver;
 static AsyncWebServer server(80);
 static Preferences    prefs;
@@ -86,8 +91,15 @@ void loadConfig() {
     cfg.emergencyDetection = prefs.getBool("emDet", true);
     cfg.forceActivate      = prefs.getBool("cnMode", false);
     cfg.hw3OffsetManual    = prefs.getInt("hw3Off", -1);
-    cfg.hw3SpeedCapEnable  = prefs.getBool("hw3Cap", false);
-    cfg.precondition       = prefs.getBool("precond", false);
+    cfg.apRestart          = prefs.getBool("apRestart", false);
+    cfg.hw3SmartEnable     = prefs.getBool("hw3SmEn", false);
+    cfg.hw3SmartT1         = prefs.getUChar("hw3SmT1", 60);
+    cfg.hw3SmartT2         = prefs.getUChar("hw3SmT2", 100);
+    cfg.hw3SmartO1         = prefs.getUChar("hw3SmO1", 20);
+    cfg.hw3SmartO2         = prefs.getUChar("hw3SmO2", 15);
+    cfg.hw3SmartO3         = prefs.getUChar("hw3SmO3", 10);
+    cfg.precondition       = prefs.getBool("precond",  false);
+    cfg.nagKiller          = prefs.getBool("nagKill",  false);
     strlcpy(apSSID, prefs.getString("apSSID", "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass, prefs.getString("apPass", "12345678").c_str(), sizeof(apPass));
     strlcpy(staSSID, prefs.getString("staSSID", "").c_str(), sizeof(staSSID));
@@ -103,6 +115,8 @@ void loadConfig() {
     // Clamp values
     if (cfg.hwMode > 2)       cfg.hwMode = 2;
     if (cfg.speedProfile > 4) cfg.speedProfile = 1;
+
+    cfg.hw3SmartLastKmh = cfg.hw3SmartO2;  // sync fallback to current tier-2 default
 }
 
 void saveConfig() {
@@ -114,10 +128,108 @@ void saveConfig() {
     prefs.putBool("isaChm",  cfg.isaChimeSuppress);
     prefs.putBool("emDet",   cfg.emergencyDetection);
     prefs.putBool("cnMode",  cfg.forceActivate);
-    prefs.putInt("hw3Off",   cfg.hw3OffsetManual);
-    prefs.putBool("hw3Cap",  cfg.hw3SpeedCapEnable);
-    prefs.putBool("precond", cfg.precondition);
+    prefs.putInt("hw3Off",    cfg.hw3OffsetManual);
+    prefs.putBool("apRestart", cfg.apRestart);
+    prefs.putBool("hw3SmEn",   cfg.hw3SmartEnable);
+    prefs.putUChar("hw3SmT1", cfg.hw3SmartT1);
+    prefs.putUChar("hw3SmT2", cfg.hw3SmartT2);
+    prefs.putUChar("hw3SmO1", cfg.hw3SmartO1);
+    prefs.putUChar("hw3SmO2", cfg.hw3SmartO2);
+    prefs.putUChar("hw3SmO3", cfg.hw3SmartO3);
+    prefs.putBool("precond",   cfg.precondition);
+    prefs.putBool("nagKill",   cfg.nagKiller);
     prefs.end();
+}
+
+// ═══════════════════════════════════════════
+//  SPIFFS persistent log  (Core 0 only)
+// ═══════════════════════════════════════════
+// File: /diag.log  max ~96 KB.
+// When the file exceeds SPIFFS_LOG_MAX, the back half is kept (rotate in-place).
+// All writes happen from Core 0 (loop / setupWebServer) — never from canTask.
+
+static constexpr size_t SPIFFS_LOG_MAX   = 96 * 1024;  // 96 KB rotate threshold
+static constexpr size_t SPIFFS_LOG_KEEP  = 48 * 1024;  // keep last 48 KB after rotate
+static const char*      SPIFFS_LOG_PATH  = "/diag.log";
+static bool             spiffsOK         = false;
+
+// Rotate: keep only the last SPIFFS_LOG_KEEP bytes of the file.
+static void spiffsRotate() {
+    File f = SPIFFS.open(SPIFFS_LOG_PATH, "r");
+    if (!f) return;
+    size_t sz = f.size();
+    if (sz <= SPIFFS_LOG_KEEP) { f.close(); return; }
+    size_t skip = sz - SPIFFS_LOG_KEEP;
+    f.seek(skip);
+    // Read tail into a temporary buffer and rewrite the file.
+    // We do this in 2 KB chunks to avoid a large stack allocation.
+    static uint8_t rotBuf[2048];
+    File tmp = SPIFFS.open("/diag.tmp", "w");
+    if (!tmp) { f.close(); return; }
+    while (f.available()) {
+        size_t n = f.readBytes((char*)rotBuf, sizeof(rotBuf));
+        if (n > 0) tmp.write(rotBuf, n);
+    }
+    f.close();
+    tmp.close();
+    SPIFFS.remove(SPIFFS_LOG_PATH);
+    SPIFFS.rename("/diag.tmp", SPIFFS_LOG_PATH);
+}
+
+// Called once during setup — mount SPIFFS and write a BOOT marker.
+static void setupSpiffs(const char* fwVersion) {
+    if (!SPIFFS.begin(/*formatOnFail=*/true)) {
+        Serial.println("[SPIFFS] mount failed");
+        return;
+    }
+    spiffsOK = true;
+    File f = SPIFFS.open(SPIFFS_LOG_PATH, "a");
+    if (f) {
+        char marker[64];
+        snprintf(marker, sizeof(marker), "\n=== BOOT v%s ===\n", fwVersion);
+        f.print(marker);
+        f.close();
+    }
+    size_t total = SPIFFS.totalBytes();
+    size_t used  = SPIFFS.usedBytes();
+    Serial.printf("[SPIFFS] mounted  total=%u used=%u\n", (unsigned)total, (unsigned)used);
+}
+
+// Called from loop() every 3 s — appends any new RAM ring-buffer entries to flash.
+static void flushLogsToSpiffs() {
+    if (!spiffsOK) return;
+    uint32_t total = diagTotal;  // snapshot (volatile read)
+    if (total == diagFlushed) return;  // nothing new
+
+    File f = SPIFFS.open(SPIFFS_LOG_PATH, "a");
+    if (!f) return;
+
+    // Walk the ring buffer from diagFlushed to total.
+    // diagBuf holds at most DIAG_CAP entries; if more than DIAG_CAP have been written
+    // since last flush we can only recover the most recent DIAG_CAP.
+    uint32_t pending = total - diagFlushed;
+    uint32_t skip    = (pending > DIAG_CAP) ? pending - DIAG_CAP : 0;
+    uint32_t start   = diagFlushed + skip;
+
+    for (uint32_t t = start; t < total; t++) {
+        // Map monotonic index t → ring buffer slot.
+        // diagHead points to the *next* write slot, so the oldest entry in the
+        // ring is at (diagHead + DIAG_CAP - diagCount) % DIAG_CAP when full.
+        // Simpler: entry at absolute index t is at slot t % DIAG_CAP.
+        uint16_t slot = (uint16_t)(t % DIAG_CAP);
+        f.print(diagBuf[slot]);
+        f.print('\n');
+    }
+    f.close();
+    diagFlushed = total;
+
+    // Rotate if the file has grown too large.
+    File fr = SPIFFS.open(SPIFFS_LOG_PATH, "r");
+    if (fr) {
+        size_t sz = fr.size();
+        fr.close();
+        if (sz >= SPIFFS_LOG_MAX) spiffsRotate();
+    }
 }
 
 // ═══════════════════════════════════════════
@@ -125,6 +237,27 @@ void saveConfig() {
 // ═══════════════════════════════════════════
 
 void setupWebServer() {
+    // ── Captive portal — iOS & Android auto-detection ─────────────────
+    // iOS tries /hotspot-detect.html; redirect to main page.
+    server.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->redirect("http://" + WiFi.softAPIP().toString() + "/");
+    });
+    // iOS 14+
+    server.on("/library/test/success.html", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/html", "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
+    });
+    // Android generate_204
+    server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->redirect("http://" + WiFi.softAPIP().toString() + "/");
+    });
+    // Windows NCSI
+    server.on("/connecttest.txt", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/plain", "Microsoft NCSI");
+    });
+    server.on("/ncsi.txt", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/plain", "Microsoft NCSI");
+    });
+
     // Serve UI
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
         req->send_P(200, "text/html", INDEX_HTML);
@@ -133,6 +266,26 @@ void setupWebServer() {
     // Dashboard page — instrument cluster view (token checked via JS)
     server.on("/dash", HTTP_GET, [](AsyncWebServerRequest* req) {
         req->send_P(200, "text/html", DASH_HTML);
+    });
+
+    // Performance test page
+    server.on("/perf", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send_P(200, "text/html", PERF_HTML);
+    });
+
+    // Performance test control API
+    server.on("/api/perf", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "Forbidden"); return; }
+        if (req->hasParam("cmd")) {
+            String cmd = req->getParam("cmd")->value();
+            if (cmd == "arm_accel")   { cfg.perfAccelState = 1; cfg.perfAccelMs = 0; }
+            else if (cmd == "arm_brake")  { cfg.perfBrakeState = 1; cfg.perfBrakeMs = 0; }
+            else if (cmd == "reset_accel"){ cfg.perfAccelState = 0; cfg.perfAccelMs = 0; }
+            else if (cmd == "reset_brake"){ cfg.perfBrakeState = 0; cfg.perfBrakeMs = 0; }
+            else if (cmd == "reset")  { cfg.perfAccelState = 0; cfg.perfAccelMs = 0;
+                                        cfg.perfBrakeState = 0; cfg.perfBrakeMs = 0; }
+        }
+        req->send(200, "application/json", "{\"ok\":true}");
     });
 
     // Status JSON — use %u for uint32_t on ESP32
@@ -149,14 +302,17 @@ void setupWebServer() {
             *dst++ = *src++;
         }
 
-        char buf[1280];
-        static_assert(sizeof(buf) >= 1280, "JSON buffer too small");
+        char buf[1500];
+        static_assert(sizeof(buf) >= 1500, "JSON buffer too small");
         snprintf(buf, sizeof(buf),
             "{\"rx\":%u,\"modified\":%u,\"errors\":%u,\"uptime\":%u,"
             "\"canOK\":%s,\"fsdTriggered\":%s,"
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,"
-            "\"hw3Offset\":%d,\"hw3Cap\":%s,\"precond\":%d,\"hwDetected\":%d,"
+            "\"hw3Offset\":%d,\"precond\":%d,\"hwDetected\":%d,"
+            "\"hw3Smart\":%d,\"hw3SmT1\":%d,\"hw3SmT2\":%d,"
+            "\"hw3SmO1\":%d,\"hw3SmO2\":%d,\"hw3SmO3\":%d,"
+            "\"fusedLimit\":%u,\"smartTier\":%u,\"smartKmh\":%u,"
             "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
             "\"freeHeap\":%u,\"safeMode\":%s,\"pinRequired\":%s,"
@@ -166,7 +322,8 @@ void setupWebServer() {
             "\"visionLimit\":%u,\"nagLevel\":%u,\"fcw\":%u,\"accState\":%u,\"brake\":%s,"
             "\"sideCol\":%u,\"laneWarn\":%u,\"laneChg\":%u,"
             "\"autosteer\":%s,\"aeb\":%s,\"fcwOn\":%s,"
-            "\"apRestart\":%s,"
+            "\"apRestart\":%s,\"nagKiller\":%s,"
+            "\"perfAccel\":%u,\"perfBrake\":%u,\"perfAccelMs\":%u,\"perfBrakeMs\":%u,\"brakeEntryKph\":%u,"
             "\"apSSID\":\"%s\",\"staSSID\":\"%s\",\"staIP\":\"%s\",\"staOK\":%s,"
             "\"version\":\"%s\"}",
             (unsigned)cfg.rxCount, (unsigned)cfg.modifiedCount,
@@ -181,9 +338,12 @@ void setupWebServer() {
             (int)cfg.emergencyDetection,
             (int)cfg.forceActivate,
             (int)cfg.hw3OffsetManual,
-            cfg.hw3SpeedCapEnable ? "true" : "false",
             (int)cfg.precondition,
             (int)cfg.hwDetected,
+            (int)cfg.hw3SmartEnable,
+            (int)cfg.hw3SmartT1, (int)cfg.hw3SmartT2,
+            (int)cfg.hw3SmartO1, (int)cfg.hw3SmartO2, (int)cfg.hw3SmartO3,
+            (unsigned)cfg.fusedSpeedLimit, (unsigned)cfg.hw3SmartActiveTier, (unsigned)cfg.hw3SmartLastKmh,
             cfg.bmsSeen ? "true" : "false",
             (unsigned)cfg.packVoltage_cV,   // ÷100 = V  (done in JS)
             (int)cfg.packCurrent_dA,        // ÷10  = A  (done in JS)
@@ -210,6 +370,10 @@ void setupWebServer() {
             cfg.aebOn       ? "true" : "false",
             cfg.fcwOn       ? "true" : "false",
             cfg.apRestart   ? "true" : "false",
+            cfg.nagKiller   ? "true" : "false",
+            (unsigned)cfg.perfAccelState, (unsigned)cfg.perfBrakeState,
+            (unsigned)cfg.perfAccelMs,    (unsigned)cfg.perfBrakeMs,
+            (unsigned)cfg.perfBrakeEntryKph,
             escapedSSID,
             staSSID,
             staConnected ? WiFi.localIP().toString().c_str() : "",
@@ -296,17 +460,38 @@ void setupWebServer() {
         }
         if (req->hasParam("hw3Offset")) {
             int v = req->getParam("hw3Offset")->value().toInt();
-            if ((v == -1 || (v >= 0 && v <= 50)) && v != cfg.hw3OffsetManual) {
+            if ((v == -1 || (v >= 0 && v <= 100)) && v != cfg.hw3OffsetManual) {
                 cfg.hw3OffsetManual = v; changed = true;
             }
         }
-        if (req->hasParam("hw3Cap")) {
-            bool v = req->getParam("hw3Cap")->value().toInt() != 0;
-            if (v != cfg.hw3SpeedCapEnable) { cfg.hw3SpeedCapEnable = v; changed = true; }
+        if (req->hasParam("hw3Smart")) {
+            bool v = req->getParam("hw3Smart")->value().toInt() != 0;
+            if (v != cfg.hw3SmartEnable) { cfg.hw3SmartEnable = v; changed = true; }
         }
-        if (req->hasParam("precond")) {
-            bool v = req->getParam("precond")->value().toInt() != 0;
-            if (v != cfg.precondition) { cfg.precondition = v; changed = true; }
+        if (req->hasParam("hw3SmT1")) {
+            uint8_t v = (uint8_t)constrain(req->getParam("hw3SmT1")->value().toInt(), 20, 180);
+            if (v != cfg.hw3SmartT1) { cfg.hw3SmartT1 = v; changed = true; }
+        }
+        if (req->hasParam("hw3SmT2")) {
+            uint8_t v = (uint8_t)constrain(req->getParam("hw3SmT2")->value().toInt(), 20, 200);
+            if (v != cfg.hw3SmartT2) { cfg.hw3SmartT2 = v; changed = true; }
+        }
+        if (req->hasParam("hw3SmO1")) {
+            uint8_t v = (uint8_t)constrain(req->getParam("hw3SmO1")->value().toInt(), 0, 20);
+            if (v != cfg.hw3SmartO1) { cfg.hw3SmartO1 = v; changed = true; }
+        }
+        if (req->hasParam("hw3SmO2")) {
+            uint8_t v = (uint8_t)constrain(req->getParam("hw3SmO2")->value().toInt(), 0, 20);
+            if (v != cfg.hw3SmartO2) { cfg.hw3SmartO2 = v; changed = true; }
+        }
+        if (req->hasParam("hw3SmO3")) {
+            uint8_t v = (uint8_t)constrain(req->getParam("hw3SmO3")->value().toInt(), 0, 20);
+            if (v != cfg.hw3SmartO3) { cfg.hw3SmartO3 = v; changed = true; }
+        }
+        // precond removed from UI — requires Vehicle CAN (X179 pin 9/10)
+        if (req->hasParam("nagKiller")) {
+            bool v = req->getParam("nagKiller")->value().toInt() != 0;
+            if (v != cfg.nagKiller) { cfg.nagKiller = v; changed = true; }
         }
 
         if (changed) saveConfig();
@@ -341,9 +526,18 @@ void setupWebServer() {
     });
 
     // WiFi scan — returns nearby SSIDs as JSON array
+    // Uses async scan + polling to avoid blocking the WiFi driver in AP+STA mode.
     server.on("/api/scan", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
-        int n = WiFi.scanNetworks(/*async=*/false, /*hidden=*/false);
+        WiFi.scanDelete();
+        WiFi.scanNetworks(/*async=*/true, /*hidden=*/false);
+        // Poll up to 6 s for results (channel hopping takes ~100 ms/channel)
+        uint32_t t0 = millis();
+        int n = WIFI_SCAN_RUNNING;
+        while (n == WIFI_SCAN_RUNNING && millis() - t0 < 6000) {
+            delay(100);
+            n = WiFi.scanComplete();
+        }
         uint32_t up = (millis() - cfg.uptimeStart) / 1000;
         if (n <= 0) {
             char logMsg[48];
@@ -422,28 +616,59 @@ void setupWebServer() {
     server.on("/api/log/clear", HTTP_POST, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         diagLogClear();
+        if (spiffsOK) SPIFFS.remove(SPIFFS_LOG_PATH);
         req->send(200, "text/plain", "OK");
     });
 
-    // High beam force — only activatable when adaptive lighting is detected on bus
-    server.on("/api/highbeam", HTTP_GET, [](AsyncWebServerRequest* req) {
+    // Download full persistent log from SPIFFS as a text attachment.
+    server.on("/api/log/download", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
-        if (!req->hasParam("en")) { req->send(400, "text/plain", "Missing en"); return; }
-        bool en = req->getParam("en")->value().toInt() != 0;
-        if (en && !cfg.adaptiveLighting) {
-            req->send(200, "application/json", "{\"ok\":false,\"reason\":\"not_adaptive\"}");
+        if (!spiffsOK || !SPIFFS.exists(SPIFFS_LOG_PATH)) {
+            req->send(404, "text/plain", "No persistent log");
             return;
         }
-        cfg.highBeamForce = en;
-        req->send(200, "application/json", "{\"ok\":true}");
+        AsyncWebServerResponse* resp = req->beginResponse(
+            SPIFFS, SPIFFS_LOG_PATH, "text/plain");
+        resp->addHeader("Content-Disposition",
+                        "attachment; filename=\"diag.log\"");
+        req->send(resp);
     });
+
+    // /api/highbeam removed — requires Vehicle CAN (X179 pin 9/10), not available on Party CAN
 
     // AP auto-restart toggle
     server.on("/api/aprestart", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         if (!req->hasParam("en")) { req->send(400, "text/plain", "Missing en"); return; }
         cfg.apRestart = req->getParam("en")->value().toInt() != 0;
+        saveConfig();
         req->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    // Manual reboot — flag-based (same pattern as OTA restart)
+    server.on("/api/reboot", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        req->send(200, "application/json", "{\"ok\":true}");
+        otaPendingRestart = true;
+    });
+
+    server.on("/api/reset", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
+        // Clear all namespaces
+        prefs.begin("fsd", false);
+        prefs.clear();
+        prefs.end();
+        Preferences secPrefs;
+        secPrefs.begin("sec", false);
+        secPrefs.clear();
+        secPrefs.end();
+        Preferences sysPrefs;
+        sysPrefs.begin("sys", false);
+        sysPrefs.clear();
+        sysPrefs.end();
+        // Reload defaults into cfg and restart
+        req->send(200, "application/json", "{\"ok\":true}");
+        otaPendingRestart = true;
     });
 
     // OTA firmware upload — flag-based restart (no delay in async context)
@@ -491,11 +716,18 @@ void canTask(void* param) {
     esp_task_wdt_add(NULL);
 
     CanFrame frame;
-    uint32_t precondTick  = 0;
-    uint32_t busOffTick   = 0;
-    uint32_t normalTick   = 0;   // counts up after init; clears crash counter at 10s
-    uint32_t logTick      = 0;   // counts up to 1000ms for 1 Hz event log check
+    uint32_t precondLastMs = 0;  // last precondition frame sent (millis)
+    uint32_t normalStartMs = millis();  // boot time; clears crash counter after 10s
+    bool     crashCleared  = false;    // true once crash counter has been cleared
+    uint32_t logLastMs     = 0;  // last 1 Hz log check (millis)
     uint8_t  prevAccState = 0;   // tracks AP state transitions for auto-restart
+
+    // One-shot CAN ID frequency scan — collects for 30s then logs to diag
+    struct IdEntry { uint32_t id; uint32_t cnt; };
+    static IdEntry idScan[256];  // static: avoids 2KB stack usage
+    memset(idScan, 0, sizeof(idScan));
+    uint8_t  idScanN    = 0;
+    bool     idScanDone = false;
 
     // Diagnostic log — state tracking for transition detection
     bool     log_prevCanOK     = false;
@@ -513,15 +745,32 @@ void canTask(void* param) {
         twai_status_info_t twaiStatus;
         if (twai_get_status_info(&twaiStatus) == ESP_OK) {
             if (twaiStatus.state == TWAI_STATE_BUS_OFF) {
-                cfg.canOK = false;
-                if (++busOffTick >= 500) {   // ~500ms in bus-off → trigger recovery
-                    busOffTick = 0;
-                    twai_initiate_recovery();
-                    Serial.println("[CAN] Bus-Off recovery initiated");
-                    addDiagLog((millis() - cfg.uptimeStart) / 1000, "CAN BUS-OFF recovery");
+                if (cfg.canOK) {
+                    // Transition into bus-off: clear stale gesture state so
+                    // spurious noise frames during recovery can't complete a
+                    // partially-accumulated HB tap sequence.
+                    resetStalkGestureState();
+                    // Log TEC/REC counters to help diagnose who is causing errors.
+                    // TEC high → ESP32 is transmitting bad frames (firmware/wiring issue on TX)
+                    // REC high → ESP32 is receiving error frames (car-side or CAN-H/L wiring fault)
+                    uint32_t up = (millis() - cfg.uptimeStart) / 1000;
+                    char errmsg[64];
+                    snprintf(errmsg, sizeof(errmsg),
+                             "bus-off TEC=%u REC=%u tx_err=%u rx_err=%u",
+                             (unsigned)twaiStatus.tx_error_counter,
+                             (unsigned)twaiStatus.rx_error_counter,
+                             (unsigned)twaiStatus.tx_failed_count,
+                             (unsigned)twaiStatus.rx_missed_count);
+                    addDiagLog(up, errmsg);
                 }
-            } else if (twaiStatus.state == TWAI_STATE_RUNNING) {
-                busOffTick = 0;
+                cfg.canOK = false;
+                // Recovery handled internally by driver's read()/send()
+                // via recoverWithCooldown() — no external trigger needed.
+            } else if (!cfg.canOK && canDriver.isDriverOK()) {
+                // Driver recovered from bus-off but no frame has arrived yet.
+                // Sync canOK so the UI reflects the restored state immediately
+                // rather than waiting for the first successful frame read.
+                cfg.canOK = true;
             }
         }
 
@@ -531,6 +780,15 @@ void canTask(void* param) {
             cfg.canOK = true;
             activity = true;
             handleMessage(frame, canDriver);
+            updatePerfTest(telemSpeedRaw(), telemTorqueRear(), telemBrake());
+            // ID scan: track unique IDs for first 30s
+            if (!idScanDone) {
+                bool found = false;
+                for (uint8_t i = 0; i < idScanN; i++) {
+                    if (idScan[i].id == frame.id) { idScan[i].cnt++; found = true; break; }
+                }
+                if (!found && idScanN < 256) { idScan[idScanN].id = frame.id; idScan[idScanN].cnt = 1; idScanN++; }
+            }
         }
 
         // ── AP auto-restart on disengage ──────────────────────────────
@@ -544,31 +802,55 @@ void canTask(void* param) {
         }
         prevAccState = cfg.accState;
 
-        // ── Precondition frame every ~1 s when enabled ─────────────
+        // ── Precondition frame every 500 ms when enabled ───────────
         if (cfg.precondition && cfg.canOK) {
-            if (++precondTick >= 1000) {
-                precondTick = 0;
+            uint32_t now = millis();
+            if (now - precondLastMs >= 500) {
+                precondLastMs = now;
                 CanFrame pcFrame;
                 buildPreconditionFrame(pcFrame);
                 canDriver.send(pcFrame);
             }
         } else {
-            precondTick = 0;
+            precondLastMs = 0;
         }
 
 
         // ── Clear crash counter after 10s of normal operation ──────
-        // Cap at 10001 so this triggers exactly once per boot, not every 49 days
-        if (normalTick < 10001 && ++normalTick == 10000) {
+        if (!crashCleared && millis() - normalStartMs >= 10000) {
+            crashCleared = true;
             prefs.begin("sys", false);
             prefs.putInt("crashes", 0);
             prefs.end();
         }
 
-        // ── Diagnostic log — 1 Hz event transition check ──────────
-        if (++logTick >= 1000) {
-            logTick = 0;
+        // ── CAN ID scan: log all IDs at 30s sorted by ID number ──────
+        if (!idScanDone && millis() - normalStartMs >= 30000) {
+            idScanDone = true;
+            // Sort by ID ascending (selection sort, small N)
+            for (uint8_t i = 0; i < idScanN - 1; i++)
+                for (uint8_t j = i + 1; j < idScanN; j++)
+                    if (idScan[j].id < idScan[i].id) {
+                        IdEntry t = idScan[i]; idScan[i] = idScan[j]; idScan[j] = t;
+                    }
             uint32_t up = (millis() - cfg.uptimeStart) / 1000;
+            char hdr[40];
+            snprintf(hdr, sizeof(hdr), "=== CAN IDs (%u unique, 30s) ===", idScanN);
+            addDiagLog(up, hdr);
+            char buf[80];
+            for (uint8_t i = 0; i < idScanN; i += 6) {
+                int p = 0;
+                for (uint8_t j = i; j < i + 6 && j < idScanN; j++)
+                    p += snprintf(buf + p, sizeof(buf) - p, "%03X:%u ", idScan[j].id, idScan[j].cnt);
+                addDiagLog(up, buf);
+            }
+        }
+
+        // ── Diagnostic log — 1 Hz event transition check ──────────
+        uint32_t nowMs = millis();
+        if (nowMs - logLastMs >= 1000) {
+            logLastMs = nowMs;
+            uint32_t up = (nowMs - cfg.uptimeStart) / 1000;
             char msg[64];
 
             if (cfg.canOK != log_prevCanOK) {
@@ -658,6 +940,9 @@ void setup() {
 
     cfg.uptimeStart = millis();
 
+    // Init SPIFFS — must come before boot log entry so the marker lands in the file
+    setupSpiffs(FIRMWARE_VERSION);
+
     // Boot log entry
     {
         char bootMsg[64];
@@ -686,8 +971,8 @@ void setup() {
     // Connect to router first (if configured) so we can read the assigned STA IP
     // and pick a non-conflicting AP subnet
     if (staSSID[0] != '\0') {
-        // Bring up AP temporarily on 192.168.99.1 while STA connects
-        WiFi.softAPConfig(IPAddress(192,168,99,1), IPAddress(192,168,99,1), IPAddress(255,255,255,0));
+        // Bring up AP on default 192.168.4.1 while STA connects
+        WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
         WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
         WiFi.begin(staSSID, staPass[0] ? staPass : nullptr);
         Serial.printf("WiFi STA: connecting to '%s'...\n", staSSID);
@@ -697,15 +982,14 @@ void setup() {
         }
         staConnected = (WiFi.status() == WL_CONNECTED);
         if (staConnected) {
-            // Pick an AP subnet that doesn't overlap the router's subnet
-            // Router subnet third octet → avoid it; try 99, then 98, 97...
-            uint8_t routerOctet = WiFi.localIP()[2];  // e.g. 1 for 192.168.1.x
-            uint8_t apOctet = 99;
+            // Keep AP on 192.168.4.1; only move if router is on the same subnet.
+            uint8_t routerOctet = WiFi.localIP()[2];
+            uint8_t apOctet = 4;
+            if (apOctet == routerOctet) apOctet = 99;
             if (apOctet == routerOctet) apOctet = 98;
-            if (apOctet == routerOctet) apOctet = 97;
             IPAddress apIP(192, 168, apOctet, 1);
             WiFi.softAPConfig(apIP, apIP, IPAddress(255,255,255,0));
-            WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);  // re-apply with new subnet
+            WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
             char logMsg[64];
             snprintf(logMsg, sizeof(logMsg), "STA connected %s  AP: 192.168.%u.1",
                      WiFi.localIP().toString().c_str(), (unsigned)apOctet);
@@ -716,10 +1000,14 @@ void setup() {
             addDiagLog(0, "STA connect FAILED");
         }
     } else {
-        // No router configured — use 192.168.99.1 (avoids common 0/1/4.x subnets)
-        WiFi.softAPConfig(IPAddress(192,168,99,1), IPAddress(192,168,99,1), IPAddress(255,255,255,0));
+        // No router configured — use default ESP32 AP address
+        WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
         WiFi.softAP(apSSID, apPass[0] ? apPass : nullptr);
     }
+    // Captive portal DNS — redirect all domains to ESP32 AP IP.
+    // Causes iOS/Android to detect a captive portal and pop up the browser automatically.
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer.start(53, "*", WiFi.softAPIP());
     Serial.printf("WiFi AP: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
 
     // Start web server
@@ -747,5 +1035,35 @@ void loop() {
         delay(1000);  // let response finish sending
         ESP.restart();
     }
-    vTaskDelay(1000);
+
+    // Captive portal — must be called frequently to answer DNS queries promptly
+    dnsServer.processNextRequest();
+
+    // Flush new RAM log entries to SPIFFS every 3 s (Core 0 only).
+    static uint32_t lastFlushMs = 0;
+    uint32_t nowMs = millis();
+    if (nowMs - lastFlushMs >= 3000) {
+        lastFlushMs = nowMs;
+        flushLogsToSpiffs();
+    }
+
+    // Heap guard: AsyncWebServer heap fragmentation causes silent request
+    // failures after long uptime. Auto-restart when free heap < 20 KB.
+    static uint32_t lastHeapMs  = 0;
+    static bool     heapWarnSent = false;
+    if (nowMs - lastHeapMs >= 5000) {
+        lastHeapMs = nowMs;
+        uint32_t freeHeap = ESP.getFreeHeap();
+        if (freeHeap < 20000 && !heapWarnSent) {
+            uint32_t up = (nowMs - cfg.uptimeStart) / 1000;
+            char msg[48];
+            snprintf(msg, sizeof(msg), "low heap %u B", (unsigned)freeHeap);
+            addDiagLog(up, msg);
+            heapWarnSent = true;
+        } else if (freeHeap >= 20000) {
+            heapWarnSent = false;  // reset so it can warn again if heap drops again
+        }
+    }
+
+    vTaskDelay(10);
 }

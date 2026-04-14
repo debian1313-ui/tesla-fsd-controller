@@ -36,7 +36,7 @@ struct TWAIDriver : public CanDriver {
         msg.data_length_code  = frame.dlc;
         memcpy(msg.data, frame.data, 8);
         if (twai_transmit(&msg, pdMS_TO_TICKS(2)) != ESP_OK) {
-            if (isBusOff()) recover();
+            if (isBusOff()) recoverWithCooldown();
             return false;
         }
         return true;
@@ -49,7 +49,7 @@ struct TWAIDriver : public CanDriver {
         }
         twai_message_t msg;
         if (twai_receive(&msg, 0) != ESP_OK) {
-            if (isBusOff()) recover();
+            if (isBusOff()) recoverWithCooldown();
             return false;
         }
         frame.id  = msg.identifier;
@@ -59,6 +59,8 @@ struct TWAIDriver : public CanDriver {
         return true;
     }
 
+    bool isDriverOK() const { return driverOK_; }
+
     void setFilters(const uint32_t* /*ids*/, uint8_t /*count*/) override {
         // Software filtering via isFilteredId() in handlers.h
     }
@@ -67,8 +69,8 @@ private:
     static constexpr uint32_t BUSOFF_COOLDOWN_MS  = 1000;
     static constexpr uint32_t DRIVERFAIL_RETRY_MS = 10000;
 
-    bool     driverOK_      = false;
-    uint32_t lastRecovery_  = 0;
+    bool     driverOK_     = false;
+    uint32_t lastRecovery_ = 0;
 
     bool isBusOff() {
         twai_status_info_t status;
@@ -76,12 +78,27 @@ private:
         return status.state == TWAI_STATE_BUS_OFF;
     }
 
-    void recover() {
+    // stop → uninstall → reinstall → start.
+    // Directly resets the TWAI peripheral and lets the SN65HVD230 transceiver
+    // recover from dominant-timeout lockup (TX goes idle during uninstall).
+    // Aligned with tesla-open-can-mod: skip twai_initiate_recovery() entirely
+    // since it requires 128 recessive bits on the bus — useless when the
+    // transceiver is locked and the bus is dead.
+    void recoverWithCooldown() {
         uint32_t now = millis();
         if (now - lastRecovery_ < BUSOFF_COOLDOWN_MS) return;
         lastRecovery_ = now;
-        // Use ESP-IDF native recovery API — lighter than full reinstall.
-        twai_initiate_recovery();
+        twai_stop();
+        twai_driver_uninstall();
+        twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(txPin, rxPin, TWAI_MODE_NORMAL);
+        g.rx_queue_len = 32;
+        g.tx_queue_len = 16;
+        twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+        twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+        if (twai_driver_install(&g, &t, &f) == ESP_OK && twai_start() == ESP_OK)
+            driverOK_ = true;
+        else
+            driverOK_ = false;
     }
 
     void tryRecover() {
