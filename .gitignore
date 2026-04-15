@@ -3,5 +3,5 @@
 __pycache__/
 *.pyc
 mock_server.py
-firmware_*.bin
+*_v*.bin
 include/web_ui_gz.h
