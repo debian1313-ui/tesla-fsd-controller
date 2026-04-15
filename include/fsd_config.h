@@ -32,7 +32,7 @@ struct FSDConfig {
     volatile bool     highBeamForce       = false;  // user override via UI or stalk gesture
 
     // DAS status — read from 0x39B (DAS_status), 0x399 (DAS_status ISA) and 0x389 (DAS_status2)
-    volatile uint8_t  fusedSpeedLimit     = 0;   // DAS_fusedSpeedLimit        0x399 byte1[4:0]  ×5=kph; 0=none (camera+map)
+    volatile uint8_t  fusedSpeedLimit     = 0;   // DAS_fusedSpeedLimit        0x39B byte1[4:0]  ×5=kph; 0=none (camera+map)
     volatile uint8_t  visionSpeedLimit    = 0;   // DAS_visionOnlySpeedLimit   0x39B bit16|5     ×5=kph; 0=none (camera only)
     volatile uint8_t  nagLevel            = 0;   // DAS_autopilotHandsOnState  bit42|4  0=ok, 1-15=nag
     volatile uint8_t  fcwLevel            = 0;   // DAS_forwardCollisionWarning bit22|2  0=none
@@ -51,15 +51,19 @@ struct FSDConfig {
     volatile uint8_t  apRestartCache[8]   = {};    // last received 0x293 raw bytes
     volatile bool     apRestartValid      = false; // cache has at least one frame
 
-    // HW3 Smart Speed Offset
+    // HW3 Smart Speed Offset  (5-tier)
     volatile bool    hw3SmartEnable       = false; // auto-adjust offset by speed tier
-    volatile uint8_t hw3SmartT1           = 60;    // kph: below this → tier 1
-    volatile uint8_t hw3SmartT2           = 100;   // kph: below this → tier 2, else tier 3
-    volatile uint8_t hw3SmartO1           = 20;    // km/h offset for tier 1 (<T1)
-    volatile uint8_t hw3SmartO2           = 15;    // km/h offset for tier 2 (T1~T2)
-    volatile uint8_t hw3SmartO3           = 10;    // km/h offset for tier 3 (>T2)
-    volatile uint8_t hw3SmartLastKmh      = 15;    // last valid computed offset (fallback when limit=0); init=tier2 default
-    volatile uint8_t hw3SmartActiveTier  = 0;     // currently active tier: 1/2/3; 0=smart disabled or limit unknown
+    volatile uint8_t hw3SmartT1           = 40;    // kph threshold: tier1/2 boundary
+    volatile uint8_t hw3SmartT2           = 60;    // kph threshold: tier2/3 boundary
+    volatile uint8_t hw3SmartT3           = 80;    // kph threshold: tier3/4 boundary
+    volatile uint8_t hw3SmartT4           = 100;   // kph threshold: tier4/5 boundary
+    volatile uint8_t hw3SmartO1           = 20;    // km/h offset tier1 (< T1)
+    volatile uint8_t hw3SmartO2           = 15;    // km/h offset tier2 (T1~T2)
+    volatile uint8_t hw3SmartO3           = 12;    // km/h offset tier3 (T2~T3)
+    volatile uint8_t hw3SmartO4           = 10;    // km/h offset tier4 (T3~T4)
+    volatile uint8_t hw3SmartO5           = 8;     // km/h offset tier5 (≥T4)
+    volatile uint8_t hw3SmartLastKmh      = 12;    // last valid computed offset (fallback when limit=0)
+    volatile uint8_t hw3SmartActiveTier   = 0;     // currently active tier: 1-5; 0=smart disabled or limit unknown
 
     // Nag killer — echo 0x370 EPAS3S_sysStatus with counter+1
     // Makes AP think EPAS is continuously providing fresh data.

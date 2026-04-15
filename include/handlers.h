@@ -63,14 +63,8 @@ static void handleMessage(CanFrame& frame, CanDriver& driver) {
     if (frame.id == 905) { handleDASStatus2(frame);           return; }  // 0x389 DAS_status2
     if (frame.id == 585) { handleSCCMStalk(frame, driver);    return; }  // 0x249 SCCM_leftStalk
     if (frame.id == 880) { handleEPASNag(frame, driver);      return; }  // 0x370 EPAS3S_sysStatus
-    // 0x399 speed limits for HW3/Legacy — HW4 handles this inside handleHW4 via filter
-    if (frame.id == 921 && cfg.hwMode != 2) {
-        if (frame.dlc >= 3) {
-            cfg.fusedSpeedLimit  = frame.data[1] & 0x1F;  // DAS_fusedSpeedLimit  ×5=kph
-            cfg.visionSpeedLimit = frame.data[2] & 0x1F;  // DAS_visionOnlySpeedLimit ×5=kph
-        }
-        return;
-    }
+    // 0x399 (921) DAS_status_ISA — ISA chime only, NOT a speed limit source.
+    // Speed limits come exclusively from 0x39B (923) via handleDASStatus above.
 
     // FSD injection — route to hardware-specific handler
     if (!isFilteredId(frame.id)) return;

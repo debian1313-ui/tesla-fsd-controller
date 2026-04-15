@@ -110,13 +110,20 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
             int offset;
             if (cfg.hw3SmartEnable) {
                 // Smart mode: pick offset tier based on current speed limit
-                uint8_t lim = cfg.fusedSpeedLimit > 0 ? cfg.fusedSpeedLimit : cfg.visionSpeedLimit;
+                // raw 0 = UNKNOWN_SNA, raw 31 = NONE — both invalid
+                uint8_t fl = (cfg.fusedSpeedLimit > 0 && cfg.fusedSpeedLimit < 31) ? cfg.fusedSpeedLimit : 0;
+                uint8_t vl = (cfg.visionSpeedLimit > 0 && cfg.visionSpeedLimit < 31) ? cfg.visionSpeedLimit : 0;
+                uint8_t lim = fl > 0 ? fl : vl;
                 if (lim > 0) {
                     int speedKph = lim * 5;
-                    uint8_t tier = (speedKph < cfg.hw3SmartT1) ? 1 :
-                                   (speedKph < cfg.hw3SmartT2) ? 2 : 3;
-                    int kmh = (tier == 1) ? cfg.hw3SmartO1 :
-                              (tier == 2) ? cfg.hw3SmartO2 : cfg.hw3SmartO3;
+                    uint8_t tier;
+                    if      (speedKph < cfg.hw3SmartT1) tier = 1;
+                    else if (speedKph < cfg.hw3SmartT2) tier = 2;
+                    else if (speedKph < cfg.hw3SmartT3) tier = 3;
+                    else if (speedKph < cfg.hw3SmartT4) tier = 4;
+                    else                                 tier = 5;
+                    int kmh = (tier==1)?cfg.hw3SmartO1:(tier==2)?cfg.hw3SmartO2:
+                              (tier==3)?cfg.hw3SmartO3:(tier==4)?cfg.hw3SmartO4:cfg.hw3SmartO5;
                     cfg.hw3SmartActiveTier = tier;
                     cfg.hw3SmartLastKmh    = (uint8_t)kmh;
                     offset = kmh * 5;
@@ -129,6 +136,18 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
                 // Manual mode: fixed offset (or auto from mux-0)
                 cfg.hw3SmartActiveTier = 0;
                 offset = (cfg.hw3OffsetManual >= 0) ? cfg.hw3OffsetManual : cfg.hw3SpeedOffset;
+            }
+            // Hard cap: base speed limit + offset must not exceed 140 kph
+            {
+                uint8_t fl2 = (cfg.fusedSpeedLimit > 0 && cfg.fusedSpeedLimit < 31) ? cfg.fusedSpeedLimit : 0;
+                uint8_t vl2 = (cfg.visionSpeedLimit > 0 && cfg.visionSpeedLimit < 31) ? cfg.visionSpeedLimit : 0;
+                uint8_t limRaw = fl2 > 0 ? fl2 : vl2;
+                if (limRaw > 0) {
+                    int limKph = limRaw * 5;
+                    int maxOffsetKph = std::max(0, 140 - limKph);
+                    int maxOffsetCAN = maxOffsetKph * 5;
+                    offset = std::min(offset, maxOffsetCAN);
+                }
             }
             offset = std::max(std::min(offset, 100), 0);
             frame.data[0] &= ~(0b11000000);
@@ -143,11 +162,10 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
 
 // ── Handler: HW4 (0x3FD / 0x3F8 / 0x399) ────────────────────────────────
 static void handleHW4(CanFrame& frame, CanDriver& driver) {
-    // 0x399 (921) — ISA speed-limit chime suppression + fused speed limit read
+    // 0x399 (921) — ISA speed-limit chime suppression only
+    // Speed limits are read from 0x39B (923) by handleDASStatus — do NOT read here
     if (frame.id == 921) {
         if (frame.dlc < 8) return;
-        cfg.fusedSpeedLimit  = frame.data[1] & 0x1F;  // DAS_fusedSpeedLimit  byte1[4:0] ×5=kph
-        cfg.visionSpeedLimit = frame.data[2] & 0x1F;  // DAS_visionOnlySpeedLimit byte2[4:0] ×5=kph
         if (!cfg.isaChimeSuppress) return;
         frame.data[1] |= 0x20;
         uint8_t sum = 0;
@@ -190,6 +208,8 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
             else                    cfg.errorCount++;
         }
         if (index == 1) {
+            // bit19=false: nag suppression (same as HW3)
+            // bit47=true:  HW4-specific FSD ready signal; counted as modification (unlike HW3 nag-only)
             setBit(frame, 19, false);
             setBit(frame, 47, true);
             if (driver.send(frame)) cfg.modifiedCount++;

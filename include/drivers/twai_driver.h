@@ -105,6 +105,7 @@ private:
         uint32_t now = millis();
         if (now - lastRecovery_ < DRIVERFAIL_RETRY_MS) return;
         lastRecovery_ = now;
+        twai_stop();             // defensive: no-op if already stopped/uninstalled
         twai_driver_uninstall();
         twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(txPin, rxPin, TWAI_MODE_NORMAL);
         g.rx_queue_len = 32;

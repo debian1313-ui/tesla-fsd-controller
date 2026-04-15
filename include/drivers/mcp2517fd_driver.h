@@ -21,9 +21,8 @@ struct MCP2517FDDriver : public CanDriver {
         : mcp_(csPin, spi, intPin) {}
 
     bool init() override {
-        ACAN2517Settings settings(MCP2517FD_OSC_HZ,
-                                  ACAN2517Settings::bitrate500kBPS);
-        settings.mRequestedMode = ACAN2517Settings::NormalMode;
+        ACAN2517Settings settings(ACAN2517Settings::OSC_20MHz, 500UL * 1000UL);
+        // mRequestedMode defaults to Normal20B — no override needed
         const uint32_t err = mcp_.begin(settings, nullptr);
         ok_ = (err == 0);
         if (!ok_) {

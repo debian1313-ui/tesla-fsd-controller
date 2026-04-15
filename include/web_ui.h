@@ -218,26 +218,41 @@ select:focus{outline:none;border-color:#38bdf8}
   <div id="rowHW3SmartRules" style="display:none">
     <div class="smart-rules">
       <div class="smart-rule">
-        <span id="iSmR1L">限速 &lt;</span>
-        <input type="number" id="hw3SmT1" min="20" max="180" value="60" style="width:50px" onchange="saveSmartRules()">
-        <span>kph &rarr; +</span>
-        <input type="number" id="hw3SmO1" min="0" max="20" value="20" style="width:44px" onchange="saveSmartRules()">
+        <span>限速 &lt; </span>
+        <input type="number" id="hw3SmT1" min="20" max="180" value="40" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
+        <span> kph &rarr; +</span>
+        <input type="number" id="hw3SmO1" min="0" max="20" value="20" style="width:44px">
         <span class="km">km/h</span>
       </div>
       <div class="smart-rule">
-        <span id="iSmR2L"><span id="sSmT1Val">60</span> ~</span>
-        <input type="number" id="hw3SmT2" min="20" max="200" value="100" style="width:50px" onchange="saveSmartRules()">
-        <span>kph &rarr; +</span>
-        <input type="number" id="hw3SmO2" min="0" max="20" value="15" style="width:44px" onchange="saveSmartRules()">
+        <span><span id="sSmLbl2">40</span> ~ </span>
+        <input type="number" id="hw3SmT2" min="20" max="200" value="60" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
+        <span> kph &rarr; +</span>
+        <input type="number" id="hw3SmO2" min="0" max="20" value="15" style="width:44px">
         <span class="km">km/h</span>
       </div>
       <div class="smart-rule">
-        <span id="iSmR3L">&ge; <span id="sSmT2Val">100</span> kph &rarr; +</span>
-        <input type="number" id="hw3SmO3" min="0" max="20" value="10" style="width:44px" onchange="saveSmartRules()">
+        <span><span id="sSmLbl3">60</span> ~ </span>
+        <input type="number" id="hw3SmT3" min="20" max="200" value="80" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
+        <span> kph &rarr; +</span>
+        <input type="number" id="hw3SmO3" min="0" max="20" value="12" style="width:44px">
         <span class="km">km/h</span>
       </div>
-      <div class="smart-rule" style="justify-content:flex-end;border-bottom:none;padding-top:10px">
+      <div class="smart-rule">
+        <span><span id="sSmLbl4">80</span> ~ </span>
+        <input type="number" id="hw3SmT4" min="20" max="200" value="100" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
+        <span> kph &rarr; +</span>
+        <input type="number" id="hw3SmO4" min="0" max="20" value="10" style="width:44px">
+        <span class="km">km/h</span>
+      </div>
+      <div class="smart-rule">
+        <span>&ge; <span id="sSmLbl5">100</span> kph &rarr; +</span>
+        <input type="number" id="hw3SmO5" min="0" max="20" value="8" style="width:44px">
+        <span class="km">km/h</span>
+      </div>
+      <div class="smart-rule" style="justify-content:flex-end;border-bottom:none;padding-top:10px;gap:8px">
         <button onclick="resetSmartRules()" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer" id="iSmResetBtn">恢复默认</button>
+        <button onclick="saveSmartRules()" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer" id="iSmSaveBtn">保存</button>
       </div>
     </div>
   </div>
@@ -594,12 +609,23 @@ function poll(){
     var smartEl=document.getElementById('hw3Smart');
     if(smartEl){
       smartEl.checked=!!d.hw3Smart;
-      if(d.hw3SmT1!=null){document.getElementById('hw3SmT1').value=d.hw3SmT1;document.getElementById('sSmT1Val').textContent=d.hw3SmT1;}
-      if(d.hw3SmT2!=null){document.getElementById('hw3SmT2').value=d.hw3SmT2;document.getElementById('sSmT2Val').textContent=d.hw3SmT2;}
-      if(d.hw3SmO1!=null)document.getElementById('hw3SmO1').value=d.hw3SmO1;
-      if(d.hw3SmO2!=null)document.getElementById('hw3SmO2').value=d.hw3SmO2;
-      if(d.hw3SmO3!=null)document.getElementById('hw3SmO3').value=d.hw3SmO3;
-      document.getElementById('rowHW3SmartRules').style.display=(d.hwMode===1&&!!d.hw3Smart)?'':'none';
+      // Sync smart rule inputs only once on first load; never overwrite user edits afterward
+      if(!smartInitialized){
+        if(d.hw3SmT1!=null)document.getElementById('hw3SmT1').value=d.hw3SmT1;
+        if(d.hw3SmT2!=null)document.getElementById('hw3SmT2').value=d.hw3SmT2;
+        if(d.hw3SmT3!=null)document.getElementById('hw3SmT3').value=d.hw3SmT3;
+        if(d.hw3SmT4!=null)document.getElementById('hw3SmT4').value=d.hw3SmT4;
+        if(d.hw3SmO1!=null)document.getElementById('hw3SmO1').value=d.hw3SmO1;
+        if(d.hw3SmO2!=null)document.getElementById('hw3SmO2').value=d.hw3SmO2;
+        if(d.hw3SmO3!=null)document.getElementById('hw3SmO3').value=d.hw3SmO3;
+        if(d.hw3SmO4!=null)document.getElementById('hw3SmO4').value=d.hw3SmO4;
+        if(d.hw3SmO5!=null)document.getElementById('hw3SmO5').value=d.hw3SmO5;
+        smartInitialized=true;
+        updateSmartLabels();
+      }
+      var smartActive=(d.hwMode===1&&!!d.hw3Smart);
+      document.getElementById('rowHW3Offset').style.display=(d.hwMode===1&&!smartActive)?'':'none';
+      document.getElementById('rowHW3SmartRules').style.display=smartActive?'':'none';
     }
     document.getElementById('apRestart').checked=!!d.apRestart;
     document.getElementById('nagKiller').checked=!!d.nagKiller;
@@ -637,11 +663,15 @@ function poll(){
     var tierRow=document.getElementById('rowLiveTier');
     if(d.hwMode===1&&d.hw3Smart&&d.smartTier>0){
       tierRow.style.display='';
-      document.getElementById('liveTier').textContent='T'+d.smartTier+' +'+d.smartKmh+' km/h';
+      var tierLabels=['',' < '+d.hw3SmT1,d.hw3SmT1+'~'+d.hw3SmT2,d.hw3SmT2+'~'+d.hw3SmT3,d.hw3SmT3+'~'+d.hw3SmT4,' ≥ '+d.hw3SmT4];
+      var tl=tierLabels[d.smartTier]||('T'+d.smartTier);
+      document.getElementById('liveTier').textContent=tl+' kph  +'+d.smartKmh+' km/h';
     } else {
       tierRow.style.display='none';
     }
-    var offVal=d.hwMode===1?(d.hw3Smart?d.smartKmh:(d.hw3Offset>=0?d.hw3Offset:(d.hw3AutoOffset>0?d.hw3AutoOffset:null))):null;
+    var offKmh=d.hw3Offset>=0?Math.round(d.hw3Offset/5):null;
+    var autoKmh=d.hw3AutoOffset>0?Math.round(d.hw3AutoOffset/5):null;
+    var offVal=d.hwMode===1?(d.hw3Smart?d.smartKmh:(offKmh!=null?offKmh:autoKmh)):null;
     document.getElementById('liveOffset').textContent=offVal!=null?'+'+offVal:'--';
     // ── Torque / Gear / AP / Brake ───────────────────────────────────────
     var tq=(d.torqueR||0)*2;
@@ -774,9 +804,10 @@ function updateSpeedOptions(hwMode){
   if(!isHW4&&parseInt(sel.value)>2){sel.value='2';setVal('speedProfile',2);}
   // Show HW3 rows only for HW3 mode
   var isHW3=(hwMode===1);
-  document.getElementById('rowHW3Offset').style.display=isHW3?'':'none';
   document.getElementById('rowHW3Smart').style.display=isHW3?'':'none';
   var smartOn=isHW3&&document.getElementById('hw3Smart').checked;
+  // 智能开启时隐藏手动偏移下拉，避免用户误以为手动值在生效
+  document.getElementById('rowHW3Offset').style.display=(isHW3&&!smartOn)?'':'none';
   document.getElementById('rowHW3SmartRules').style.display=smartOn?'':'none';
   // Emergency detection is HW4-only — hide and force OFF on HW3/Legacy
   document.getElementById('rowEmgDet').style.display=isHW4?'':'none';
@@ -814,33 +845,61 @@ function setVal(key,val){
 }
 function setHW3Smart(enabled){
   setVal('hw3Smart',enabled?1:0);
+  document.getElementById('rowHW3Offset').style.display=enabled?'none':'';
   document.getElementById('rowHW3SmartRules').style.display=enabled?'':'none';
+}
+var smartInitialized=false;
+function updateSmartLabels(){
+  var t1=parseInt(document.getElementById('hw3SmT1').value)||40;
+  var t2=parseInt(document.getElementById('hw3SmT2').value)||60;
+  var t3=parseInt(document.getElementById('hw3SmT3').value)||80;
+  var t4=parseInt(document.getElementById('hw3SmT4').value)||100;
+  document.getElementById('sSmLbl2').textContent=t1;
+  document.getElementById('sSmLbl3').textContent=t2;
+  document.getElementById('sSmLbl4').textContent=t3;
+  document.getElementById('sSmLbl5').textContent=t4;
 }
 function saveSmartRules(){
   if(!agreed)return;
-  var t1=parseInt(document.getElementById('hw3SmT1').value)||60;
-  var t2=parseInt(document.getElementById('hw3SmT2').value)||100;
+  var t1=parseInt(document.getElementById('hw3SmT1').value)||40;
+  var t2=parseInt(document.getElementById('hw3SmT2').value)||60;
+  var t3=parseInt(document.getElementById('hw3SmT3').value)||80;
+  var t4=parseInt(document.getElementById('hw3SmT4').value)||100;
   var o1=parseInt(document.getElementById('hw3SmO1').value)||20;
   var o2=parseInt(document.getElementById('hw3SmO2').value)||15;
-  var o3=parseInt(document.getElementById('hw3SmO3').value)||10;
-  // Clamp: T1 < T2, offsets 0-20
+  var o3=parseInt(document.getElementById('hw3SmO3').value)||12;
+  var o4=parseInt(document.getElementById('hw3SmO4').value)||10;
+  var o5=parseInt(document.getElementById('hw3SmO5').value)||8;
+  // Clamp: T1<T2<T3<T4, offsets 0-20
   t1=Math.max(20,Math.min(t1,180));
   t2=Math.max(t1+1,Math.min(t2,200));
-  o1=Math.max(0,Math.min(o1,20));
-  o2=Math.max(0,Math.min(o2,20));
-  o3=Math.max(0,Math.min(o3,20));
-  document.getElementById('sSmT1Val').textContent=t1;
-  document.getElementById('sSmT2Val').textContent=t2;
-  var url='/api/set?hw3SmT1='+t1+'&hw3SmT2='+t2+'&hw3SmO1='+o1+'&hw3SmO2='+o2+'&hw3SmO3='+o3+(token?'&token='+token:'');
-  fetch(url).then(function(r){if(r.status===403){token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}showPinStep();}}).catch(function(){});
+  t3=Math.max(t2+1,Math.min(t3,200));
+  t4=Math.max(t3+1,Math.min(t4,200));
+  o1=Math.max(0,Math.min(o1,20));o2=Math.max(0,Math.min(o2,20));o3=Math.max(0,Math.min(o3,20));
+  o4=Math.max(0,Math.min(o4,20));o5=Math.max(0,Math.min(o5,20));
+  // Update inputs after clamping
+  document.getElementById('hw3SmT1').value=t1;document.getElementById('hw3SmT2').value=t2;
+  document.getElementById('hw3SmT3').value=t3;document.getElementById('hw3SmT4').value=t4;
+  updateSmartLabels();
+  var url='/api/set?hw3SmT1='+t1+'&hw3SmT2='+t2+'&hw3SmT3='+t3+'&hw3SmT4='+t4
+        +'&hw3SmO1='+o1+'&hw3SmO2='+o2+'&hw3SmO3='+o3+'&hw3SmO4='+o4+'&hw3SmO5='+o5+(token?'&token='+token:'');
+  var btn=document.getElementById('iSmSaveBtn');
+  fetch(url).then(function(r){
+    if(r.status===403){token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}showPinStep();}
+    else if(r.ok&&btn){btn.textContent='✓';setTimeout(function(){btn.textContent='保存';},1500);}
+  }).catch(function(){});
 }
 function resetSmartRules(){
   if(!agreed)return;
-  document.getElementById('hw3SmT1').value=60;
-  document.getElementById('hw3SmT2').value=100;
+  document.getElementById('hw3SmT1').value=40;
+  document.getElementById('hw3SmT2').value=60;
+  document.getElementById('hw3SmT3').value=80;
+  document.getElementById('hw3SmT4').value=100;
   document.getElementById('hw3SmO1').value=20;
   document.getElementById('hw3SmO2').value=15;
-  document.getElementById('hw3SmO3').value=10;
+  document.getElementById('hw3SmO3').value=12;
+  document.getElementById('hw3SmO4').value=10;
+  document.getElementById('hw3SmO5').value=8;
   saveSmartRules();
 }
 function doWifi(){
