@@ -17,6 +17,7 @@ HTML_SOURCES = [
     ("include/web_ui.h",      "INDEX_HTML", "rawliteral"),
     ("include/web_ui_dash.h", "DASH_HTML",  "dash"),
     ("include/web_perf.h",    "PERF_HTML",  "rawliteral"),
+    ("include/web_ui_car.h",  "CAR_HTML",   "rawliteral"),
 ]
 
 OUTPUT_HEADER = "include/web_ui_gz.h"
@@ -86,4 +87,10 @@ def _compress(source, target, env):  # noqa: ARG001
     print(f"[compress_html] Written {OUTPUT_HEADER}")
 
 
+# Run immediately at script load so web_ui_gz.h is up-to-date BEFORE main.cpp compiles.
+# (AddPreAction on the .elf only runs after .cpp.o files are built, which is too late
+# when new HTML symbols were added — main.cpp would fail to compile referencing them.)
+_compress(None, None, env)
+
+# Also keep the pre-link hook so mid-session HTML edits get picked up.
 env.AddPreAction("$BUILD_DIR/${PROGNAME}.elf", _compress)

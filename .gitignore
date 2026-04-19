@@ -5,3 +5,9 @@ __pycache__/
 mock_server.py
 *_v*.bin
 include/web_ui_gz.h
+refs/
+mockup_tesla_car.html
+preview_dash.html
+test_car_mock.py
+CMakeLists.txt
+src/CMakeLists.txt

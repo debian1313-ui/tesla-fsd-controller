@@ -72,7 +72,7 @@ Closed-source FSD activation modules sell for around ¥500. Here's the full comp
 2. Connect the board via **Type-C** → click **Connect** and select the serial port
 3. Click **Add File**, select the downloaded firmware, set address to `0x0`
 4. Click **Program** and wait for completion
-5. Connect to the `FSD-Controller` WiFi hotspot (password: `12345678`), then open `192.168.4.1`
+5. Connect to the `FSD-Controller` WiFi hotspot (password: `12345678`), then open `9.9.9.9`
 
 > ⚠️ Safari does not support WebUSB. Use Chrome or Edge.
 >
@@ -216,7 +216,7 @@ Vehicle CAN-L (X179 Pin 14)    →  Board right terminal CAN L
 **Recommended (change via web panel after flashing):**
 
 1. After flashing, connect to the default hotspot `FSD-Controller` (password `12345678`).
-2. Open `192.168.4.1` in your browser. Go to the **WiFi Settings** card, enter a new name and password.
+2. Open `9.9.9.9` in your browser. Go to the **WiFi Settings** card, enter a new name and password.
 3. Click **Save & Restart**. Reconnect using the new credentials.
 
 **Alternative (edit source before flashing):**
@@ -274,7 +274,7 @@ Connect the ESP32 to your computer with a USB cable.
 
 1. Power the ESP32 (USB power bank or any USB power source).
 2. On your phone, find `FSD-Controller` (or your custom name) in WiFi settings and connect.
-3. Open `192.168.4.1` in your phone's browser.
+3. Open `9.9.9.9` in your phone's browser.
 
 ### 5.2 Control Panel Reference
 
@@ -328,7 +328,7 @@ After modifying and rebuilding the firmware, you can update wirelessly — no US
 
 ## FAQ
 
-**Q: Browser can't open 192.168.4.1 after connecting to WiFi?**
+**Q: Browser can't open 9.9.9.9 after connecting to WiFi?**
 > Some phones automatically disconnect from WiFi networks with no internet. In your phone's WiFi settings, find the hotspot and disable "Auto-switch to better network" or "Smart WiFi".
 
 **Q: CAN Bus shows ERROR?**

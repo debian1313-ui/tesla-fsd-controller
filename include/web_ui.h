@@ -19,8 +19,8 @@ h1{font-size:22px;color:#38bdf8;font-weight:700;letter-spacing:1px}
 .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1e293b}
 .row:last-child{border-bottom:none}
 .row-label{font-size:14px;font-weight:500}
-.toggle{position:relative;width:50px;height:28px}
-.toggle input{opacity:0;width:0;height:0}
+.toggle,.switch{position:relative;display:inline-block;width:50px;height:28px}
+.toggle input,.switch input{opacity:0;width:0;height:0}
 .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#334155;border-radius:28px;transition:.3s}
 .slider:before{content:"";position:absolute;height:22px;width:22px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
 input:checked+.slider{background:#22c55e}
@@ -67,9 +67,26 @@ select:focus{outline:none;border-color:#38bdf8}
 .smart-rule input[type=number]:focus{outline:none;border-color:#38bdf8}
 .smart-rule .km{color:#38bdf8;font-weight:600}
 .stat-val.red{color:#ef4444}
+.car-link{position:fixed;bottom:14px;right:14px;background:rgba(30,41,59,.9);color:#94a3b8;border:1px solid #334155;border-radius:20px;padding:8px 14px;font-size:12px;text-decoration:none;z-index:500;backdrop-filter:blur(6px)}
+.car-link:active{background:#1e293b}
 </style>
+<script>
+// 启发式车机检测：UA 不含 Tesla/QtCarBrowser 的 AMD 车机（Chromium）会落到这里。
+// 触控屏 + 大视口 (≥1000×600) → 自动跳 /car；用户可用 /?ui=phone 强制手机版。
+(function(){
+  try{
+    if(location.search.indexOf('ui=phone')!==-1) return;
+    if(location.pathname!=='/'&&location.pathname!=='') return;
+    var coarse=window.matchMedia&&matchMedia('(pointer:coarse)').matches;
+    var touchLike=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
+    var wide=window.innerWidth>=1000&&window.innerHeight>=600;
+    if((coarse||touchLike)&&wide){ location.replace('/car'); }
+  }catch(_){}
+})();
+</script>
 </head>
 <body>
+<a href="/car" class="car-link" title="切换到车机版">🚗 车机版</a>
 <div id="disclaimer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:999;display:none;align-items:center;justify-content:center;padding:20px">
   <div style="background:#131d32;border-radius:16px;padding:24px;max-width:360px;width:100%;border:1px solid #ef4444">
     <!-- 步骤1：免责声明 -->
@@ -137,7 +154,9 @@ select:focus{outline:none;border-color:#38bdf8}
     <div class="stat"><div class="stat-val" id="liveBrake">--</div><div class="stat-label" id="iLblLiveBrake">刹车</div></div>
   </div>
   <div class="status-row"><span id="iLblLiveFSD">FSD 注入</span><span id="liveFSD" class="status-no">--</span></div>
+  <div class="status-row" id="rowLiveGWAP" style="display:none"><span id="iLblLiveGWAP">AP 类型</span><span id="liveGWAP" style="color:#38bdf8;font-weight:700">--</span></div>
   <div class="status-row" id="rowLiveTier" style="display:none"><span id="iLblLiveTier">智能档位</span><span id="liveTier" style="color:#38bdf8;font-weight:700">--</span></div>
+  <div class="status-row" id="rowLiveTemp" style="display:none"><span id="iLblLiveTemp">车内/外温度</span><span id="liveTemp" style="color:#38bdf8;font-weight:700">--</span></div>
 </div>
 
 <div class="card">
@@ -185,31 +204,45 @@ select:focus{outline:none;border-color:#38bdf8}
     <span class="row-label" id="iLblCN">强制激活</span>
     <label class="toggle"><input type="checkbox" id="forceActivate" onchange="setVal('forceActivate',this.checked?1:0)"><span class="slider"></span></label>
   </div>
-  <!-- precond + highbeam hidden: require Vehicle CAN (X179 pin 9/10), not available on Party CAN -->
+  <!-- highbeam hidden: requires Vehicle CAN (X179 pin 9/10), not available on Party CAN -->
+  <div class="row" id="rowOverrideSL" style="display:none">
+    <span class="row-label" id="iLblOverrideSL">重写速度限制</span>
+    <label class="toggle"><input type="checkbox" id="overrideSL" onchange="setVal('overrideSL',this.checked?1:0)"><span class="slider"></span></label>
+  </div>
   <div class="row">
     <span class="row-label" id="iLblAPRestart">AP 自动恢复</span>
     <label class="toggle"><input type="checkbox" id="apRestart" onchange="setAPRestart(this.checked)"><span class="slider"></span></label>
   </div>
-  <div class="row">
-    <span class="row-label" id="iLblNagKiller">Nag Killer</span>
-    <label class="toggle"><input type="checkbox" id="nagKiller" onchange="setVal('nagKiller',this.checked?1:0)"><span class="slider"></span></label>
-  </div>
   <div class="row" id="rowHW3Offset" style="display:none">
-    <span class="row-label" id="iLblHW3Off">速度偏移 km/h（HW3）</span>
+    <span class="row-label" id="iLblHW3Off">速度偏移 %（HW3）</span>
     <select id="hw3Offset" onchange="setVal('hw3Offset',this.value)">
       <option value="-1" data-zh="自动" data-en="Auto">自动</option>
-      <option value="0" data-zh="+0 km/h" data-en="+0 km/h">+0 km/h</option>
-      <option value="10" data-zh="+2 km/h" data-en="+2 km/h">+2 km/h</option>
-      <option value="20" data-zh="+4 km/h" data-en="+4 km/h">+4 km/h</option>
-      <option value="30" data-zh="+6 km/h" data-en="+6 km/h">+6 km/h</option>
-      <option value="40" data-zh="+8 km/h" data-en="+8 km/h">+8 km/h</option>
-      <option value="50" data-zh="+10 km/h" data-en="+10 km/h">+10 km/h</option>
-      <option value="60" data-zh="+12 km/h" data-en="+12 km/h">+12 km/h</option>
-      <option value="70" data-zh="+14 km/h" data-en="+14 km/h">+14 km/h</option>
-      <option value="80" data-zh="+16 km/h" data-en="+16 km/h">+16 km/h</option>
-      <option value="90" data-zh="+18 km/h" data-en="+18 km/h">+18 km/h</option>
-      <option value="100" data-zh="+20 km/h" data-en="+20 km/h">+20 km/h</option>
+      <option value="0" data-zh="+0%" data-en="+0%">+0%</option>
+      <option value="5" data-zh="+5%" data-en="+5%">+5%</option>
+      <option value="10" data-zh="+10%" data-en="+10%">+10%</option>
+      <option value="15" data-zh="+15%" data-en="+15%">+15%</option>
+      <option value="20" data-zh="+20%" data-en="+20%">+20%</option>
+      <option value="25" data-zh="+25%" data-en="+25%">+25%</option>
+      <option value="30" data-zh="+30%" data-en="+30%">+30%</option>
+      <option value="35" data-zh="+35%" data-en="+35%">+35%</option>
+      <option value="40" data-zh="+40%" data-en="+40%">+40%</option>
+      <option value="45" data-zh="+45%" data-en="+45%">+45%</option>
+      <option value="50" data-zh="+50%" data-en="+50%">+50%</option>
     </select>
+  </div>
+  <div class="row" id="rowHW4Offset" style="display:none">
+    <span class="row-label" id="iLblHW4Off" data-zh="速度偏移 km/h（HW4）" data-en="HW4 Speed Offset (km/h)">速度偏移 km/h（HW4）</span>
+    <select id="hw4Offset" onchange="setVal('hw4Offset',this.value)">
+      <option value="0" data-zh="关闭" data-en="Off">关闭</option>
+      <option value="7" data-zh="+5 km/h" data-en="+5 km/h">+5 km/h</option>
+      <option value="10" data-zh="+7 km/h" data-en="+7 km/h">+7 km/h</option>
+      <option value="14" data-zh="+10 km/h" data-en="+10 km/h">+10 km/h</option>
+      <option value="21" data-zh="+15 km/h" data-en="+15 km/h">+15 km/h</option>
+    </select>
+  </div>
+  <div class="row" id="rowTrackMode" style="display:none">
+    <span class="row-label" id="iLblTrackMode">赛道模式（实验性）</span>
+    <label class="toggle"><input type="checkbox" id="trackMode" onchange="onTrackModeChange(this)"><span class="slider"></span></label>
   </div>
   <div class="row" id="rowHW3Smart" style="display:none">
     <span class="row-label" id="iLblHW3Smart">智能速度偏移</span>
@@ -219,36 +252,36 @@ select:focus{outline:none;border-color:#38bdf8}
     <div class="smart-rules">
       <div class="smart-rule">
         <span>限速 &lt; </span>
-        <input type="number" id="hw3SmT1" min="20" max="180" value="40" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
+        <input type="number" id="hw3SmT1" min="20" max="195" value="40" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
         <span> kph &rarr; +</span>
-        <input type="number" id="hw3SmO1" min="0" max="20" value="20" style="width:44px">
-        <span class="km">km/h</span>
+        <input type="number" id="hw3SmO1" min="0" max="50" value="50" style="width:44px" oninput="markSmartDirty()">
+        <span class="km">%</span>
       </div>
       <div class="smart-rule">
         <span><span id="sSmLbl2">40</span> ~ </span>
         <input type="number" id="hw3SmT2" min="20" max="200" value="60" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
         <span> kph &rarr; +</span>
-        <input type="number" id="hw3SmO2" min="0" max="20" value="15" style="width:44px">
-        <span class="km">km/h</span>
+        <input type="number" id="hw3SmO2" min="0" max="50" value="25" style="width:44px" oninput="markSmartDirty()">
+        <span class="km">%</span>
       </div>
       <div class="smart-rule">
         <span><span id="sSmLbl3">60</span> ~ </span>
         <input type="number" id="hw3SmT3" min="20" max="200" value="80" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
         <span> kph &rarr; +</span>
-        <input type="number" id="hw3SmO3" min="0" max="20" value="12" style="width:44px">
-        <span class="km">km/h</span>
+        <input type="number" id="hw3SmO3" min="0" max="50" value="15" style="width:44px" oninput="markSmartDirty()">
+        <span class="km">%</span>
       </div>
       <div class="smart-rule">
         <span><span id="sSmLbl4">80</span> ~ </span>
         <input type="number" id="hw3SmT4" min="20" max="200" value="100" style="width:50px" oninput="markSmartDirty();updateSmartLabels()">
         <span> kph &rarr; +</span>
-        <input type="number" id="hw3SmO4" min="0" max="20" value="10" style="width:44px">
-        <span class="km">km/h</span>
+        <input type="number" id="hw3SmO4" min="0" max="50" value="10" style="width:44px" oninput="markSmartDirty()">
+        <span class="km">%</span>
       </div>
       <div class="smart-rule">
         <span>&ge; <span id="sSmLbl5">100</span> kph &rarr; +</span>
-        <input type="number" id="hw3SmO5" min="0" max="20" value="8" style="width:44px">
-        <span class="km">km/h</span>
+        <input type="number" id="hw3SmO5" min="0" max="50" value="8" style="width:44px" oninput="markSmartDirty()">
+        <span class="km">%</span>
       </div>
       <div class="smart-rule" style="justify-content:flex-end;border-bottom:none;padding-top:10px;gap:8px">
         <button onclick="resetSmartRules()" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer" id="iSmResetBtn">恢复默认</button>
@@ -275,6 +308,10 @@ select:focus{outline:none;border-color:#38bdf8}
     <div class="status-row"><span id="iLblCANChassis">底盘 CAN</span><span id="sCANChassis" class="status-no">--</span></div>
   </div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
+  <div class="status-row" id="rowTemp" style="display:none">
+    <span id="iLblTemp">车内/外温度</span>
+    <span id="sTemp" style="color:#38bdf8;font-weight:600;font-size:13px">--</span>
+  </div>
   <div class="status-row" id="rowBMS" style="display:none">
     <span id="iLblBMS">电池 <span style="color:#64748b;font-size:11px">（数据未经车辆验证）</span></span>
     <span id="sBMS" style="color:#38bdf8;font-weight:600;font-size:13px">--</span>
@@ -285,6 +322,7 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="status-row" id="rowLanIP" style="display:none"><span id="iLblLanIP">内网 IP</span><span id="sLanIP" style="color:#22c55e;font-weight:600;font-family:monospace">--</span></div>
   <div class="status-row"><span id="iLblMdns">本地域名</span><span style="color:#38bdf8;font-weight:600;font-family:monospace">fsd.local</span></div>
 </div>
+
 
 <div class="card">
   <div class="card-title" id="iCardWifi">WiFi 设置</div>
@@ -298,7 +336,7 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <button class="save-btn" id="wifiSaveBtn" onclick="doWifi()">保存并重启</button>
   <div class="msg" id="wifiMsg"></div>
-  <div style="margin-top:18px;padding-top:18px;border-top:1px solid #1e293b">
+  <div id="staSection" style="margin-top:18px;padding-top:18px;border-top:1px solid #1e293b">
     <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:12px" id="iLblStaSection">连接路由器（内网访问）</div>
     <div style="color:#64748b;font-size:12px;margin-bottom:10px" id="iLblStaDesc">填写后模块将同时连接路由器，可通过内网 IP 访问，热点仍保留。留空则只用热点。</div>
     <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:8px">
@@ -331,6 +369,72 @@ select:focus{outline:none;border-color:#38bdf8}
     <input type="password" id="accessPin" class="text-input" maxlength="16" placeholder="4~16 位，留空=不设密码" style="margin-bottom:10px">
     <button class="save-btn" id="pinSaveBtn" onclick="doPin()">设置密码</button>
     <div class="msg" id="pinMsg"></div>
+  </div>
+</div>
+
+<!-- WiFi bridge card (only visible when /api/wifi-bridge/status responds) -->
+<div class="card" id="cardBridge" style="display:none">
+  <div class="card-title">WiFi 桥接（上游转发）</div>
+  <div style="background:#450a0a;border:2px solid #dc2626;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;color:#fecaca">
+    <div style="font-weight:700;color:#fca5a5;margin-bottom:4px">⚠️ 重要提醒：先过滤再联网</div>
+    <div>车机连接本 Wi-Fi 之前，请先<span style="color:#fef08a;font-weight:600">启用下方 DNS 过滤并配置好规则</span>。直接让车机裸连上网 = 特斯拉云端会收到非官方网络流量，存在<span style="color:#fca5a5;font-weight:600">账号被封禁或车辆被拉黑</span>的风险。</div>
+    <div style="margin-top:4px;color:#fed7aa">建议顺序：① 先用手机加入上游热点 → ② 启用 DNS 过滤 + 选预设 → ③ 最后再让车机连本 AP</div>
+  </div>
+  <div class="row"><span class="row-label">启用</span>
+    <label class="switch"><input type="checkbox" id="brEn" onchange="brSet()"><span class="slider"></span></label></div>
+  <div class="row"><span class="row-label">上游状态</span>
+    <span id="brStat" style="font-family:monospace;font-size:13px">--</span></div>
+  <div class="row"><span class="row-label">上游 SSID</span>
+    <span id="brSSID" style="font-family:monospace;font-size:13px">--</span></div>
+  <div class="row"><span class="row-label">NAT</span>
+    <span id="brNat" style="font-family:monospace;font-size:13px">--</span></div>
+  <div class="row"><span class="row-label">芯片温度</span>
+    <span id="brTemp" style="font-family:monospace;font-size:13px">--</span></div>
+
+  <div style="margin-top:14px;padding-top:14px;border-top:1px solid #1e293b">
+    <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:10px">已保存热点</div>
+    <div id="brList" style="font-size:13px;font-family:monospace"></div>
+    <div style="margin-top:10px">
+      <input type="text" id="brAddSsid" class="text-input" maxlength="32" placeholder="SSID（手动填写，大小写严格一致）" style="margin-bottom:6px">
+      <input type="password" id="brAddPass" class="text-input" maxlength="63" placeholder="密码（开放热点留空）" style="margin-bottom:6px">
+      <button class="save-btn" onclick="brAdd()">添加 / 更新</button>
+      <div class="msg" id="brMsg"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:14px;padding-top:14px;border-top:1px solid #1e293b">
+    <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:10px">DNS 过滤</div>
+    <div class="row"><span class="row-label">启用</span>
+      <label class="switch"><input type="checkbox" id="brDnsEn" onchange="brSet()"><span class="slider"></span></label></div>
+    <div style="color:#64748b;font-size:11px;margin:4px 0 4px 0">空格/逗号/分号分隔，支持根域（含子域匹配）</div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:8px;margin:6px 0 8px 0;font-size:11px;color:#94a3b8;line-height:1.6">
+      <div style="color:#cbd5e1;font-weight:600;margin-bottom:4px">⚠️ 一键预设 · 载入后可自由修改</div>
+      <div>• 预设只是帮你填好文本框，<span style="color:#34d399">载入后还可以手动增删</span>，改完点「保存 DNS 配置」才生效</div>
+      <div>• 匹配规则：<span style="color:#cbd5e1">更长的规则优先</span>（如 tesla.cn 黑 + nav-prd-maps.tesla.cn 白 → nav-prd-maps 放行，其他 *.tesla.cn 拦）</div>
+      <div>• 手机若开启「私人 DNS (DoT)」或 DoH 会<span style="color:#f87171">绕过</span>本过滤，需在系统设置关闭</div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #334155;color:#fbbf24">• 预设内容<span style="color:#fde68a">来自网络收集</span>，仅供参考。Tesla 云域名可能因车型/区域/版本而异，请结合自己车的实际流量（参考"最近拦截"列表）自行增删调整。</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      <button type="button" id="pstTesla" onclick="brApplyPreset('tesla_min')" style="height:28px;padding:0 10px;background:#065f46;color:#d1fae5;border:2px solid #34d399;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">⭐ Tesla 推荐（实测）</button>
+      <button type="button" id="pstBl" onclick="brApplyPreset('bl_telemetry')" style="height:28px;padding:0 10px;background:#7c2d12;color:#fed7aa;border:none;border-radius:6px;font-size:11px;cursor:pointer">只屏蔽遥测</button>
+      <button type="button" id="pstClr" onclick="brApplyPreset('clear')" style="height:28px;padding:0 10px;background:#334155;color:#cbd5e1;border:none;border-radius:6px;font-size:11px;cursor:pointer">清空</button>
+    </div>
+    <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <span class="row-label">白名单（留空=允许全部未拉黑）</span>
+      <textarea id="brDnsAllow" class="text-input" maxlength="1023" rows="3" style="font-family:monospace;font-size:12px"></textarea>
+    </div>
+    <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-top:8px">
+      <span class="row-label">黑名单（优先生效）</span>
+      <textarea id="brDnsBlock" class="text-input" maxlength="1023" rows="3" style="font-family:monospace;font-size:12px"></textarea>
+    </div>
+    <button class="save-btn" onclick="brSet()" style="margin-top:8px">保存 DNS 配置</button>
+    <div style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:#64748b">DNS 拦截 <span id="brBlkTot">0</span> 次 · IP 拦截 <span id="brIpDrops">0</span> 次 (cache <span id="brIpCache">0</span>/<span id="brIpCap">256</span> · peak <span id="brIpPeak">0</span>)</span>
+        <button onclick="brBlkClear()" style="height:28px;padding:0 12px;background:#334155;color:#cbd5e1;border:none;border-radius:6px;font-size:12px;cursor:pointer">清空</button>
+      </div>
+      <div id="brBlkList" style="font-family:monospace;font-size:12px;max-height:120px;overflow-y:auto"></div>
+    </div>
   </div>
 </div>
 
@@ -415,10 +519,14 @@ var T={
     logCopyBtn:'复制日志',logDlBtn:'下载持久日志',logClrBtn:'清除',logCleared:'已清除',logCopied:'已复制',
     lblTimeSync:'时间同步',timeSyncOK:'已同步',timeSyncNo:'未同步',
     lblAPRestart:'AP 自动恢复',
+    lblHW4Off:'速度偏移 km/h（HW4）',
+    lblTrackMode:'赛道模式（实验性）',
+    trackModeWarn:'⚠️ 实验性功能，效果未经完全验证。开启后将向总线持续注入赛道模式请求，可能影响车辆稳定控制。请知悉风险后开启。',
+    lblLiveGWAP:'AP 类型',
     hwDetHW3:'CAN 检测到：HW3',hwDetHW4:'CAN 检测到：HW4',
     hwDetNone:'未自动检测到，请手动选择（2020+ 车型不支持）',
     cardLive:'实时摘要',lblLiveCAN:'CAN',lblLiveSpeed:'车速',lblLiveLimit:'限速',lblLiveOffset:'偏移',
-    lblLiveFSD:'FSD 注入',lblLiveTier:'智能档位',liveSpeedUnit:'km/h',liveLimitUnit:'km/h',liveOffUnit:'km/h',
+    lblLiveFSD:'FSD 注入',lblLiveTier:'智能档位',lblLiveTemp:'车内/外温度',liveSpeedUnit:'km/h',liveLimitUnit:'km/h',liveOffUnit:'km/h',
     lblLiveTorque:'扭矩 Nm',lblLiveGear:'挡位',lblLiveAP:'AP',lblLiveBrake:'刹车'},
   en:{title:'Tesla Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
@@ -447,10 +555,14 @@ var T={
     logCopyBtn:'Copy Log',logDlBtn:'Download Persistent Log',logClrBtn:'Clear',logCleared:'Cleared',logCopied:'Copied',
     lblTimeSync:'Time Sync',timeSyncOK:'Synced',timeSyncNo:'Not synced',
     lblAPRestart:'AP Auto-Resume',
+    lblHW4Off:'HW4 Speed Offset (km/h)',
+    lblTrackMode:'Track Mode (Experimental)',
+    trackModeWarn:'⚠️ Experimental. Continuously injects Track Mode request on the CAN bus. May affect stability control. Enable only if you understand the risk.',
+    lblLiveGWAP:'AP TYPE',
     hwDetHW3:'CAN detected: HW3',hwDetHW4:'CAN detected: HW4',
     hwDetNone:'Auto-detect failed — select manually (2020+ vehicles not supported)',
     cardLive:'LIVE STATUS',lblLiveCAN:'CAN',lblLiveSpeed:'SPEED',lblLiveLimit:'LIMIT',lblLiveOffset:'OFFSET',
-    lblLiveFSD:'FSD INJECT',lblLiveTier:'SMART TIER',liveSpeedUnit:'km/h',liveLimitUnit:'km/h',liveOffUnit:'km/h',
+    lblLiveFSD:'FSD INJECT',lblLiveTier:'SMART TIER',lblLiveTemp:'CABIN/AMBIENT TEMP',liveSpeedUnit:'km/h',liveLimitUnit:'km/h',liveOffUnit:'km/h',
     lblLiveTorque:'TORQUE Nm',lblLiveGear:'GEAR',lblLiveAP:'AP',lblLiveBrake:'BRAKE'}
 };
 function applyLang(){
@@ -498,6 +610,10 @@ function applyLang(){
   document.getElementById('scanBtn').textContent=t.scanBtn;
   document.getElementById('iScanPlaceholder').textContent=t.scanPlaceholder;
   document.getElementById('iLblAPRestart').textContent=t.lblAPRestart;
+  document.getElementById('iLblHW4Off').textContent=t.lblHW4Off;
+  document.getElementById('iLblTrackMode').textContent=t.lblTrackMode;
+  document.getElementById('iLblLiveGWAP').textContent=t.lblLiveGWAP;
+  document.getElementById('iLblLiveTemp').textContent=t.lblLiveTemp;
   document.getElementById('iLblTimeSync').textContent=t.lblTimeSync;
   document.getElementById('iCardLog').textContent=t.cardLog;
   document.getElementById('iLblLogNote').textContent=t.lblLogNote;
@@ -564,7 +680,7 @@ function poll(){
     var hwAutoEl=document.getElementById('iHWAuto');
     if(d.hwDetected===1){hwAutoEl.style.color='#22c55e';hwAutoEl.textContent=T[lang].hwDetHW3;hwAutoEl.style.display='';}
     else if(d.hwDetected===2){hwAutoEl.style.color='#22c55e';hwAutoEl.textContent=T[lang].hwDetHW4;hwAutoEl.style.display='';}
-    else if(d.rxCount>0){hwAutoEl.style.color='#f59e0b';hwAutoEl.textContent=T[lang].hwDetNone;hwAutoEl.style.display='';}
+    else if(d.rx>0){hwAutoEl.style.color='#f59e0b';hwAutoEl.textContent=T[lang].hwDetNone;hwAutoEl.style.display='';}
     else{hwAutoEl.style.display='none';}
     updateSpeedOptions(d.hwMode);
     document.getElementById('speedProfile').value=d.speedProfile;
@@ -573,9 +689,16 @@ function poll(){
     document.getElementById('isaChime').checked=!!d.isaChime;
     document.getElementById('emergencyDet').checked=!!d.emergencyDet;
     document.getElementById('forceActivate').checked=!!d.forceActivate;
+    document.getElementById('overrideSL').checked=!!d.overrideSL;
+    document.getElementById('rowOverrideSL').style.display=(d.hwMode===0)?'':'none';
     var hw3OffEl=document.getElementById('hw3Offset');
     if(hw3OffEl)hw3OffEl.value=String(d.hw3Offset!=null?d.hw3Offset:-1);
-    var precondEl=document.getElementById('precond');if(precondEl)precondEl.checked=!!d.precond;
+    if(d.tempSeen){
+      document.getElementById('rowTemp').style.display='';
+      var tIn=(d.tempInRaw*0.25).toFixed(1)+'°C';
+      var tOut=(d.tempOutRaw*0.5-40).toFixed(1)+'°C';
+      document.getElementById('sTemp').textContent=tIn+' / '+tOut;
+    }
     if(d.bmsSeen){
       var bmsRow=document.getElementById('rowBMS');
       bmsRow.style.display='';
@@ -604,13 +727,13 @@ function poll(){
     var lanRow=document.getElementById('rowLanIP');
     if(d.staOK&&d.staIP){document.getElementById('sLanIP').textContent=d.staIP;lanRow.style.display='';}
     else{lanRow.style.display='none';}
-    if(d.version)document.getElementById('sVer').textContent='v'+d.version;
+    if(d.version)document.getElementById('sVer').textContent=(d.variant?d.variant+' ':'')+'v'+d.version;
     // AP auto-restart
     var smartEl=document.getElementById('hw3Smart');
     if(smartEl){
       smartEl.checked=!!d.hw3Smart;
-      // Sync smart rule inputs only once on first load; never overwrite user edits afterward
-      if(!smartInitialized){
+      // Sync smart rule inputs whenever user isn't actively editing — keeps phone/car UI in sync
+      if(!smartDirty){
         if(d.hw3SmT1!=null)document.getElementById('hw3SmT1').value=d.hw3SmT1;
         if(d.hw3SmT2!=null)document.getElementById('hw3SmT2').value=d.hw3SmT2;
         if(d.hw3SmT3!=null)document.getElementById('hw3SmT3').value=d.hw3SmT3;
@@ -620,15 +743,19 @@ function poll(){
         if(d.hw3SmO3!=null)document.getElementById('hw3SmO3').value=d.hw3SmO3;
         if(d.hw3SmO4!=null)document.getElementById('hw3SmO4').value=d.hw3SmO4;
         if(d.hw3SmO5!=null)document.getElementById('hw3SmO5').value=d.hw3SmO5;
-        smartInitialized=true;
         updateSmartLabels();
       }
       var smartActive=(d.hwMode===1&&!!d.hw3Smart);
       document.getElementById('rowHW3Offset').style.display=(d.hwMode===1&&!smartActive)?'':'none';
       document.getElementById('rowHW3SmartRules').style.display=smartActive?'':'none';
+      document.getElementById('rowHW4Offset').style.display=(d.hwMode===2)?'':'none';
+      document.getElementById('rowTrackMode').style.display=(d.hwMode===1)?'':'none';
     }
     document.getElementById('apRestart').checked=!!d.apRestart;
-    document.getElementById('nagKiller').checked=!!d.nagKiller;
+    var hw4OffEl=document.getElementById('hw4Offset');
+    if(hw4OffEl)hw4OffEl.value=String(d.hw4Offset!=null?d.hw4Offset:0);
+    var trackModeEl=document.getElementById('trackMode');
+    if(trackModeEl)trackModeEl.checked=!!d.trackMode;
 
     var tsEl=document.getElementById('sTimeSync');
     if(d.timeSynced){tsEl.textContent=T[lang].timeSyncOK;tsEl.className='status-ok';}
@@ -665,14 +792,38 @@ function poll(){
       tierRow.style.display='';
       var tierLabels=['',' < '+d.hw3SmT1,d.hw3SmT1+'~'+d.hw3SmT2,d.hw3SmT2+'~'+d.hw3SmT3,d.hw3SmT3+'~'+d.hw3SmT4,' ≥ '+d.hw3SmT4];
       var tl=tierLabels[d.smartTier]||('T'+d.smartTier);
-      document.getElementById('liveTier').textContent=tl+' kph  +'+d.smartKmh+' km/h';
+      var _sLim=d.fusedLimit>0?d.fusedLimit*5:(d.visionLimit>0?d.visionLimit*5:0);
+      var smartKmh=(_sLim>0&&d.smartPct!=null)?Math.round(_sLim*d.smartPct/100):0;
+      document.getElementById('liveTier').textContent=tl+' kph  +'+d.smartPct+'%  (+'+smartKmh+' km/h)';
     } else {
       tierRow.style.display='none';
     }
-    var offKmh=d.hw3Offset>=0?Math.round(d.hw3Offset/5):null;
-    var autoKmh=d.hw3AutoOffset>0?Math.round(d.hw3AutoOffset/5):null;
-    var offVal=d.hwMode===1?(d.hw3Smart?d.smartKmh:(offKmh!=null?offKmh:autoKmh)):null;
+    var liveTempRow=document.getElementById('rowLiveTemp');
+    if(d.tempSeen){
+      liveTempRow.style.display='';
+      document.getElementById('liveTemp').textContent=(d.tempInRaw*0.25).toFixed(1)+'°C / '+(d.tempOutRaw*0.5-40).toFixed(1)+'°C';
+    } else {
+      liveTempRow.style.display='none';
+    }
+    var spdLimKph=d.fusedLimit>0?d.fusedLimit*5:(d.visionLimit>0?d.visionLimit*5:0);
+    // Prefer manual hw3Offset; fall back to live hw3AutoOffset (matches car UI)
+    var hw3Pct=(d.hw3Offset>=0)?d.hw3Offset:(d.hw3AutoOffset>=0?d.hw3AutoOffset:-1);
+    var offKmh=(hw3Pct>=0&&spdLimKph>0)?Math.round(spdLimKph*hw3Pct/100):null;
+    var smartKmh=(d.smartPct>0&&spdLimKph>0)?Math.round(spdLimKph*d.smartPct/100):0;
+    var hw4OffKmh={0:0,7:5,10:7,14:10,21:15}[d.hw4Offset]||0;
+    // HW3 auto mode (smart off, manual=-1): passthrough Tesla's mux-2 bytes, we do not override.
+    var offVal=d.hwMode===1?(d.hw3Smart?smartKmh:(offKmh!=null?offKmh:null)):
+               (d.hwMode===2&&hw4OffKmh>0?hw4OffKmh:null);
     document.getElementById('liveOffset').textContent=offVal!=null?'+'+offVal:'--';
+    // ── GTW_autopilot type ────────────────────────────────────────────────
+    var gwApNames=['NONE','HWY','EAP','FSD','BASIC'];
+    var gwApRow=document.getElementById('rowLiveGWAP');
+    if(d.gwAutopilot>=0){
+      gwApRow.style.display='';
+      document.getElementById('liveGWAP').textContent=gwApNames[d.gwAutopilot]||('AP'+d.gwAutopilot);
+    } else {
+      gwApRow.style.display='none';
+    }
     // ── Torque / Gear / AP / Brake ───────────────────────────────────────
     var tq=(d.torqueR||0)*2;
     document.getElementById('liveTorque').textContent=tq?tq:'--';
@@ -721,6 +872,145 @@ function startApp(){
   appStarted=true;
   setInterval(poll,1000);poll();
   syncTime();  // push browser clock to ESP32 for real timestamps in CSV
+  brInit();    // probe for WiFi bridge endpoint (esp32s3-waveshare-wifi only)
+}
+
+// ── WiFi bridge card (shown only if backend supports it) ───────────
+var brDirty=false;  // true while user editing DNS lists → skip overwrite
+var brPollTimer=null;
+function brInit(){
+  fetch('/api/wifi-bridge/status'+(token?'?token='+token:'')).then(function(r){
+    if(!r.ok)return;
+    document.getElementById('cardBridge').style.display='';
+    // Bridge supersedes the old single-SSID STA field; hide it to avoid two-config confusion
+    var staSec=document.getElementById('staSection');
+    if(staSec)staSec.style.display='none';
+    brPoll();
+    brPollTimer=setInterval(brPoll,3000);
+    // mark dirty on any edit so polling doesn't overwrite user input
+    ['brDnsAllow','brDnsBlock','brAddSsid','brAddPass'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.addEventListener('input',function(){brDirty=true;});
+    });
+  }).catch(function(){});
+}
+function brPoll(){
+  fetch('/api/wifi-bridge/status'+(token?'?token='+token:'')).then(function(r){return r.ok?r.json():null;}).then(function(d){
+    if(!d)return;
+    document.getElementById('brEn').checked=!!d.upstreamEnable;
+    document.getElementById('brDnsEn').checked=!!d.dnsEnable;
+    document.getElementById('brStat').textContent=d.upstreamStatus+(d.upstreamSignal?' · '+d.upstreamSignal:'')+(d.upstreamRSSI!==null?' · '+d.upstreamRSSI+' dBm':'');
+    document.getElementById('brSSID').textContent=d.upstreamSSID||'--';
+    document.getElementById('brNat').textContent=d.natStatus;
+    var tempStr='--';
+    if(d.chipTempC!==null){
+      tempStr=d.chipTempC.toFixed(1)+'°C';
+      if(d.chipTempAvgC!==null)tempStr+=' (avg '+d.chipTempAvgC.toFixed(1)+')';
+      tempStr+=' · '+d.thermalStatus;
+    }
+    document.getElementById('brTemp').textContent=tempStr;
+    // hotspot list
+    var list=document.getElementById('brList');
+    if(!d.upstreamNetworks.length){list.innerHTML='<span style="color:#64748b">无已保存热点</span>';}
+    else{
+      list.innerHTML=d.upstreamNetworks.map(function(n){
+        var dot=n.connected?'🟢':(n.active?'🟡':'⚪');
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e293b">'+
+          '<span>'+dot+' '+escHtml(n.ssid)+(n.hasPass?'':' <span style="color:#fbbf24">(开放)</span>')+'</span>'+
+          '<button onclick="brDel('+JSON.stringify(n.ssid).replace(/"/g,'&quot;')+')" style="height:26px;padding:0 10px;background:#991b1b;color:#fee2e2;border:none;border-radius:6px;font-size:11px;cursor:pointer">删除</button>'+
+          '</div>';
+      }).join('');
+    }
+    if(!brDirty){
+      document.getElementById('brDnsAllow').value=d.dnsAllow||'';
+      document.getElementById('brDnsBlock').value=d.dnsBlock||'';
+    }
+    brHighlightPreset(d.dnsAllow,d.dnsBlock);
+    document.getElementById('brBlkTot').textContent=d.dnsBlockedTotal;
+    document.getElementById('brIpDrops').textContent=(d.ipBlockDrops!=null?d.ipBlockDrops:0);
+    document.getElementById('brIpCache').textContent=(d.ipCacheCount!=null?d.ipCacheCount:0);
+    document.getElementById('brIpPeak').textContent=(d.ipCachePeak!=null?d.ipCachePeak:0);
+    var blk=document.getElementById('brBlkList');
+    if(!d.dnsBlockedRecent.length){blk.innerHTML='<span style="color:#64748b">暂无拦截</span>';}
+    else{
+      blk.innerHTML=d.dnsBlockedRecent.map(function(e){
+        return '<div style="display:flex;justify-content:space-between;padding:2px 0">'+
+          '<span>'+escHtml(e.domain)+'</span><span style="color:#94a3b8">×'+e.count+'</span></div>';
+      }).join('');
+    }
+  }).catch(function(){});
+}
+function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function brSet(){
+  var qs='upstreamEnable='+(document.getElementById('brEn').checked?1:0)+
+         '&dnsEnable='+(document.getElementById('brDnsEn').checked?1:0)+
+         '&dnsAllow='+encodeURIComponent(document.getElementById('brDnsAllow').value)+
+         '&dnsBlock='+encodeURIComponent(document.getElementById('brDnsBlock').value);
+  fetch('/api/wifi-bridge/set?'+qs+(token?'&token='+token:''))
+    .then(function(r){brDirty=false;msg('brMsg',r.ok?'已保存':'保存失败',r.ok);});
+}
+var BR_PRESETS={
+  tesla_min:{name:'⭐ Tesla 推荐方案（实测）',
+    allow:'connman.vn.cloud.tesla.cn nav-prd-maps.tesla.cn hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn media-server-me.tesla.cn www.tesla.cn maps-cn-prd.go.tesla.services volcengine.com volces.com volcengineapi.com volccdn.com api.map.baidu.com lc.map.baidu.com newvector.map.baidu.com route.map.baidu.com newclient.map.baidu.com tracknavi.baidu.com itsmap3.baidu.com app.navi.baidu.com mapapip0.bdimg.com mapapisp0.bdimg.com automap0.bdimg.com baidunavi.cdn.bcebos.com lbsnavi.cdn.bcebos.com enlargeroad-view.su.bcebos.com',
+    block:'tesla.cn tesla.com teslamotors.com tesla.services',
+    note:'屏蔽全部 Tesla 云域名，仅放行核心子域：\n• Wi-Fi 检测 connman + www.tesla.cn\n• Tesla 地图导航 nav-prd-maps + maps-cn-prd\n• 手机 APP 控车 hermes + signaling\n• Intel 车机语音 media-server-me\n• AMD 车机语音 volcengine/volces/volcengineapi/volccdn（字节火山引擎）\n• 百度地图/导航 *.map.baidu.com + *.bdimg.com + *.bcebos.com（车机内置地图需要）\n\n✅ 已实测 2 天无异常（APP 控车/导航/语音/Wi-Fi 正常工作）。推荐优先使用此方案。'},
+  bl_telemetry:{name:'屏蔽遥测（中风险）',
+    allow:'',
+    block:'hermes-stream-prd.vn.cloud.tesla.cn vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn firmware.tesla.cn',
+    note:'拦 4 条 Tesla 遥测/上传/OTA 端点：\n• hermes-stream-prd（车辆数据流）\n• vehicle-files prd.cnn1/cn1（车辆日志/文件上传）\n• firmware.tesla.cn（OTA 固件下载）\n\nhermes-stream 风险略高，可能影响部分推送/远程指令。屏蔽 firmware.tesla.cn 会阻止 OTA 升级。'},
+  clear:{name:'清空',allow:'',block:'',note:'清空所有过滤规则'}
+};
+var PRESET_IDS_PH={tesla_min:'pstTesla',bl_telemetry:'pstBl',clear:'pstClr'};
+function normListPh(s){return String(s||'').trim().split(/\s+/).filter(Boolean).sort().join(' ');}
+function brHighlightPreset(allow,block){
+  var a=normListPh(allow),b=normListPh(block);
+  var active=null;
+  for(var k in BR_PRESETS){
+    if(normListPh(BR_PRESETS[k].allow)===a && normListPh(BR_PRESETS[k].block)===b){active=k;break;}
+  }
+  for(var kk in PRESET_IDS_PH){
+    var el=document.getElementById(PRESET_IDS_PH[kk]);
+    if(el) el.style.boxShadow=(kk===active)?'0 0 0 3px #fbbf24':'none';
+  }
+}
+function brApplyPreset(key){
+  var p=BR_PRESETS[key];if(!p)return;
+  if(!confirm('应用预设「'+p.name+'」？\n\n' + p.note + '\n\n⚠ 预设内容来自网络收集，仅供参考，准确性请自行验证。\n注意：会覆盖当前白/黑名单文本框内容。')){return;}
+  document.getElementById('brDnsAllow').value=p.allow;
+  document.getElementById('brDnsBlock').value=p.block;
+  brDirty=true;
+  msg('brMsg','已载入「'+p.name+'」，请点保存 DNS 配置',true);
+}
+function brAdd(){
+  var ssid=document.getElementById('brAddSsid').value.trim();
+  var pass=document.getElementById('brAddPass').value;
+  if(!ssid){msg('brMsg','请填写 SSID',false);return;}
+  var qs='ssid='+encodeURIComponent(ssid)+'&pass='+encodeURIComponent(pass);
+  fetch('/api/wifi-bridge/add?'+qs+(token?'&token='+token:''))
+    .then(function(r){
+      if(r.ok){
+        document.getElementById('brAddSsid').value='';
+        document.getElementById('brAddPass').value='';
+        document.getElementById('brScanList').style.display='none';
+        brDirty=false;
+        msg('brMsg','已保存',true);
+      }else{r.text().then(function(t){msg('brMsg','失败：'+t,false);});}
+    });
+}
+function brDel(ssid){
+  if(!confirm('删除 '+ssid+' ?'))return;
+  fetch('/api/wifi-bridge/delete?ssid='+encodeURIComponent(ssid)+(token?'&token='+token:''))
+    .then(function(r){msg('brMsg',r.ok?'已删除':'删除失败',r.ok);});
+}
+function brBlkClear(){
+  fetch('/api/wifi-bridge/blocked-clear'+(token?'?token='+token:''))
+    .then(function(r){msg('brMsg',r.ok?'已清空':'清空失败',r.ok);});
+}
+function msg(id,text,ok){
+  var el=document.getElementById(id);
+  el.textContent=text;
+  el.style.color=ok?'#34d399':'#f87171';
+  setTimeout(function(){el.textContent='';},2500);
 }
 function showPinStep(){
   document.getElementById('disclaimerContent').style.display='none';
@@ -805,12 +1095,16 @@ function updateSpeedOptions(hwMode){
   // Show HW3 rows only for HW3 mode
   var isHW3=(hwMode===1);
   document.getElementById('rowHW3Smart').style.display=isHW3?'':'none';
+  document.getElementById('rowTrackMode').style.display=isHW3?'':'none';
   var smartOn=isHW3&&document.getElementById('hw3Smart').checked;
   // 智能开启时隐藏手动偏移下拉，避免用户误以为手动值在生效
   document.getElementById('rowHW3Offset').style.display=(isHW3&&!smartOn)?'':'none';
   document.getElementById('rowHW3SmartRules').style.display=smartOn?'':'none';
-  // Emergency detection is HW4-only — hide and force OFF on HW3/Legacy
+  // HW4-only rows — hide and reset on other modes
+  document.getElementById('rowHW4Offset').style.display=isHW4?'':'none';
   document.getElementById('rowEmgDet').style.display=isHW4?'':'none';
+  // Legacy-only rows
+  document.getElementById('rowOverrideSL').style.display=(hwMode===0)?'':'none';
   if(!isHW4){
     var emgEl=document.getElementById('emergencyDet');
     if(emgEl&&emgEl.checked){emgEl.checked=false;setVal('emergencyDet',0);}
@@ -843,12 +1137,19 @@ function setVal(key,val){
       }
     });
 }
+function onTrackModeChange(el){
+  if(el.checked){
+    if(!confirm(T[lang].trackModeWarn)){el.checked=false;return;}
+  }
+  setVal('trackMode',el.checked?1:0);
+}
 function setHW3Smart(enabled){
   setVal('hw3Smart',enabled?1:0);
   document.getElementById('rowHW3Offset').style.display=enabled?'none':'';
   document.getElementById('rowHW3SmartRules').style.display=enabled?'':'none';
 }
-var smartInitialized=false;
+var smartDirty=false;
+function markSmartDirty(){ smartDirty=true; }
 function updateSmartLabels(){
   var t1=parseInt(document.getElementById('hw3SmT1').value)||40;
   var t2=parseInt(document.getElementById('hw3SmT2').value)||60;
@@ -865,18 +1166,18 @@ function saveSmartRules(){
   var t2=parseInt(document.getElementById('hw3SmT2').value)||60;
   var t3=parseInt(document.getElementById('hw3SmT3').value)||80;
   var t4=parseInt(document.getElementById('hw3SmT4').value)||100;
-  var o1=parseInt(document.getElementById('hw3SmO1').value)||20;
-  var o2=parseInt(document.getElementById('hw3SmO2').value)||15;
-  var o3=parseInt(document.getElementById('hw3SmO3').value)||12;
-  var o4=parseInt(document.getElementById('hw3SmO4').value)||10;
-  var o5=parseInt(document.getElementById('hw3SmO5').value)||8;
-  // Clamp: T1<T2<T3<T4, offsets 0-20
-  t1=Math.max(20,Math.min(t1,180));
+  var o1=parseInt(document.getElementById('hw3SmO1').value);if(isNaN(o1))o1=50;
+  var o2=parseInt(document.getElementById('hw3SmO2').value);if(isNaN(o2))o2=25;
+  var o3=parseInt(document.getElementById('hw3SmO3').value);if(isNaN(o3))o3=15;
+  var o4=parseInt(document.getElementById('hw3SmO4').value);if(isNaN(o4))o4=10;
+  var o5=parseInt(document.getElementById('hw3SmO5').value);if(isNaN(o5))o5=8;
+  // Clamp: T1<T2<T3<T4, offsets 0-50 (matches backend + car UI)
+  t1=Math.max(20,Math.min(t1,195));
   t2=Math.max(t1+1,Math.min(t2,200));
   t3=Math.max(t2+1,Math.min(t3,200));
   t4=Math.max(t3+1,Math.min(t4,200));
-  o1=Math.max(0,Math.min(o1,20));o2=Math.max(0,Math.min(o2,20));o3=Math.max(0,Math.min(o3,20));
-  o4=Math.max(0,Math.min(o4,20));o5=Math.max(0,Math.min(o5,20));
+  o1=Math.max(0,Math.min(o1,50));o2=Math.max(0,Math.min(o2,50));o3=Math.max(0,Math.min(o3,50));
+  o4=Math.max(0,Math.min(o4,50));o5=Math.max(0,Math.min(o5,50));
   // Update inputs after clamping
   document.getElementById('hw3SmT1').value=t1;document.getElementById('hw3SmT2').value=t2;
   document.getElementById('hw3SmT3').value=t3;document.getElementById('hw3SmT4').value=t4;
@@ -886,8 +1187,17 @@ function saveSmartRules(){
   var btn=document.getElementById('iSmSaveBtn');
   fetch(url).then(function(r){
     if(r.status===403){token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}showPinStep();}
-    else if(r.ok&&btn){btn.textContent='✓';setTimeout(function(){btn.textContent='保存';},1500);}
-  }).catch(function(){});
+    else if(r.ok){smartDirty=false; if(btn){btn.textContent='✓';setTimeout(function(){btn.textContent='保存';},1500);}}
+    else {
+      // Backend rejected (e.g. 400 validation) — clear dirty so poll can re-sync, flag to user.
+      smartDirty=false;
+      if(btn){btn.textContent='✗';setTimeout(function(){btn.textContent='保存';},1500);}
+    }
+  }).catch(function(){
+    // Network error — clear dirty so poll re-syncs; user can retry.
+    smartDirty=false;
+    if(btn){btn.textContent='✗';setTimeout(function(){btn.textContent='保存';},1500);}
+  });
 }
 function resetSmartRules(){
   if(!agreed)return;
@@ -895,9 +1205,9 @@ function resetSmartRules(){
   document.getElementById('hw3SmT2').value=60;
   document.getElementById('hw3SmT3').value=80;
   document.getElementById('hw3SmT4').value=100;
-  document.getElementById('hw3SmO1').value=20;
-  document.getElementById('hw3SmO2').value=15;
-  document.getElementById('hw3SmO3').value=12;
+  document.getElementById('hw3SmO1').value=50;
+  document.getElementById('hw3SmO2').value=25;
+  document.getElementById('hw3SmO3').value=15;
   document.getElementById('hw3SmO4').value=10;
   document.getElementById('hw3SmO5').value=8;
   saveSmartRules();
@@ -1131,6 +1441,13 @@ function doResetAll(){
       msg.textContent=t.resetAllOK;msg.className='msg ok';
     });
 }
+
+// 键盘避让：输入框获得焦点时滚动到视口中央，避免被软键盘挡住
+document.addEventListener('focusin',function(e){
+  var t=e.target;
+  if(!t||!(t.matches&&t.matches('input,textarea')))return;
+  setTimeout(function(){try{t.scrollIntoView({block:'center',behavior:'smooth'});}catch(_){}} ,300);
+});
 </script>
 </body>
 </html>

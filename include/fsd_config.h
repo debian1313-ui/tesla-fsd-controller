@@ -14,10 +14,18 @@ struct FSDConfig {
     volatile bool     isaChimeSuppress    = false;
     volatile bool     emergencyDetection  = true;
     volatile bool     forceActivate       = false;   // bypass isFSDSelectedInUI (regions without TLSSC)
-    volatile int      hw3SpeedOffset      = 0;       // cached from mux-0 frame, used in mux-2
-    volatile int      hw3OffsetManual     = -1;      // -1=auto(from CAN), 0-100=user override (CAN units, ÷5=km/h)
-    volatile bool     precondition        = false;   // trigger battery preheating via 0x082
+    volatile bool     overrideSpeedLimit  = false;   // Legacy: set UI_visionSpeedSlider=100 in frame 1080
+    volatile int      hw3SpeedOffset      = 0;       // % of speed limit, decoded from mux-0 (0-100)
+    volatile int      hw3OffsetManual     = -1;      // -1=auto(from CAN), 0-100=% of current speed limit
+    volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 mux-2 data[1][5:0]; 0=off (presets: 7=+5,10=+7,14=+10,21=+15 km/h)
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
+    volatile int8_t   gatewayAutopilot    = -1;      // from 0x7FF mux-2: -1=unseen, 0=NONE,1=HIGHWAY,2=ENHANCED,3=SELF_DRIVING,4=BASIC
+    volatile bool     trackModeEnable     = false;   // HW3: echo 0x313 with UI_trackModeRequest=ON (off by default)
+
+    // Climate — read from 0x28B (BODY_R1, GTW bus)
+    volatile bool     tempSeen          = false;
+    volatile uint8_t  tempInsideRaw     = 0;   // AirTemp_Insd  data[5]: raw × 0.25 = °C
+    volatile uint8_t  tempOutsideRaw    = 0;   // AirTemp_Outsd data[7]: raw × 0.5 − 40 = °C
 
     // BMS — read-only sniff, no transmission
     volatile bool     bmsSeen             = false;
@@ -57,18 +65,13 @@ struct FSDConfig {
     volatile uint8_t hw3SmartT2           = 60;    // kph threshold: tier2/3 boundary
     volatile uint8_t hw3SmartT3           = 80;    // kph threshold: tier3/4 boundary
     volatile uint8_t hw3SmartT4           = 100;   // kph threshold: tier4/5 boundary
-    volatile uint8_t hw3SmartO1           = 20;    // km/h offset tier1 (< T1)
-    volatile uint8_t hw3SmartO2           = 15;    // km/h offset tier2 (T1~T2)
-    volatile uint8_t hw3SmartO3           = 12;    // km/h offset tier3 (T2~T3)
-    volatile uint8_t hw3SmartO4           = 10;    // km/h offset tier4 (T3~T4)
-    volatile uint8_t hw3SmartO5           = 8;     // km/h offset tier5 (≥T4)
-    volatile uint8_t hw3SmartLastKmh      = 12;    // last valid computed offset (fallback when limit=0)
+    volatile uint8_t hw3SmartO1           = 50;    // % offset tier1 (≤T1): speedLimit * O1 / 100
+    volatile uint8_t hw3SmartO2           = 25;    // % offset tier2 (T1~T2)
+    volatile uint8_t hw3SmartO3           = 15;    // % offset tier3 (T2~T3)
+    volatile uint8_t hw3SmartO4           = 10;    // % offset tier4 (T3~T4)
+    volatile uint8_t hw3SmartO5           = 8;     // % offset tier5 (≥T4)
+    volatile uint8_t hw3SmartLastPct      = 12;    // last valid computed % offset (fallback when limit=0)
     volatile uint8_t hw3SmartActiveTier   = 0;     // currently active tier: 1-5; 0=smart disabled or limit unknown
-
-    // Nag killer — echo 0x370 EPAS3S_sysStatus with counter+1
-    // Makes AP think EPAS is continuously providing fresh data.
-    // WARNING: bypasses hands-on detection. Use with extreme caution.
-    volatile bool     nagKiller           = false;
 
     // Performance test — 0→100 acceleration and 100→0 braking
     volatile uint8_t  perfAccelState      = 0;   // 0=idle,1=armed,2=running,3=done
