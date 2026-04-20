@@ -17,6 +17,7 @@ struct FSDConfig {
     volatile bool     overrideSpeedLimit  = false;   // Legacy: set UI_visionSpeedSlider=100 in frame 1080
     volatile int      hw3SpeedOffset      = 0;       // % of speed limit, decoded from mux-0 (0-100)
     volatile int      hw3OffsetManual     = -1;      // -1=auto(from CAN), 0-100=% of current speed limit
+    volatile bool     hw3HighSpeedPassthrough = true;// ≥80 km/h limits: pass Tesla's native EAP offset through unchanged
     volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 mux-2 data[1][5:0]; 0=off (presets: 7=+5,10=+7,14=+10,21=+15 km/h)
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
     volatile int8_t   gatewayAutopilot    = -1;      // from 0x7FF mux-2: -1=unseen, 0=NONE,1=HIGHWAY,2=ENHANCED,3=SELF_DRIVING,4=BASIC

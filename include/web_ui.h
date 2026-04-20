@@ -248,6 +248,10 @@ select:focus{outline:none;border-color:#38bdf8}
     <span class="row-label" id="iLblHW3Smart">智能速度偏移</span>
     <label class="toggle"><input type="checkbox" id="hw3Smart" onchange="setHW3Smart(this.checked)"><span class="slider"></span></label>
   </div>
+  <div class="row" id="rowHW3HiPass" style="display:none">
+    <span class="row-label" id="iLblHW3HiPass">≥80 km/h 让原车（HW3）</span>
+    <label class="toggle"><input type="checkbox" id="hw3HiPass" onchange="setVal('hw3HiPass',this.checked?1:0)"><span class="slider"></span></label>
+  </div>
   <div id="rowHW3SmartRules" style="display:none">
     <div class="smart-rules">
       <div class="smart-rule">
@@ -771,12 +775,15 @@ function poll(){
       document.getElementById('rowHW3SmartRules').style.display=smartActive?'':'none';
       document.getElementById('rowHW4Offset').style.display=(d.hwMode===2)?'':'none';
       document.getElementById('rowTrackMode').style.display=(d.hwMode===1)?'':'none';
+      document.getElementById('rowHW3HiPass').style.display=(d.hwMode===1)?'':'none';
     }
     document.getElementById('apRestart').checked=!!d.apRestart;
     var hw4OffEl=document.getElementById('hw4Offset');
     if(hw4OffEl)hw4OffEl.value=String(d.hw4Offset!=null?d.hw4Offset:0);
     var trackModeEl=document.getElementById('trackMode');
     if(trackModeEl)trackModeEl.checked=!!d.trackMode;
+    var hiPassEl=document.getElementById('hw3HiPass');
+    if(hiPassEl)hiPassEl.checked=(d.hw3HiPass==null?true:!!d.hw3HiPass);
 
     var tsEl=document.getElementById('sTimeSync');
     if(d.timeSynced){tsEl.textContent=T[lang].timeSyncOK;tsEl.className='status-ok';}
@@ -1119,6 +1126,7 @@ function updateSpeedOptions(hwMode){
   var isHW3=(hwMode===1);
   document.getElementById('rowHW3Smart').style.display=isHW3?'':'none';
   document.getElementById('rowTrackMode').style.display=isHW3?'':'none';
+  document.getElementById('rowHW3HiPass').style.display=isHW3?'':'none';
   var smartOn=isHW3&&document.getElementById('hw3Smart').checked;
   // 智能开启时隐藏手动偏移下拉，避免用户误以为手动值在生效
   document.getElementById('rowHW3Offset').style.display=(isHW3&&!smartOn)?'':'none';

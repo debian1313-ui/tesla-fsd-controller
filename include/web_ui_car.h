@@ -417,6 +417,7 @@ button{font-family:inherit;cursor:pointer}
           </div>
         </div>
         <div class="row"><div class="rlbl">智能模式</div><div class="tog" id="tgSmart" data-k="hw3Smart"></div><div class="rval">随车速自动调节偏移</div></div>
+        <div class="row"><div class="rlbl">高速让原车</div><div class="tog" id="tgHiPass" data-k="hw3HiPass"></div><div class="rval">≥80 km/h 时交还原车 EAP 偏移</div></div>
       </div>
 
       <!-- HW3 智能规则（分段偏移） -->
@@ -996,6 +997,7 @@ function render(d){
   setTog('tgForce', d.forceActivate);
   setTog('tgOvr', d.overrideSL);
   setTog('tgTrack', d.trackMode);
+  setTog('tgHiPass', d.hw3HiPass==null ? true : !!d.hw3HiPass);
   // HW 选中
   document.querySelectorAll('#grpHw .pill').forEach(function(b){
     b.classList.toggle('active', parseInt(b.dataset.v)===d.hwMode);

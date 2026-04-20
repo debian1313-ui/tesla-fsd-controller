@@ -136,54 +136,72 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
         }
         if (index == 2 && cfg.fsdTriggered && cfg.fsdEnable) {
             // Override policy:
-            //   smart on               → compute pct from tier rules
-            //   manual set (>=0)       → use cfg.hw3OffsetManual
-            //   auto (smart off, -1)   → pass Tesla's own mux-2 bytes through unchanged
-            // Wire encoding for override: canVal = pct × 4 (per upstream release/app.h:211).
+            //   passthrough (limKph ≥ 80 & flag) → keep factory EAP offset untouched
+            //   smart on                         → compute pct from tier rules
+            //   manual set (>=0)                 → use cfg.hw3OffsetManual
+            //   auto (smart off, -1)             → pass Tesla's own mux-2 bytes through unchanged
+            // Wire encoding: canVal = offsetKph × 5 (car reads canVal / 5 as kph;
+            // hardware max raw=200 → 40 kph). Prior code used pct×4 which the car
+            // misread as 0.8×pct kph — under-delivering at high limits and
+            // over-delivering at low limits.
             int pct = -1;
             uint8_t fl = (cfg.fusedSpeedLimit > 0 && cfg.fusedSpeedLimit < 31) ? cfg.fusedSpeedLimit : 0;
             uint8_t vl = (cfg.visionSpeedLimit > 0 && cfg.visionSpeedLimit < 31) ? cfg.visionSpeedLimit : 0;
             uint8_t limRaw = fl > 0 ? fl : vl;
             int limKph = limRaw * 5;
-            if (cfg.hw3SmartEnable) {
-                if (limKph > 0) {
-                    // Snapshot tier thresholds + offsets under critical section so
-                    // /api/set can't mid-update any individual field and make
-                    // limKph straddle an inconsistent boundary (T2 < T1, etc.).
-                    uint8_t sT1, sT2, sT3, sT4, sO1, sO2, sO3, sO4, sO5;
-                    portENTER_CRITICAL(&gHw3SmartMux);
-                    sT1 = cfg.hw3SmartT1; sT2 = cfg.hw3SmartT2;
-                    sT3 = cfg.hw3SmartT3; sT4 = cfg.hw3SmartT4;
-                    sO1 = cfg.hw3SmartO1; sO2 = cfg.hw3SmartO2; sO3 = cfg.hw3SmartO3;
-                    sO4 = cfg.hw3SmartO4; sO5 = cfg.hw3SmartO5;
-                    portEXIT_CRITICAL(&gHw3SmartMux);
-                    uint8_t tier;
-                    if      (limKph <= sT1) tier = 1;
-                    else if (limKph <= sT2) tier = 2;
-                    else if (limKph <= sT3) tier = 3;
-                    else if (limKph <= sT4) tier = 4;
-                    else                     tier = 5;
-                    pct = (tier==1)?sO1:(tier==2)?sO2:(tier==3)?sO3:(tier==4)?sO4:sO5;
-                    cfg.hw3SmartActiveTier = tier;
-                    cfg.hw3SmartLastPct    = (uint8_t)std::min(pct, 50);
+
+            // ≥80 km/h limits are Tesla's native EAP domain — the factory offset
+            // (+5/+10/... via stalk) already works well. Let mux-2 pass through
+            // so our override doesn't fight EAP. Controlled by hw3HighSpeedPassthrough.
+            bool highSpeedPassthrough = (limKph >= 80 && cfg.hw3HighSpeedPassthrough);
+
+            if (!highSpeedPassthrough) {
+                if (cfg.hw3SmartEnable) {
+                    if (limKph > 0) {
+                        // Snapshot tier thresholds + offsets under critical section so
+                        // /api/set can't mid-update any individual field and make
+                        // limKph straddle an inconsistent boundary (T2 < T1, etc.).
+                        uint8_t sT1, sT2, sT3, sT4, sO1, sO2, sO3, sO4, sO5;
+                        portENTER_CRITICAL(&gHw3SmartMux);
+                        sT1 = cfg.hw3SmartT1; sT2 = cfg.hw3SmartT2;
+                        sT3 = cfg.hw3SmartT3; sT4 = cfg.hw3SmartT4;
+                        sO1 = cfg.hw3SmartO1; sO2 = cfg.hw3SmartO2; sO3 = cfg.hw3SmartO3;
+                        sO4 = cfg.hw3SmartO4; sO5 = cfg.hw3SmartO5;
+                        portEXIT_CRITICAL(&gHw3SmartMux);
+                        uint8_t tier;
+                        if      (limKph <= sT1) tier = 1;
+                        else if (limKph <= sT2) tier = 2;
+                        else if (limKph <= sT3) tier = 3;
+                        else if (limKph <= sT4) tier = 4;
+                        else                     tier = 5;
+                        pct = (tier==1)?sO1:(tier==2)?sO2:(tier==3)?sO3:(tier==4)?sO4:sO5;
+                        cfg.hw3SmartActiveTier = tier;
+                        cfg.hw3SmartLastPct    = (uint8_t)std::min(pct, 50);
+                    } else {
+                        // Speed limit unknown — hold last valid percentage, do not drop to zero
+                        pct = cfg.hw3SmartLastPct;
+                    }
                 } else {
-                    // Speed limit unknown — hold last valid percentage, do not drop to zero
-                    pct = cfg.hw3SmartLastPct;
+                    cfg.hw3SmartActiveTier = 0;
+                    if (cfg.hw3OffsetManual >= 0) pct = cfg.hw3OffsetManual;
+                    // else: pct stays -1 → passthrough (no mux-2 override)
                 }
             } else {
-                cfg.hw3SmartActiveTier = 0;
-                if (cfg.hw3OffsetManual >= 0) pct = cfg.hw3OffsetManual;
-                // else: pct stays -1 → passthrough (no mux-2 override)
+                cfg.hw3SmartActiveTier = 0;  // passthrough active — no tier displayed
             }
             if (pct >= 0) {
-                // Hard cap: base speed limit + offset must not exceed 140 kph.
+                pct = std::max(std::min(pct, 50), 0);     // UI cap
+                int offsetKph;
                 if (limKph > 0) {
-                    int maxOffsetKph = std::max(0, 140 - limKph);
-                    int maxPct       = (maxOffsetKph * 100) / limKph;
-                    pct = std::min(pct, maxPct);
+                    offsetKph = (limKph * pct + 50) / 100;          // pct % of limit, round
+                    int headroom = std::max(0, 140 - limKph);        // base+offset ≤ 140
+                    offsetKph = std::min(offsetKph, headroom);
+                } else {
+                    // No speed limit known — scale pct against wire cap (40 kph)
+                    offsetKph = (pct * 40 + 50) / 100;
                 }
-                pct = std::max(std::min(pct, 50), 0);     // upstream UI cap
-                int canVal = std::min(pct * 4, 200);
+                offsetKph = std::min(offsetKph, 40);                  // wire max 40 kph
+                int canVal = offsetKph * 5;                           // wire raw = kph × 5
                 frame.data[0] &= ~(0b11000000);
                 frame.data[1] &= ~(0b00111111);
                 frame.data[0] |= (canVal & 0x03) << 6;

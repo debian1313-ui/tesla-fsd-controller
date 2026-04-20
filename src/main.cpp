@@ -130,6 +130,7 @@ static bool checkToken(AsyncWebServerRequest* req) {
 #define NV_PIN       "p1"
 #define NV_HW4_OFF   "d1"
 #define NV_TRACK_MD  "d2"
+#define NV_HW3_PT    "d3"   // hw3HighSpeedPassthrough: ≥80 km/h limits use factory EAP offset
 
 // ═══════════════════════════════════════════
 //  Config persistence (NVS)
@@ -212,6 +213,7 @@ void loadConfig() {
     if (prefs.isKey(NV_PRECOND)) prefs.remove(NV_PRECOND);
     cfg.hw4OffsetRaw       = prefs.getUChar(NV_HW4_OFF, 0);
     cfg.trackModeEnable    = prefs.getBool(NV_TRACK_MD, false);
+    cfg.hw3HighSpeedPassthrough = prefs.getBool(NV_HW3_PT, true);
     strlcpy(apSSID,  prefs.getString(NV_AP_SSID,  "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass,  prefs.getString(NV_AP_PASS,  "12345678").c_str(),       sizeof(apPass));
     strlcpy(staSSID, prefs.getString(NV_STA_SSID, "").c_str(),               sizeof(staSSID));
@@ -270,6 +272,7 @@ void saveConfig() {
     // NV_PRECOND no longer written — field is runtime-only until a UI surface returns.
     prefs.putUChar(NV_HW4_OFF,  cfg.hw4OffsetRaw);
     prefs.putBool(NV_TRACK_MD,  cfg.trackModeEnable);
+    prefs.putBool(NV_HW3_PT,    cfg.hw3HighSpeedPassthrough);
     // WiFi keys written directly by /api/wifi — not touched here.
     prefs.end();
 }
@@ -499,7 +502,7 @@ void setupWebServer() {
             "\"visionLimit\":%u,\"nagLevel\":%u,\"fcw\":%u,\"accState\":%u,\"brake\":%s,"
             "\"sideCol\":%u,\"laneWarn\":%u,\"laneChg\":%u,"
             "\"autosteer\":%s,\"aeb\":%s,\"fcwOn\":%s,"
-            "\"apRestart\":%s,\"hw4Offset\":%u,\"trackMode\":%d,"
+            "\"apRestart\":%s,\"hw4Offset\":%u,\"trackMode\":%d,\"hw3HiPass\":%d,"
             "\"perfAccel\":%u,\"perfBrake\":%u,\"perfAccelMs\":%u,\"perfBrakeMs\":%u,\"brakeEntryKph\":%u,"
             "\"apSSID\":\"%s\",\"staSSID\":\"%s\",\"staIP\":\"%s\",\"staOK\":%s,"
             "\"variant\":\"%s\",\"version\":\"%s\"}",
@@ -554,6 +557,7 @@ void setupWebServer() {
             cfg.apRestart   ? "true" : "false",
             (unsigned)cfg.hw4OffsetRaw,
             (int)cfg.trackModeEnable,
+            (int)cfg.hw3HighSpeedPassthrough,
             (unsigned)cfg.perfAccelState, (unsigned)cfg.perfBrakeState,
             (unsigned)cfg.perfAccelMs,    (unsigned)cfg.perfBrakeMs,
             (unsigned)cfg.perfBrakeEntryKph,
@@ -744,6 +748,10 @@ void setupWebServer() {
         if (req->hasParam("trackMode")) {
             bool v = req->getParam("trackMode")->value().toInt() != 0;
             if (v != cfg.trackModeEnable) { cfg.trackModeEnable = v; changed = true; }
+        }
+        if (req->hasParam("hw3HiPass")) {
+            bool v = req->getParam("hw3HiPass")->value().toInt() != 0;
+            if (v != cfg.hw3HighSpeedPassthrough) { cfg.hw3HighSpeedPassthrough = v; changed = true; }
         }
 
         if (changed) saveConfig();
