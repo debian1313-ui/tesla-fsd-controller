@@ -44,9 +44,7 @@ FSDConfig cfg;  // NOLINT(misc-definitions-in-headers)
 
 // ── Unified dispatch ───────────────────────────────────────────────────────
 // Called for every received CAN frame. Routes to the appropriate module.
-// NOTE: cfg.rxCount is *not* incremented here — canTask increments the
-// per-bus counter (rxCount / vhRxCount / prtyRxCount) before dispatching,
-// so party-bus silence isn't masked by VH/PRTY activity.
+// cfg.rxCount is incremented in canTask before dispatching.
 static void handleMessage(CanFrame& frame, CanDriver& driver) {
 
     // HW detection: GTW_carConfig 0x398 (920)

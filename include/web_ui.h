@@ -307,10 +307,6 @@ select:focus{outline:none;border-color:#38bdf8}
     ⚠️ 安全模式：设备连续崩溃，CAN 已禁用。请重新刷写固件。
   </div>
   <div class="status-row"><span id="iLblCAN">CAN 总线</span><span id="sCAN" class="status-no">--</span></div>
-  <div id="rowDualCAN" style="display:none">
-    <div class="status-row"><span id="iLblCANVH">整车 CAN</span><span id="sCANVH" class="status-no">--</span></div>
-    <div class="status-row"><span id="iLblCANChassis">底盘 CAN</span><span id="sCANChassis" class="status-no">--</span></div>
-  </div>
   <div class="status-row"><span id="iLblFSDTrig">FSD 已触发</span><span id="sFSD" class="status-no">--</span></div>
   <div class="status-row" id="rowTemp" style="display:none">
     <span id="iLblTemp">车内/外温度</span>
@@ -514,8 +510,7 @@ var T={
     lblFsdEn:'FSD 开关',lblHW:'硬件版本',lblSpeed:'速度模式',lblPMode:'模式来源',
     lblISA:'限速提示音抑制',lblEmg:'紧急车辆检测',lblCN:'强制激活',
     lblMod:'已修改',lblRX:'已接收',lblErr:'错误',lblUp:'运行时间',
-    lblCAN:'Party CAN',lblFSDTrig:'FSD 已触发',
-    lblCANVH:'整车 CAN',lblCANChassis:'底盘 CAN',
+    lblCAN:'CAN 总线',lblFSDTrig:'FSD 已触发',
     lblFile:'选择文件',noFile:'未选择文件',uploadBtn:'上传固件',
     lblVer:'固件版本',
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
@@ -553,8 +548,7 @@ var T={
     lblHW3Off:'HW3 Speed Offset (km/h)',lblHW3Smart:'Smart Speed Offset',
     smR1L:'Limit <',smR2L:'Limit T1 ~',smR3L:'Limit ≥ T2 → +',lblBMS:'Battery',
     lblMod:'MODIFIED',lblRX:'RECEIVED',lblErr:'ERRORS',lblUp:'UPTIME',
-    lblCAN:'Party CAN',lblFSDTrig:'FSD Triggered',
-    lblCANVH:'Vehicle CAN',lblCANChassis:'Chassis CAN',
+    lblCAN:'CAN Bus',lblFSDTrig:'FSD Triggered',
     lblFile:'Choose File',noFile:'No file chosen',uploadBtn:'Upload Firmware',
     lblVer:'Firmware Version',
     canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
@@ -685,17 +679,6 @@ function poll(){
     canEl.textContent=d.canOK?t.canOK:t.canErr;
     canEl.className=d.canOK?'status-ok':'status-err';
     document.getElementById('iLblCAN').textContent=t.lblCAN;
-    if(typeof d.vhOK!=='undefined'){
-      document.getElementById('rowDualCAN').style.display='';
-      document.getElementById('iLblCANVH').textContent=t.lblCANVH;
-      document.getElementById('iLblCANChassis').textContent=t.lblCANChassis;
-      var vhEl=document.getElementById('sCANVH');
-      vhEl.textContent=d.vhOK?t.canOK:t.canErr;
-      vhEl.className=d.vhOK?'status-ok':'status-err';
-      var prtyEl=document.getElementById('sCANChassis');
-      prtyEl.textContent=d.prtyOK?t.canOK:t.canErr;
-      prtyEl.className=d.prtyOK?'status-ok':'status-err';
-    }
     var fsdEl=document.getElementById('sFSD');
     var fsdActive=d.fsdTriggered&&!!d.fsdEnable;
     fsdEl.textContent=fsdActive?t.fsdYes:t.fsdNo;

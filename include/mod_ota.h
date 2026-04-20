@@ -30,9 +30,7 @@
 // Build-variant tag — must match merge_firmware.py env_name.replace('-','_').
 // Asset names look like: esp32_v1.4.15_ota.bin, esp32s3_waveshare_v1.4.15_ota.bin …
 #ifndef FIRMWARE_ENV_TAG
-#  if defined(DUAL_CAN_ENABLED)
-#    define FIRMWARE_ENV_TAG "esp32s3_waveshare_dual"
-#  elif defined(WIFI_BRIDGE_ENABLED) && (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_USB_MODE))
+#  if defined(WIFI_BRIDGE_ENABLED) && (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_USB_MODE))
 #    define FIRMWARE_ENV_TAG "esp32s3_waveshare_wifi"
 #  elif defined(WIFI_BRIDGE_ENABLED)
 #    define FIRMWARE_ENV_TAG "esp32_wifi"

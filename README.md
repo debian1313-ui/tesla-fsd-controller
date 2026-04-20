@@ -28,19 +28,17 @@
 > - **`xxx_v1.4.17.bin`**（合并固件）→ 首次刷机用，通过 ESP Web Flasher 写入，地址 `0x0`
 > - **`xxx_v1.4.17_ota.bin`**（OTA 固件）→ 后续无线升级用，通过控制面板「固件更新」上传；或让设备从 GitHub 在线自动拉取
 >
-> 完整最新资产见 [**releases 页面**](https://github.com/wjsall/tesla-fsd-controller/releases/latest)。以下为 **v1.4.17** 直链：
+> 完整最新资产见 [**releases 页面**](https://github.com/wjsall/tesla-fsd-controller/releases/latest)。以下为 **v1.4.18** 直链：
 
 | 板子 / 变体 | 首次刷机 | OTA 升级 | 适用场景 |
 |---|---|---|---|
-| 标准 ESP32 + SN65HVD230（单 CAN）| [esp32_v1.4.17.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32_v1.4.17.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32_v1.4.17_ota.bin) | 入门，5V USB 供电 |
-| **Waveshare ESP32-S3-RS485-CAN（单 CAN）** | [esp32s3_waveshare_v1.4.17.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32s3_waveshare_v1.4.17.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32s3_waveshare_v1.4.17_ota.bin) | 车内永久安装，7–36V 宽压 |
-| Waveshare ESP32-S3 + 双 MCP2517FD（双 CAN）| [esp32s3_waveshare_dual_v1.4.17.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32s3_waveshare_dual_v1.4.17.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32s3_waveshare_dual_v1.4.17_ota.bin) | 同时接 VH + PRTY 两路 CAN |
-| ESP32 Wi-Fi 桥接 | [esp32_wifi_v1.4.17.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32_wifi_v1.4.17.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32_wifi_v1.4.17_ota.bin) | 给车机提供 Wi-Fi 上行 + DNS 过滤 |
-| Waveshare ESP32-S3 Wi-Fi 桥接 | [esp32s3_waveshare_wifi_v1.4.17.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32s3_waveshare_wifi_v1.4.17.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.17/esp32s3_waveshare_wifi_v1.4.17_ota.bin) | 车内安装 + Wi-Fi 桥接 |
+| 标准 ESP32 + SN65HVD230 | [esp32_v1.4.18.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32_v1.4.18.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32_v1.4.18_ota.bin) | 入门，5V USB 供电 |
+| **Waveshare ESP32-S3-RS485-CAN** | [esp32s3_waveshare_v1.4.18.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32s3_waveshare_v1.4.18.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32s3_waveshare_v1.4.18_ota.bin) | 车内永久安装，7–36V 宽压 |
+| ESP32 Wi-Fi 桥接 | [esp32_wifi_v1.4.18.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32_wifi_v1.4.18.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32_wifi_v1.4.18_ota.bin) | 给车机提供 Wi-Fi 上行 + DNS 过滤 |
+| Waveshare ESP32-S3 Wi-Fi 桥接 | [esp32s3_waveshare_wifi_v1.4.18.bin](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32s3_waveshare_wifi_v1.4.18.bin) | [ota](https://github.com/wjsall/tesla-fsd-controller/releases/download/v1.4.18/esp32s3_waveshare_wifi_v1.4.18_ota.bin) | 车内安装 + Wi-Fi 桥接 |
 
 > **变体说明**：
-> - **单 CAN**：标配，接入车辆一路 CAN（X179 或 X652），足够完成 FSD 注入。
-> - **双 CAN**：Waveshare 底板外挂两颗 MCP2517FD，可同时监听 VH（车辆）与 PRTY（底盘）总线，获得更完整的遥测。
+> - **CAN 控制器**：所有固件都接入车辆一路 CAN（X179 或 X652），完成 FSD 注入与遥测。
 > - **Wi-Fi 桥接**：ESP32 作为 STA 连上行 Wi-Fi，并以 AP 方式向车机输出带 DNS 过滤/域名拦截的网络。非必需功能，按需选择。
 
 ### 第二步：刷入固件
@@ -419,11 +417,9 @@ include/
   drivers/
     can_driver.h        ← 驱动抽象基类
     twai_driver.h       ← ESP32 TWAI（内置 CAN）
-    mcp2517fd_driver.h  ← MCP2517FD（双 CAN 变体专用）
 
-platformio.ini          ← 5 个 env：esp32 / esp32s3_waveshare /
-                         esp32s3_waveshare_dual / esp32_wifi /
-                         esp32s3_waveshare_wifi
+platformio.ini          ← 4 个 env：esp32 / esp32s3_waveshare /
+                         esp32_wifi / esp32s3_waveshare_wifi
 ```
 
 ---

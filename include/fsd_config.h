@@ -81,14 +81,6 @@ struct FSDConfig {
     volatile uint32_t perfBrakeMs         = 0;   // result ms
     volatile uint8_t  perfBrakeEntryKph   = 0;   // actual speed (kph) when braking started
 
-#ifdef DUAL_CAN_ENABLED
-    // Dual CAN bus status (MCP2517FD ×2)
-    volatile bool     vhCanOK      = false;  // Vehicle CAN (VH connector, pins 9/10)
-    volatile bool     prtyCanOK    = false;  // Chassis CAN (PRTY connector, pins 2/3)
-    volatile uint32_t vhRxCount    = 0;
-    volatile uint32_t prtyRxCount  = 0;
-#endif
-
     // Statistics
     volatile uint32_t rxCount             = 0;
     volatile uint32_t modifiedCount       = 0;
