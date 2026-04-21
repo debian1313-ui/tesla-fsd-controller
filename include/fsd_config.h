@@ -1,7 +1,19 @@
 #pragma once
 #include <cstdint>
 
-static constexpr int kHw3CustomTargetCount = 5;  // 30/40/50/60/70 kph limit buckets
+// ── HW3 policy constants (shared with mod_fsd.h, defaults below, and UI labels) ──
+// Auto targets (field-calibrated — metric cluster under-delivers vs request):
+static constexpr int kHw3AutoTargetBelow60Kph      = 64;   // fusedLimit <60 kph  → request 64 (visible ~50)
+static constexpr int kHw3AutoTargetAt60Kph         = 100;  // fusedLimit =60 kph  → request 100 (visible ~80)
+static constexpr int kHw3AutoTargetForVisible80Kph = 85;   // 60<fusedLimit<80    → request 85 (visible ~70)
+static constexpr int kHw3StockOffsetCutoverKph     = 80;   // ≥80 kph → passthrough stock EAP offset
+// Custom mode: user-defined target-speed lookup bucketed by 10 kph starting at 30.
+static constexpr int kHw3CustomBucketBaseKph = 30;
+static constexpr int kHw3CustomBucketStepKph = 10;
+static constexpr int kHw3CustomTargetCount   = 5;  // 30/40/50/60/70 kph limit buckets
+static_assert((kHw3StockOffsetCutoverKph - kHw3CustomBucketBaseKph)
+                / kHw3CustomBucketStepKph == kHw3CustomTargetCount,
+              "Custom target table must cover [base, cutover) in step-sized buckets");
 
 // ── Runtime-configurable state (shared between CAN task and web server) ──
 // All fields are volatile — written by Core1 (CAN), read by Core0 (WiFi/web).
@@ -20,14 +32,22 @@ struct FSDConfig {
     volatile int      hw3SpeedOffset      = 0;       // stock offset from mux-0 data[3] as pct*5 (0-100); display only
     volatile bool     hw3AutoSpeed        = true;    // HW3 auto speed targeting: <60→64, =60→100, 60-79→85, ≥80→stock passthrough
     volatile bool     hw3CustomSpeed      = false;   // HW3 custom target table (overrides hw3AutoSpeed when true); ≥80 always stock passthrough
-    // Defaults match Auto so a fresh unit behaves identically until the user edits.
-    volatile uint8_t  hw3CustomTarget[kHw3CustomTargetCount] = {64, 64, 64, 100, 85};
+    // Defaults mirror Auto's per-bucket preference at the bucket boundary (30/40/50→64, 60→100, 70→85).
+    // Auto's if-ladder still differs mid-bucket (e.g. fusedLimit=65 returns 85), so this is a
+    // reasonable starting point, not a literal equivalence.
+    volatile uint8_t  hw3CustomTarget[kHw3CustomTargetCount] = {
+        kHw3AutoTargetBelow60Kph,       // 30 kph bucket
+        kHw3AutoTargetBelow60Kph,       // 40 kph bucket
+        kHw3AutoTargetBelow60Kph,       // 50 kph bucket
+        kHw3AutoTargetAt60Kph,          // 60 kph bucket
+        kHw3AutoTargetForVisible80Kph,  // 70 kph bucket
+    };
     volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 mux-2 data[1][5:0]; 0=off (presets: 7=+5,10=+7,14=+10,21=+15 km/h)
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
     volatile int8_t   gatewayAutopilot    = -1;      // from 0x7FF mux-2: -1=unseen, 0=NONE,1=HIGHWAY,2=ENHANCED,3=SELF_DRIVING,4=BASIC
     volatile bool     trackModeEnable     = false;   // HW3: echo 0x313 with UI_trackModeRequest=ON (off by default)
 
-    // Climate — read from 0x28B (BODY_R1, GTW bus)
+    // Climate — read from 0x283 (BODY_R1, GTW bus)
     volatile bool     tempSeen          = false;
     volatile uint8_t  tempInsideRaw     = 0;   // AirTemp_Insd  data[5]: raw × 0.25 = °C
     volatile uint8_t  tempOutsideRaw    = 0;   // AirTemp_Outsd data[7]: raw × 0.5 − 40 = °C

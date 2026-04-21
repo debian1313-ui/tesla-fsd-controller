@@ -8,7 +8,7 @@
 //   mod_bms.h       — BMS telemetry parsers (read-only, 0x132/0x292/0x312)
 //   mod_fsd.h       — FSD injection handlers: Legacy/HW3/HW4 + filter tables
 //   mod_telemetry.h — Ring buffer + parsers: 0x257/0x145/0x118/0x108 (read-only)
-//   mod_climate.h   — Climate telemetry: 0x28B BODY_R1 (AirTemp inside/outside)
+//   mod_climate.h   — Climate telemetry: 0x283 BODY_R1 (AirTemp inside/outside)
 //   handlers.h      — cfg instance + handleMessage dispatch (this file)
 
 #include "fsd_config.h"
@@ -75,7 +75,7 @@ static void handleMessage(CanFrame& frame, CanDriver& driver) {
     if (frame.id == 325) { handleBrake(frame);  return; }  // 0x145 ESP_status (brake pedal)
     if (frame.id == 280) { handleGear(frame);   return; }  // 0x118 DI_systemStatus (DI_gear)
     if (frame.id == 264) { handleTorque(frame); return; }  // 0x108 DI_torque (cmd/actual)
-    if (frame.id == 643) { handleClimate(frame);               return; }  // 0x28B BODY_R1 (AirTemp)
+    if (frame.id == 643) { handleClimate(frame);               return; }  // 0x283 BODY_R1 (AirTemp)
     if (frame.id == 659) { handleDASSettings(frame);          return; }  // 0x293 DAS_settings
     if (frame.id == 923) { handleDASStatus(frame);            return; }  // 0x39B DAS_status
     if (frame.id == 905) { handleDASStatus2(frame);           return; }  // 0x389 DAS_status2

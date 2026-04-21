@@ -1,6 +1,6 @@
 #pragma once
 // ── Module: Climate telemetry ────────────────────────────────────────────────
-// Read-only parser for BODY_R1 (0x28B / 643), GTW bus.
+// Read-only parser for BODY_R1 (0x283 / 643), GTW bus.
 //
 // Signal decoding (Motorola big-endian, single-byte signals):
 //   AirTemp_Insd   bit47|8  data[5]  raw × 0.25        °C  [0, 63.5]

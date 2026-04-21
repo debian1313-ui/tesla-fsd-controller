@@ -21,33 +21,25 @@
 extern FSDConfig cfg;  // defined in handlers.h
 
 // ── HW3 auto speed policy (mirrors tesla-open-can-mod hw3_speed_policy.h) ──
-// Field-calibrated request floors for metric clusters. The Tesla UI
-// under-delivers relative to the injected request, so we bias upward to
-// land near visible 60/80 km/h targets.
-//   <60 kph limit           → request 64 (visible ~50)
-//   =60 kph limit           → request 100 (visible ~80, high-speed ramp)
-//   60<x<80 kph limit       → request 85 (visible ~70)
-//   ≥80 kph limit           → pass Tesla's stock EAP offset through unchanged
-static constexpr int kHw3AutoTargetBelow60Kph         = 64;
-static constexpr int kHw3AutoTargetForVisible80Kph    = 85;
-static constexpr int kHw3StockOffsetCutoverKph        = 80;
-static constexpr int kHw3SpeedOffsetRawPerKph         = 5;   // wire encoding: canVal = offsetKph × 5
-static constexpr int kHw3SpeedOffsetMaxKph            = 40;  // wire raw cap = 200
-// kHw3CustomTargetCount defined in fsd_config.h (shared with main.cpp/web UI)
+// Field-calibrated request floors for metric clusters. Auto targets / bucket
+// shape / cutover live in fsd_config.h so defaults + policy share one source.
+static constexpr int kHw3SpeedOffsetRawPerKph = 5;   // wire encoding: canVal = offsetKph × 5
+static constexpr int kHw3SpeedOffsetMaxKph    = 40;  // wire raw cap = 200
 
 static inline int computeHW3MinimumTargetSpeedKph(int fusedLimitKph) {
-    if (fusedLimitKph == 60)                      return 100;
-    if (fusedLimitKph < kHw3AutoTargetBelow60Kph) return kHw3AutoTargetBelow60Kph;
-    if (fusedLimitKph < kHw3StockOffsetCutoverKph) return kHw3AutoTargetForVisible80Kph;
+    if (fusedLimitKph == 60)                       return kHw3AutoTargetAt60Kph;
+    if (fusedLimitKph <  kHw3AutoTargetBelow60Kph) return kHw3AutoTargetBelow60Kph;
+    if (fusedLimitKph <  kHw3StockOffsetCutoverKph) return kHw3AutoTargetForVisible80Kph;
     return fusedLimitKph;
 }
 
-// Custom mode: user-defined target-speed lookup for fused limits 30/40/50/60/70.
+// Custom mode: user-defined target-speed lookup bucketed by
+// kHw3CustomBucketStepKph starting at kHw3CustomBucketBaseKph.
 // Returns 0 when input is outside the table range — caller falls back to passthrough.
-// Bucket by floor((limit-30)/10) so 30/35→idx0, 40/45→idx1, etc.
 static inline int computeHW3CustomTargetSpeedKph(int fusedLimitKph) {
-    if (fusedLimitKph < 30 || fusedLimitKph >= kHw3StockOffsetCutoverKph) return 0;
-    int idx = (fusedLimitKph - 30) / 10;
+    if (fusedLimitKph <  kHw3CustomBucketBaseKph ||
+        fusedLimitKph >= kHw3StockOffsetCutoverKph) return 0;
+    int idx = (fusedLimitKph - kHw3CustomBucketBaseKph) / kHw3CustomBucketStepKph;
     return (int)cfg.hw3CustomTarget[idx];
 }
 

@@ -196,15 +196,30 @@ static bool otaCheckLatest() {
     return ok;
 }
 
-static void otaDoPull(const char* url) {
-    if (WiFi.status() != WL_CONNECTED) {
-        otaSetMsg(OTA_ERROR, "STA 未连接,无法下载");
-        return;
-    }
+// Hardcoded mirror prefix for the GitHub Releases download URL.
+// gh-proxy.com has been reliable long-term (multi-node CF/HK/Fastly/EdgeOne
+// with auto-failover). If it ever dies, otaDoPull falls back to direct GitHub.
+static constexpr const char* kOtaMirrorPrefix = "https://gh-proxy.com/";
+
+// Build a mirrored URL: "<mirror><origin>" with exactly one slash between.
+// Returns empty String if the origin is not a github.com URL we want to mirror.
+static String otaApplyMirror(const char* mirror, const char* origin) {
+    if (!mirror || !*mirror || !origin || !*origin) return String();
+    String o(origin);
+    if (!o.startsWith("https://github.com/")) return String();
+    String m(mirror);
+    while (m.endsWith("/")) m.remove(m.length() - 1);
+    if (m.isEmpty()) return String();
+    return m + "/" + o;
+}
+
+// Single download attempt. Returns ESP_OK on full-image success, else error.
+// Does NOT call otaSetMsg on success (caller decides) but sets progress state.
+// Does NOT call saveRestartReason / set otaPendingRestart — caller handles.
+static esp_err_t otaTryDownload(const char* url) {
     gOta.state   = OTA_DOWNLOADING;
     gOta.written = 0;
     gOta.total   = 0;
-    snprintf(gOta.message, sizeof(gOta.message), "开始下载…");
 
     esp_http_client_config_t http_cfg = {};
     http_cfg.url                       = url;
@@ -227,10 +242,7 @@ static void otaDoPull(const char* url) {
 
     esp_https_ota_handle_t handle = nullptr;
     esp_err_t err = esp_https_ota_begin(&ota_cfg, &handle);
-    if (err != ESP_OK || !handle) {
-        otaSetMsg(OTA_ERROR, "OTA begin 失败 (%d)", (int)err);
-        return;
-    }
+    if (err != ESP_OK || !handle) return (err != ESP_OK ? err : ESP_FAIL);
 
     int32_t total = esp_https_ota_get_image_size(handle);
     gOta.total = (total > 0) ? (uint32_t)total : 0;
@@ -244,17 +256,42 @@ static void otaDoPull(const char* url) {
 
     if (err != ESP_OK) {
         esp_https_ota_abort(handle);
-        otaSetMsg(OTA_ERROR, "下载失败 (%d)", (int)err);
-        return;
+        return err;
     }
     if (!esp_https_ota_is_complete_data_received(handle)) {
         esp_https_ota_abort(handle);
-        otaSetMsg(OTA_ERROR, "数据不完整");
-        return;
+        return ESP_FAIL;
     }
     err = esp_https_ota_finish(handle);
+    return err;
+}
+
+static void otaDoPull(const char* url) {
+    if (WiFi.status() != WL_CONNECTED) {
+        otaSetMsg(OTA_ERROR, "STA 未连接,无法下载");
+        return;
+    }
+    snprintf(gOta.message, sizeof(gOta.message), "开始下载…");
+
+    // Try mirror first, fall back to direct github.com on failure.
+    // Keeps OTA functional both when GitHub is slow (mirror helps) AND when the
+    // mirror has died (direct still works).
+    String mirroredUrl = otaApplyMirror(kOtaMirrorPrefix, url);
+    esp_err_t err = ESP_FAIL;
+
+    if (!mirroredUrl.isEmpty()) {
+        snprintf(gOta.message, sizeof(gOta.message), "通过镜像下载…");
+        err = otaTryDownload(mirroredUrl.c_str());
+        if (err == ESP_OK) goto done;
+        // Mirror failed — try direct.
+        snprintf(gOta.message, sizeof(gOta.message), "镜像失败,直连 GitHub…");
+    }
+
+    err = otaTryDownload(url);
+
+done:
     if (err != ESP_OK) {
-        otaSetMsg(OTA_ERROR, "写入失败 (%d)", (int)err);
+        otaSetMsg(OTA_ERROR, "下载失败 (%d)", (int)err);
         return;
     }
     gOta.written = gOta.total;

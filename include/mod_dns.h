@@ -168,6 +168,13 @@ size_t gNextBlockResolveRuleIndex = 0;
 volatile uint32_t gIpForwardDropCount = 0;
 volatile uint32_t gIpCachePeakCount = 0;
 
+// Staging buffer for atomic rule-set swaps. Populated OUTSIDE the critical
+// section (may block on WiFi.hostByName per rule), then copied into gBlockedIps
+// inside a short lock so the hook never sees a half-empty cache during a
+// preset switch. 64 rules is far more than any realistic user blocklist.
+constexpr size_t kStagingCapacity = 64;
+CachedIpEntry gStagingIps[kStagingCapacity];
+
 String normalizeDomainCstr(const char* domain) {
     String normalized = domain == nullptr ? "" : String(domain);
     normalized.trim();
@@ -316,25 +323,55 @@ void resolveAndRememberDomain(const String& domain) {
     }
 }
 
-void resolveAllRules(const char* rules) {
-    size_t ruleCount = countRules(rules);
-    for (size_t i = 0; i < ruleCount; ++i) {
+// Build staging from rules OUTSIDE the lock — hostByName may block for
+// hundreds of ms per rule. Dedupes within staging. Returns populated count.
+size_t buildStaging(const char* blocklistRules, uint32_t nowSeconds) {
+    memset(gStagingIps, 0, sizeof(gStagingIps));
+    if (!hasRules(blocklistRules)) return 0;
+
+    size_t ruleCount = countRules(blocklistRules);
+    size_t stagingCount = 0;
+    for (size_t i = 0; i < ruleCount && stagingCount < kStagingCapacity; ++i) {
         String rule;
-        if (getRuleByIndex(rules, i, rule)) {
-            resolveAndRememberDomain(rule);
+        if (!getRuleByIndex(blocklistRules, i, rule) || rule.isEmpty()) continue;
+        IPAddress resolved;
+        if (WiFi.hostByName(rule.c_str(), resolved) != 1) continue;
+        uint32_t ipHostOrder = ipAddressToHostOrder(resolved);
+        if (ipHostOrder == 0) continue;
+        bool dup = false;
+        for (size_t j = 0; j < stagingCount; ++j) {
+            if (gStagingIps[j].ipHostOrder == ipHostOrder) { dup = true; break; }
         }
+        if (dup) continue;
+        gStagingIps[stagingCount].ipHostOrder = ipHostOrder;
+        gStagingIps[stagingCount].lastSeenAtSeconds = nowSeconds;
+        rule.toCharArray(gStagingIps[stagingCount].domain,
+                         sizeof(gStagingIps[stagingCount].domain));
+        stagingCount++;
     }
+    return stagingCount;
 }
 
-void resetStateLocked(const char* blocklistRules, uint32_t nowSeconds) {
-    clearEntries(gBlockedIps, kBlockedIpCapacity, gBlockedIpCount);
+// Caller holds gDnsIpPolicyMux. Overwrites gBlockedIps with staging in a
+// single short pass — hook sees either the coherent old set or the coherent
+// new set, never empty. strncpy (not String) because malloc inside a critical
+// section is unsafe (not interrupt-reentrant).
+void applyStagingLocked(size_t stagingCount, const char* blocklistRules, uint32_t nowSeconds) {
+    size_t oldCount = gBlockedIpCount;
+    for (size_t i = 0; i < stagingCount; ++i) {
+        gBlockedIps[i] = gStagingIps[i];
+    }
+    for (size_t i = stagingCount; i < oldCount; ++i) {
+        gBlockedIps[i] = CachedIpEntry{};
+    }
+    gBlockedIpCount = stagingCount;
+    if (stagingCount > gIpCachePeakCount) gIpCachePeakCount = (uint32_t)stagingCount;
 
     memset(gBlocklistSnapshot, 0, sizeof(gBlocklistSnapshot));
     if (blocklistRules != nullptr) {
-        String(blocklistRules).toCharArray(gBlocklistSnapshot, sizeof(gBlocklistSnapshot));
+        strncpy(gBlocklistSnapshot, blocklistRules, sizeof(gBlocklistSnapshot) - 1);
     }
-
-    gLastBlockResolveAtSeconds = 0;
+    gLastBlockResolveAtSeconds = nowSeconds;
     gLastFullRefreshAtSeconds = nowSeconds;
     gNextBlockResolveRuleIndex = 0;
 }
@@ -738,47 +775,51 @@ void DNSWhitelistServer::processNextRequest(const DNSFilterConfig& cfg, bool ups
 extern "C" void dnsIpPolicyService(const char* allowlistRules, const char* blocklistRules, int rulesEnabled, int upstreamReady) {
     uint32_t nowSeconds = millis() / 1000;
     bool blocklistHasRules = hasRules(blocklistRules);
-    bool shouldPrimeBlocklist = false;
-    bool didReset = false;
     (void)allowlistRules;
 
-    portENTER_CRITICAL(&gDnsIpPolicyMux);
-    bool shouldReset =
-        !rulesEnabled ||
-        !snapshotMatches(blocklistRules, gBlocklistSnapshot);
-
-    if (shouldReset) {
-        resetStateLocked(blocklistRules, nowSeconds);
-        didReset = true;
-    } else {
-        pruneEntriesLocked(gBlockedIps, kBlockedIpCapacity, gBlockedIpCount, nowSeconds);
-        shouldPrimeBlocklist = blocklistHasRules && gBlockedIpCount == 0;
-    }
-    portEXIT_CRITICAL(&gDnsIpPolicyMux);
-
-    if (!rulesEnabled || !upstreamReady) return;
-
-    if (didReset || shouldPrimeBlocklist) {
-        if (blocklistHasRules) {
-            resolveAllRules(blocklistRules);
-            gLastBlockResolveAtSeconds = nowSeconds;
-        }
-        if (didReset) {
+    if (!rulesEnabled) {
+        portENTER_CRITICAL(&gDnsIpPolicyMux);
+        if (gBlockedIpCount > 0 || gBlocklistSnapshot[0] != '\0') {
+            clearEntries(gBlockedIps, kBlockedIpCapacity, gBlockedIpCount);
+            memset(gBlocklistSnapshot, 0, sizeof(gBlocklistSnapshot));
+            gLastBlockResolveAtSeconds = 0;
+            gLastFullRefreshAtSeconds = nowSeconds;
             gNextBlockResolveRuleIndex = 0;
         }
-        if (didReset || shouldPrimeBlocklist) {
-            return;
-        }
-    }
-
-    if (nowSeconds - gLastFullRefreshAtSeconds >= kFullRefreshIntervalSeconds) {
-        portENTER_CRITICAL(&gDnsIpPolicyMux);
-        clearEntries(gBlockedIps, kBlockedIpCapacity, gBlockedIpCount);
-        gLastFullRefreshAtSeconds = nowSeconds;
-        gNextBlockResolveRuleIndex = 0;
         portEXIT_CRITICAL(&gDnsIpPolicyMux);
+        return;
     }
 
+    bool snapshotChanged;
+    portENTER_CRITICAL(&gDnsIpPolicyMux);
+    snapshotChanged = !snapshotMatches(blocklistRules, gBlocklistSnapshot);
+    portEXIT_CRITICAL(&gDnsIpPolicyMux);
+
+    bool fullRefreshDue = blocklistHasRules &&
+        (nowSeconds - gLastFullRefreshAtSeconds >= kFullRefreshIntervalSeconds);
+
+    // Rule change OR scheduled full refresh: resolve into staging outside the
+    // lock, then atomic-swap. Old IPs remain blocked until the swap completes,
+    // so there is no window where the hook sees an empty cache (= "nothing is
+    // blocked right now") during a preset switch.
+    if (snapshotChanged || fullRefreshDue) {
+        if (!upstreamReady) return;  // cache stays on old IPs; retry next tick
+        size_t stagingCount = buildStaging(blocklistRules, nowSeconds);
+
+        portENTER_CRITICAL(&gDnsIpPolicyMux);
+        applyStagingLocked(stagingCount, blocklistRules, nowSeconds);
+        portEXIT_CRITICAL(&gDnsIpPolicyMux);
+        return;
+    }
+
+    if (!upstreamReady) return;
+
+    portENTER_CRITICAL(&gDnsIpPolicyMux);
+    pruneEntriesLocked(gBlockedIps, kBlockedIpCapacity, gBlockedIpCount, nowSeconds);
+    portEXIT_CRITICAL(&gDnsIpPolicyMux);
+
+    // Incremental per-rule refresh — add-or-refresh only (no clear), so the
+    // cache never dips to empty between ticks either.
     if (blocklistHasRules && nowSeconds - gLastBlockResolveAtSeconds >= kRuleResolveIntervalSeconds) {
         size_t ruleCount = countRules(blocklistRules);
         if (ruleCount > 0) {

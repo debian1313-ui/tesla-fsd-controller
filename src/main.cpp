@@ -201,12 +201,12 @@ void loadConfig() {
     cfg.hw3AutoSpeed       = prefs.getBool(NV_HW3_AUTO, true);
     cfg.hw3CustomSpeed     = prefs.getBool(NV_HW3_CUST, false);
     {
+        // Read via temp to preserve in-class defaults on short/missing blob
+        // (partial-length reads would leave the tail at 0 if we read directly).
         uint8_t buf[kHw3CustomTargetCount];
-        size_t got = prefs.getBytes(NV_HW3_CT, buf, sizeof(buf));
-        if (got == sizeof(buf)) {
-            for (int i = 0; i < kHw3CustomTargetCount; i++) cfg.hw3CustomTarget[i] = buf[i];
+        if (prefs.getBytes(NV_HW3_CT, buf, sizeof(buf)) == sizeof(buf)) {
+            memcpy(const_cast<uint8_t*>(cfg.hw3CustomTarget), buf, sizeof(buf));
         }
-        // else keep struct's in-class defaults {64,64,64,100,85}
     }
     strlcpy(apSSID,  prefs.getString(NV_AP_SSID,  "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass,  prefs.getString(NV_AP_PASS,  "12345678").c_str(),       sizeof(apPass));
@@ -242,11 +242,9 @@ void saveConfig() {
     prefs.putBool(NV_TRACK_MD,  cfg.trackModeEnable);
     prefs.putBool(NV_HW3_AUTO,  cfg.hw3AutoSpeed);
     prefs.putBool(NV_HW3_CUST,  cfg.hw3CustomSpeed);
-    {
-        uint8_t buf[kHw3CustomTargetCount];
-        for (int i = 0; i < kHw3CustomTargetCount; i++) buf[i] = cfg.hw3CustomTarget[i];
-        prefs.putBytes(NV_HW3_CT, buf, sizeof(buf));
-    }
+    prefs.putBytes(NV_HW3_CT,
+                   const_cast<const uint8_t*>(cfg.hw3CustomTarget),
+                   sizeof(cfg.hw3CustomTarget));
     // WiFi keys written directly by /api/wifi — not touched here.
     prefs.end();
 }
@@ -610,15 +608,22 @@ void setupWebServer() {
                 req->send(400, "text/plain", "bad hw4Offset"); return;
             }
         }
-        // Coarse guard only: 0..200 kph catches garbage input. The real ceiling is
-        // enforced downstream by encodeHW3OffsetRawFromKph (offset clamped to +40 kph).
-        // Keeping the wire-protocol cap out of the API layer avoids tight coupling.
+        // API-layer coarse filter only: reject negatives and absurd values for target
+        // *speed* (0..200 kph). The +40 kph *offset* ceiling is an independent downstream
+        // clamp in encodeHW3OffsetRawFromKph — target and offset are different quantities
+        // (offset = target − fusedLimit), so they're checked separately.
+        // Single-pass validate-into-tmp keeps all-or-nothing semantics: any bad param
+        // 400s before we mutate cfg, so batched /api/set (UI debounces 5 inputs together)
+        // never leaves RAM partially updated while NVS has the old blob.
         static const char* const kHw3CTKeys[kHw3CustomTargetCount] = {"hw3CT0","hw3CT1","hw3CT2","hw3CT3","hw3CT4"};
+        uint8_t hw3CTNew[kHw3CustomTargetCount] = {0};
+        bool    hw3CTHas[kHw3CustomTargetCount] = {false};
         for (int i = 0; i < kHw3CustomTargetCount; i++) {
-            if (req->hasParam(kHw3CTKeys[i])) {
-                int raw = req->getParam(kHw3CTKeys[i])->value().toInt();
-                if (raw < 0 || raw > 200) { req->send(400, "text/plain", "bad hw3CT"); return; }
-            }
+            if (!req->hasParam(kHw3CTKeys[i])) continue;
+            int raw = req->getParam(kHw3CTKeys[i])->value().toInt();
+            if (raw < 0 || raw > 200) { req->send(400, "text/plain", "bad hw3CT"); return; }
+            hw3CTNew[i] = (uint8_t)raw;
+            hw3CTHas[i] = true;
         }
 
         bool changed = false;
@@ -670,10 +675,13 @@ void setupWebServer() {
             bool v = req->getParam("hw3CustomSpeed")->value().toInt() != 0;
             if (v != cfg.hw3CustomSpeed) { cfg.hw3CustomSpeed = v; changed = true; }
         }
+        // Apply pre-validated values — validate-all-then-apply preserves atomicity
+        // so a late bad field can't leave earlier slots mutated in RAM.
         for (int i = 0; i < kHw3CustomTargetCount; i++) {
-            if (req->hasParam(kHw3CTKeys[i])) {
-                uint8_t v = (uint8_t)req->getParam(kHw3CTKeys[i])->value().toInt();
-                if (v != cfg.hw3CustomTarget[i]) { cfg.hw3CustomTarget[i] = v; changed = true; }
+            if (!hw3CTHas[i]) continue;
+            if (hw3CTNew[i] != cfg.hw3CustomTarget[i]) {
+                cfg.hw3CustomTarget[i] = hw3CTNew[i];
+                changed = true;
             }
         }
         // precond removed from UI — requires Vehicle CAN (X179 pin 9/10)

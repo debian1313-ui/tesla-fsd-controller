@@ -67,6 +67,8 @@ select:focus{outline:none;border-color:#38bdf8}
 .smart-rule input[type=number]:focus{outline:none;border-color:#38bdf8}
 .smart-rule .km{color:#38bdf8;font-weight:600}
 .stat-val.red{color:#ef4444}
+.hw3ct-label{font-size:11px;color:#64748b;text-align:center;margin-bottom:2px}
+.hw3ct-input{width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px}
 .car-link{position:fixed;bottom:14px;right:14px;background:rgba(30,41,59,.9);color:#94a3b8;border:1px solid #334155;border-radius:20px;padding:8px 14px;font-size:12px;text-decoration:none;z-index:500;backdrop-filter:blur(6px)}
 .car-link:active{background:#1e293b}
 </style>
@@ -238,11 +240,11 @@ select:focus{outline:none;border-color:#38bdf8}
   <div id="rowHW3CustomPanel" style="display:none;padding:10px 12px;background:#0b1220;border-radius:8px;margin-top:4px">
     <div style="font-size:12px;color:#94a3b8;margin-bottom:8px" id="iLblHW3CustomHint">遇到限速时的目标速度（km/h）。≥80 限速始终透传原厂。</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">30</div><input type="number" id="hw3CT0" min="30" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT0',this.value)"></div>
-      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">40</div><input type="number" id="hw3CT1" min="40" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT1',this.value)"></div>
-      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">50</div><input type="number" id="hw3CT2" min="50" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT2',this.value)"></div>
-      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">60</div><input type="number" id="hw3CT3" min="60" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT3',this.value)"></div>
-      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">70</div><input type="number" id="hw3CT4" min="70" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT4',this.value)"></div>
+      <div><div class="hw3ct-label">30</div><input type="number" id="hw3CT0" min="30" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT0',this.value)"></div>
+      <div><div class="hw3ct-label">40</div><input type="number" id="hw3CT1" min="40" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT1',this.value)"></div>
+      <div><div class="hw3ct-label">50</div><input type="number" id="hw3CT2" min="50" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT2',this.value)"></div>
+      <div><div class="hw3ct-label">60</div><input type="number" id="hw3CT3" min="60" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT3',this.value)"></div>
+      <div><div class="hw3ct-label">70</div><input type="number" id="hw3CT4" min="70" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT4',this.value)"></div>
     </div>
   </div>
 </div>
@@ -368,7 +370,9 @@ select:focus{outline:none;border-color:#38bdf8}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
       <button type="button" id="pstTesla" onclick="brApplyPreset('tesla_min')" style="height:28px;padding:0 10px;background:#065f46;color:#d1fae5;border:2px solid #34d399;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">⭐ Tesla 推荐（实测）</button>
+      <button type="button" id="pstLean" onclick="brApplyPreset('tesla_lean')" style="height:28px;padding:0 10px;background:#1e3a8a;color:#dbeafe;border:none;border-radius:6px;font-size:11px;cursor:pointer">🔹 精简官方</button>
       <button type="button" id="pstBl" onclick="brApplyPreset('bl_telemetry')" style="height:28px;padding:0 10px;background:#7c2d12;color:#fed7aa;border:none;border-radius:6px;font-size:11px;cursor:pointer">只屏蔽遥测</button>
+      <button type="button" id="pstCust" onclick="brApplyPreset('custom_blank')" style="height:28px;padding:0 10px;background:#4c1d95;color:#e9d5ff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✍️ 自定义留空</button>
       <button type="button" id="pstClr" onclick="brApplyPreset('clear')" style="height:28px;padding:0 10px;background:#334155;color:#cbd5e1;border:none;border-radius:6px;font-size:11px;cursor:pointer">清空</button>
     </div>
     <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
@@ -387,6 +391,8 @@ select:focus{outline:none;border-color:#38bdf8}
       </div>
       <div id="brBlkList" style="font-family:monospace;font-size:12px;max-height:120px;overflow-y:auto"></div>
     </div>
+  </div>
+
   </div>
 </div>
 
@@ -689,6 +695,9 @@ function poll(){
       document.getElementById('rowHW4Offset').style.display=(d.hwMode===2)?'':'none';
       document.getElementById('rowTrackMode').style.display=(d.hwMode===1)?'':'none';
     }
+    // Server-authoritative sync: reset checkbox + panel from poll on every tick so a
+    // failed /api/set (network/403) doesn't leave the UI in a "toggle on, panel off"
+    // ghost state. Click handlers optimistically update but defer to this.
     var custEl=document.getElementById('hw3CustomSpeed');
     if(custEl){
       custEl.checked=!!d.hw3CustomSpeed;
@@ -866,7 +875,12 @@ function brPoll(){
       document.getElementById('brDnsAllow').value=d.dnsAllow||'';
       document.getElementById('brDnsBlock').value=d.dnsBlock||'';
     }
-    brHighlightPreset(d.dnsAllow,d.dnsBlock);
+    // Highlight based on textarea (not server state) so uncommitted edits show
+    // the right preset ring immediately, not just after save.
+    brHighlightPreset(
+      document.getElementById('brDnsAllow').value,
+      document.getElementById('brDnsBlock').value
+    );
     document.getElementById('brBlkTot').textContent=d.dnsBlockedTotal;
     document.getElementById('brIpDrops').textContent=(d.ipBlockDrops!=null?d.ipBlockDrops:0);
     document.getElementById('brIpCache').textContent=(d.ipCacheCount!=null?d.ipCacheCount:0);
@@ -895,18 +909,26 @@ var BR_PRESETS={
     allow:'connman.vn.cloud.tesla.cn nav-prd-maps.tesla.cn hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn media-server-me.tesla.cn www.tesla.cn maps-cn-prd.go.tesla.services volcengine.com volces.com volcengineapi.com volccdn.com api.map.baidu.com lc.map.baidu.com newvector.map.baidu.com route.map.baidu.com newclient.map.baidu.com tracknavi.baidu.com itsmap3.baidu.com app.navi.baidu.com mapapip0.bdimg.com mapapisp0.bdimg.com automap0.bdimg.com baidunavi.cdn.bcebos.com lbsnavi.cdn.bcebos.com enlargeroad-view.su.bcebos.com',
     block:'tesla.cn tesla.com teslamotors.com tesla.services',
     note:'屏蔽全部 Tesla 云域名，仅放行核心子域：\n• Wi-Fi 检测 connman + www.tesla.cn\n• Tesla 地图导航 nav-prd-maps + maps-cn-prd\n• 手机 APP 控车 hermes + signaling\n• Intel 车机语音 media-server-me\n• AMD 车机语音 volcengine/volces/volcengineapi/volccdn（字节火山引擎）\n• 百度地图/导航 *.map.baidu.com + *.bdimg.com + *.bcebos.com（车机内置地图需要）\n\n✅ 已实测 2 天无异常（APP 控车/导航/语音/Wi-Fi 正常工作）。推荐优先使用此方案。'},
+  tesla_lean:{name:'🔹 精简官方（独立方案）',
+    allow:'connman.vn.cloud.tesla.cn www.tesla.cn nav-prd-maps.tesla.cn maps-cn-prd.go.tesla.services hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn hermes-stream-prd.vn.cloud.tesla.cn api-prd.vn.cloud.tesla.cn media-server-me.tesla.cn',
+    block:'tesla.cn tesla.com tesla.services',
+    note:'只放行 Tesla 官方必要子域（9 个）：\n• Wi-Fi 检测 connman + www.tesla.cn\n• 地图导航 nav-prd-maps + maps-cn-prd\n• APP 控车 hermes-prd + signaling + hermes-stream-prd + api-prd\n• Intel 车机娱乐 media-server-me\n\n⚠️ 不含：\n• AMD 车机语音 (volcengine/volces)——AMD 车主用「Tesla 推荐」\n• 百度地图域——车机内置地图会不可用\n\n适合 Intel 车机 + 不使用车机内置地图的用户。'},
   bl_telemetry:{name:'屏蔽遥测（中风险）',
     allow:'',
     block:'hermes-stream-prd.vn.cloud.tesla.cn vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn firmware.tesla.cn',
     note:'拦 4 条 Tesla 遥测/上传/OTA 端点：\n• hermes-stream-prd（车辆数据流）\n• vehicle-files prd.cnn1/cn1（车辆日志/文件上传）\n• firmware.tesla.cn（OTA 固件下载）\n\nhermes-stream 风险略高，可能影响部分推送/远程指令。屏蔽 firmware.tesla.cn 会阻止 OTA 升级。'},
+  custom_blank:{name:'✍️ 自定义留空',
+    allow:'',block:'',
+    note:'清空白/黑名单文本框，DNS 过滤保持开启。\n\n您可以自己填域名规则（空格或换行分隔），再点「保存 DNS 配置」生效。\n\n规则提示：\n• 黑名单里填根域会连带所有子域（如 tesla.cn 覆盖 *.tesla.cn）\n• 白名单里填子域可单独放行（更长的规则优先）\n• 留空两个文本框并点保存 = 过滤启用但无规则（等同没拦截）'},
   clear:{name:'清空',allow:'',block:'',note:'清空所有过滤规则'}
 };
-var PRESET_IDS_PH={tesla_min:'pstTesla',bl_telemetry:'pstBl',clear:'pstClr'};
+var PRESET_IDS_PH={tesla_min:'pstTesla',tesla_lean:'pstLean',bl_telemetry:'pstBl',custom_blank:'pstCust',clear:'pstClr'};
 function normListPh(s){return String(s||'').trim().split(/\s+/).filter(Boolean).sort().join(' ');}
 function brHighlightPreset(allow,block){
   var a=normListPh(allow),b=normListPh(block);
   var active=null;
   for(var k in BR_PRESETS){
+    if(k==='custom_blank') continue;
     if(normListPh(BR_PRESETS[k].allow)===a && normListPh(BR_PRESETS[k].block)===b){active=k;break;}
   }
   for(var kk in PRESET_IDS_PH){
@@ -919,8 +941,13 @@ function brApplyPreset(key){
   if(!confirm('应用预设「'+p.name+'」？\n\n' + p.note + '\n\n⚠ 预设内容来自网络收集，仅供参考，准确性请自行验证。\n注意：会覆盖当前白/黑名单文本框内容。')){return;}
   document.getElementById('brDnsAllow').value=p.allow;
   document.getElementById('brDnsBlock').value=p.block;
+  // Auto-tick the DNS filter switch for non-clear presets — clicking a preset
+  // with the toggle still off would silently apply rules that never run.
+  if(key!=='clear'){document.getElementById('brDnsEn').checked=true;}
   brDirty=true;
-  msg('brMsg','已载入「'+p.name+'」，请点保存 DNS 配置',true);
+  brHighlightPreset(p.allow,p.block);
+  var hint=(key==='custom_blank')?'已清空，请填写域名后点保存 DNS 配置':('已载入「'+p.name+'」，请点保存 DNS 配置');
+  msg('brMsg',hint,true);
 }
 function brAdd(){
   var ssid=document.getElementById('brAddSsid').value.trim();
@@ -1091,16 +1118,21 @@ function setValHw3CT(key,val){
       .catch(function(){});
   },400);
 }
-// Paired toggles: turning one on forces its sibling off.
-var HW3_MUTEX={hw3AutoSpeed:'hw3CustomSpeed',hw3CustomSpeed:'hw3AutoSpeed'};
+// Paired toggles: turning one on forces its sibling off; `panelOwner` is the key whose
+// checked state determines panel visibility. Optimistic local update; poll() is final authority.
+var HW3_MUTEX={
+  hw3AutoSpeed:  {sib:'hw3CustomSpeed', panel:'rowHW3CustomPanel', panelOwner:'hw3CustomSpeed'},
+  hw3CustomSpeed:{sib:'hw3AutoSpeed',   panel:'rowHW3CustomPanel', panelOwner:'hw3CustomSpeed'}
+};
 function onHW3MutexChange(el){
-  var k=el.id, sibK=HW3_MUTEX[k];
+  var k=el.id, cfg=HW3_MUTEX[k]; if(!cfg) return;
   if(el.checked){
-    var sib=document.getElementById(sibK);
-    if(sib && sib.checked){sib.checked=false;setVal(sibK,0);}
+    var sib=document.getElementById(cfg.sib);
+    if(sib && sib.checked){sib.checked=false;setVal(cfg.sib,0);}
   }
-  if(k==='hw3CustomSpeed') document.getElementById('rowHW3CustomPanel').style.display=el.checked?'':'none';
-  else if(el.checked) document.getElementById('rowHW3CustomPanel').style.display='none';
+  var owner=document.getElementById(cfg.panelOwner);
+  var panel=document.getElementById(cfg.panel);
+  if(panel && owner) panel.style.display = owner.checked ? '' : 'none';
   setVal(k,el.checked?1:0);
 }
 function onTrackModeChange(el){

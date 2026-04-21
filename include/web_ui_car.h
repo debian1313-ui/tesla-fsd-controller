@@ -168,6 +168,8 @@ button{font-family:inherit;cursor:pointer}
 .smart-rule input::-webkit-outer-spin-button,.smart-rule input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .car-num{width:100px;font-size:22px;background:#0f172a;border:2px solid #38bdf8;color:#38bdf8;border-radius:8px;padding:8px 10px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
 .car-num::-webkit-outer-spin-button,.car-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.hw3ct-label{font-size:13px;color:#64748b;text-align:center;margin-bottom:4px}
+.hw3ct-input{width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px}
 .phone-link{position:fixed;bottom:20px;right:20px;background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:10px 16px;font-size:14px;text-decoration:none}
 .pin-overlay{position:fixed;inset:0;background:rgba(11,17,32,.95);display:none;align-items:center;justify-content:center;z-index:2000}
 .pin-overlay.show{display:flex}
@@ -412,11 +414,11 @@ button{font-family:inherit;cursor:pointer}
         <div id="rowHw3Custom" style="display:none;padding:14px;background:rgba(0,0,0,.25);border-radius:10px;margin-top:6px">
           <div style="font-size:14px;color:#94a3b8;margin-bottom:10px">遇到限速时的目标速度（km/h）。≥80 限速始终透传原厂。</div>
           <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
-            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 30</div><input type="number" id="hw3CT0" min="30" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT0',this.value)"></div>
-            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 40</div><input type="number" id="hw3CT1" min="40" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT1',this.value)"></div>
-            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 50</div><input type="number" id="hw3CT2" min="50" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT2',this.value)"></div>
-            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 60</div><input type="number" id="hw3CT3" min="60" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT3',this.value)"></div>
-            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 70</div><input type="number" id="hw3CT4" min="70" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT4',this.value)"></div>
+            <div><div class="hw3ct-label">限速 30</div><input type="number" id="hw3CT0" min="30" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT0',this.value)"></div>
+            <div><div class="hw3ct-label">限速 40</div><input type="number" id="hw3CT1" min="40" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT1',this.value)"></div>
+            <div><div class="hw3ct-label">限速 50</div><input type="number" id="hw3CT2" min="50" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT2',this.value)"></div>
+            <div><div class="hw3ct-label">限速 60</div><input type="number" id="hw3CT3" min="60" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT3',this.value)"></div>
+            <div><div class="hw3ct-label">限速 70</div><input type="number" id="hw3CT4" min="70" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT4',this.value)"></div>
           </div>
         </div>
         <div class="tip">🛈 ≥80 km/h 限速让原车 EAP 偏移接管；低速限速下按固定目标提速。自动/自定义互斥；两者都关 = 原厂透传。</div>
@@ -518,12 +520,14 @@ button{font-family:inherit;cursor:pointer}
       </div>
       <div class="panel">
         <div class="ptitle">快捷预设</div>
+        <div id="dnsPresetStat" style="margin-bottom:12px;font-size:15px;color:#94a3b8">--</div>
         <div class="bgroup" id="grpDnsPreset" style="flex-direction:column;gap:14px">
           <button class="pill" id="pstTesla" style="flex:0 0 72px" onclick="dnsPreset('tesla_min')">⭐ Tesla 推荐（实测）</button>
+          <button class="pill" id="pstLean"  style="flex:0 0 72px" onclick="dnsPreset('tesla_lean')">🔹 精简官方</button>
           <button class="pill" id="pstBl"    style="flex:0 0 72px" onclick="dnsPreset('bl_telemetry')">只屏蔽遥测</button>
           <button class="pill" id="pstClr"   style="flex:0 0 72px" onclick="dnsPreset('clear')">清空所有规则</button>
         </div>
-        <div class="tip" style="margin-top:14px">🛈 自定义域名列表请用手机版编辑</div>
+        <div class="tip" style="margin-top:14px">🛈 自定义域名列表请点下方「📱 打开手机版」编辑。点上方预设会覆盖自定义规则。</div>
       </div>
       <div class="panel" id="panelDnsBlk">
         <div class="ptitle">最近拦截 <span style="color:#64748b;font-size:13px;font-weight:500">总计 <span id="brBlkTot">0</span> 次</span></div>
@@ -587,7 +591,7 @@ button{font-family:inherit;cursor:pointer}
         </div>
         <div class="progress" id="otaDlBox" style="display:none;margin-top:14px"><div class="progress-bar" id="otaDlBar" style="width:0%"></div></div>
         <div id="otaOnlineMsg" style="margin-top:10px;font-size:15px;color:#94a3b8;min-height:22px"></div>
-        <div class="tip">🛈 需连接路由器（网络页 STA）才能联网检查和下载。</div>
+        <div class="tip">🛈 需连接路由器（网络页 STA）才能联网检查和下载。国内访问 GitHub 慢时自动经 gh-proxy.com 加速，镜像失败自动回退直连。</div>
       </div>
     </div>
 
@@ -978,6 +982,8 @@ function render(d){
 
   // 控制页
   setTog('tgFsd', d.fsdEnable);
+  // Server-authoritative sync: reset toggle + panel from poll on every tick so a failed
+  // /api/set (network/403) doesn't leave the UI showing "custom on, panel hidden" forever.
   setTog('tgAuto', d.hw3AutoSpeed==null ? true : !!d.hw3AutoSpeed);
   setTog('tgCustom', !!d.hw3CustomSpeed);
   var rowCust = document.getElementById('rowHw3Custom');
@@ -1227,12 +1233,12 @@ function setTog(id, on){
 
 // ───── 开关点击 ─────
 var TRACK_WARN = '⚠️ 实验性功能，效果未经完全验证。开启后将向总线持续注入赛道模式请求，可能影响车辆稳定控制。请知悉风险后开启。';
-// Turning a paired toggle on forces its sibling off. Each side lists sibling's {key, togId}.
-var TOG_MUTEX = {hw3AutoSpeed:{k:'hw3CustomSpeed',id:'tgCustom'}, hw3CustomSpeed:{k:'hw3AutoSpeed',id:'tgAuto'}};
-function setTogCustomPanel(on){
-  var r = document.getElementById('rowHw3Custom');
-  if(r) r.style.display = on ? '' : 'none';
-}
+// Turning a paired toggle on forces its sibling off. `panelOwner` is the key whose
+// on-state reveals the shared panel (symmetrical data structure vs desktop UI).
+var TOG_MUTEX = {
+  hw3AutoSpeed:  {sib:{k:'hw3CustomSpeed',id:'tgCustom'}, panel:'rowHw3Custom', panelOwner:'hw3CustomSpeed'},
+  hw3CustomSpeed:{sib:{k:'hw3AutoSpeed',  id:'tgAuto'},   panel:'rowHw3Custom', panelOwner:'hw3CustomSpeed'}
+};
 document.querySelectorAll('.tog[data-k]').forEach(function(t){
   t.onclick = function(){
     var k = t.dataset.k;
@@ -1240,12 +1246,17 @@ document.querySelectorAll('.tog[data-k]').forEach(function(t){
     if(k==='trackMode' && newVal && !confirm(TRACK_WARN)) return;
     t.classList.toggle('on', newVal);
     apiSet(k, newVal?1:0);
-    if(newVal && TOG_MUTEX[k]){
-      var sib = TOG_MUTEX[k], s = document.getElementById(sib.id);
-      if(s && s.classList.contains('on')){ s.classList.remove('on'); apiSet(sib.k, 0); }
+    var cfg = TOG_MUTEX[k];
+    if(cfg){
+      if(newVal){
+        var s = document.getElementById(cfg.sib.id);
+        if(s && s.classList.contains('on')){ s.classList.remove('on'); apiSet(cfg.sib.k, 0); }
+      }
+      // Panel shows iff panelOwner's toggle is ON (optimistic; poll() corrects on HTTP fail).
+      var ownerOn = (k===cfg.panelOwner) ? newVal : false;  // sib toggle OFF forces panel hidden
+      var panel = document.getElementById(cfg.panel);
+      if(panel) panel.style.display = ownerOn ? '' : 'none';
     }
-    if(k==='hw3CustomSpeed') setTogCustomPanel(newVal);
-    else if(k==='hw3AutoSpeed' && newVal) setTogCustomPanel(false);
   };
 });
 // DNS 开关（单独，需要调 wifi-bridge API）
@@ -1397,10 +1408,14 @@ var DNS_PRESETS = {
     allow: 'connman.vn.cloud.tesla.cn nav-prd-maps.tesla.cn hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn media-server-me.tesla.cn www.tesla.cn maps-cn-prd.go.tesla.services volcengine.com volces.com volcengineapi.com volccdn.com api.map.baidu.com lc.map.baidu.com newvector.map.baidu.com route.map.baidu.com newclient.map.baidu.com tracknavi.baidu.com itsmap3.baidu.com app.navi.baidu.com mapapip0.bdimg.com mapapisp0.bdimg.com automap0.bdimg.com baidunavi.cdn.bcebos.com lbsnavi.cdn.bcebos.com enlargeroad-view.su.bcebos.com',
     block: 'tesla.cn tesla.com teslamotors.com tesla.services'
   },
+  tesla_lean: {
+    allow: 'connman.vn.cloud.tesla.cn www.tesla.cn nav-prd-maps.tesla.cn maps-cn-prd.go.tesla.services hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn hermes-stream-prd.vn.cloud.tesla.cn api-prd.vn.cloud.tesla.cn media-server-me.tesla.cn',
+    block: 'tesla.cn tesla.com tesla.services'
+  },
   bl_telemetry: { allow:'', block:'hermes-stream-prd.vn.cloud.tesla.cn vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn firmware.tesla.cn' },
   clear: { allow:'', block:'' }
 };
-var PRESET_IDS = { tesla_min:'pstTesla', bl_telemetry:'pstBl', clear:'pstClr' };
+var PRESET_IDS = { tesla_min:'pstTesla', tesla_lean:'pstLean', bl_telemetry:'pstBl', clear:'pstClr' };
 function normList(s){ return String(s||'').trim().split(/\s+/).filter(Boolean).sort().join(' '); }
 function detectActivePreset(allow, block){
   var a = normList(allow), b = normList(block);
@@ -1409,17 +1424,35 @@ function detectActivePreset(allow, block){
   }
   return null;
 }
+var PRESET_NAMES = {
+  tesla_min: '⭐ Tesla 推荐（实测）',
+  tesla_lean: '🔹 精简官方',
+  bl_telemetry: '只屏蔽遥测',
+  clear: '清空所有规则'
+};
 function highlightPreset(allow, block){
   var active = detectActivePreset(allow, block);
   for(var k in PRESET_IDS){
     var el = document.getElementById(PRESET_IDS[k]);
     if(el) el.classList.toggle('active', k === active);
   }
+  var stat = document.getElementById('dnsPresetStat');
+  if(!stat) return;
+  if(active){
+    stat.innerHTML = '当前：<span style="color:#34d399">'+ (PRESET_NAMES[active] || active) +'</span>';
+  } else {
+    var aw = String(allow||'').trim().split(/\s+/).filter(Boolean).length;
+    var bk = String(block||'').trim().split(/\s+/).filter(Boolean).length;
+    stat.innerHTML = '当前：<span style="color:#fbbf24">✍️ 自定义规则</span>（白名单 '+aw+' · 黑名单 '+bk+'）';
+  }
 }
 function dnsPreset(name){
   var p = DNS_PRESETS[name];
   if(!p) return;
+  // Auto-enable the DNS filter for non-clear presets so rules don't sit inert
+  // behind an off switch. Clear preset = intentional disable, leave toggle alone.
   var qs = '?dnsAllow='+encodeURIComponent(p.allow)+'&dnsBlock='+encodeURIComponent(p.block);
+  if(name!=='clear') qs += '&dnsEnable=1';
   if(tok) qs += '&token='+encodeURIComponent(tok);
   fetch('/api/wifi-bridge/set'+qs)
     .then(function(r){if(r.status===200){toast('预设已应用','ok');brPoll()}else{toast('失败','err')}});
