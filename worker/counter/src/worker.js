@@ -13,8 +13,10 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+const STATS_CACHE_TTL_SEC = 60;
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     const url = new URL(request.url);
@@ -23,7 +25,7 @@ export default {
       return handlePing(request, env);
     }
     if (request.method === "GET" && url.pathname === "/stats") {
-      return handleStatsCached(request, env);
+      return handleStatsCached(request, env, ctx);
     }
     return new Response(
       "tesla-counter\n\nPOST /ping {id, version, env}\nGET /stats\n",
@@ -53,19 +55,19 @@ async function handlePing(request, env) {
   return txt("ok");
 }
 
-async function handleStatsCached(request, env) {
+async function handleStatsCached(request, env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request(new URL(request.url).toString(), { method: "GET" });
-  let resp = await cache.match(cacheKey);
-  if (resp) {
-    resp = new Response(resp.body, resp);
+  const cacheKey = new Request(request.url, { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) {
+    const resp = new Response(hit.body, { headers: new Headers(hit.headers) });
     resp.headers.set("X-Cache", "HIT");
     return resp;
   }
-  resp = await handleStats(env);
-  const toCache = resp.clone();
-  // ctx.waitUntil isn't passed here; we just await — acceptable for tiny payload.
-  await cache.put(cacheKey, toCache);
+  const resp = await handleStats(env);
+  // Write-through off the hot path so a slow/failed cache.put can't block or
+  // 500 the response — /stats is an optimization, not a source of truth.
+  ctx.waitUntil(cache.put(cacheKey, resp.clone()).catch(() => {}));
   resp.headers.set("X-Cache", "MISS");
   return resp;
 }
@@ -108,7 +110,7 @@ async function handleStats(env) {
   }), { headers: {
     ...CORS,
     "Content-Type": "application/json",
-    "Cache-Control": "public, s-maxage=60",
+    "Cache-Control": `public, s-maxage=${STATS_CACHE_TTL_SEC}`,
   } });
 }
 

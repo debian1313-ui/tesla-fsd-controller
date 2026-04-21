@@ -11,6 +11,9 @@ workers_dev = false
 
 # Custom domain — CF auto-creates the DNS record (proxied) and issues an
 # SSL cert. The zone wjsall.uk must already be on this account.
+# NOTE: this hostname is duplicated in worker/counter/dashboard.html and
+# include/mod_telemetry_ping.h (TESLA_COUNTER_ENDPOINT). Change all three
+# together when migrating domains.
 routes = [
   { pattern = "counter.wjsall.uk", custom_domain = true }
 ]
