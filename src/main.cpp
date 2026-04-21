@@ -613,10 +613,10 @@ void setupWebServer() {
         // Coarse guard only: 0..200 kph catches garbage input. The real ceiling is
         // enforced downstream by encodeHW3OffsetRawFromKph (offset clamped to +40 kph).
         // Keeping the wire-protocol cap out of the API layer avoids tight coupling.
+        static const char* const kHw3CTKeys[kHw3CustomTargetCount] = {"hw3CT0","hw3CT1","hw3CT2","hw3CT3","hw3CT4"};
         for (int i = 0; i < kHw3CustomTargetCount; i++) {
-            char k[12]; snprintf(k, sizeof(k), "hw3CT%d", i);
-            if (req->hasParam(k)) {
-                int raw = req->getParam(k)->value().toInt();
+            if (req->hasParam(kHw3CTKeys[i])) {
+                int raw = req->getParam(kHw3CTKeys[i])->value().toInt();
                 if (raw < 0 || raw > 200) { req->send(400, "text/plain", "bad hw3CT"); return; }
             }
         }
@@ -671,9 +671,8 @@ void setupWebServer() {
             if (v != cfg.hw3CustomSpeed) { cfg.hw3CustomSpeed = v; changed = true; }
         }
         for (int i = 0; i < kHw3CustomTargetCount; i++) {
-            char k[12]; snprintf(k, sizeof(k), "hw3CT%d", i);
-            if (req->hasParam(k)) {
-                uint8_t v = (uint8_t)req->getParam(k)->value().toInt();
+            if (req->hasParam(kHw3CTKeys[i])) {
+                uint8_t v = (uint8_t)req->getParam(kHw3CTKeys[i])->value().toInt();
                 if (v != cfg.hw3CustomTarget[i]) { cfg.hw3CustomTarget[i] = v; changed = true; }
             }
         }
