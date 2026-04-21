@@ -48,14 +48,16 @@ button{font-family:inherit;cursor:pointer}
 .scene{position:relative;display:grid;grid-template-columns:240px 1fr 170px;gap:20px;align-items:center;min-height:680px}
 /* ── 挡位列 ── */
 .c-gear{text-align:center;position:relative;z-index:2}
-.gear-big{font-size:260px;font-weight:900;line-height:.82;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;letter-spacing:-16px;color:#64748b;transition:color .35s, font-size .35s cubic-bezier(.25,.8,.25,1), letter-spacing .35s;text-shadow:0 6px 80px currentColor;display:inline-block}
-.cluster.driving .gear-big{font-size:160px;letter-spacing:-10px}
+.gear-big{font-size:260px;font-weight:900;line-height:.82;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;letter-spacing:-16px;color:#64748b;transform-origin:center center;transition:color .35s, transform .45s cubic-bezier(.2,.8,.2,1);text-shadow:0 6px 80px currentColor;display:inline-block;will-change:transform}
+.cluster.driving .gear-big{transform:scale(.37)}
 .gear-big.P{color:#60a5fa}
 .gear-big.R{color:#f87171}
 .gear-big.N{color:#94a3b8}
 .gear-big.D{color:#34d399}
-.gear-big.pop{animation:gear-pop .85s cubic-bezier(.25,1.5,.35,1)}
-@keyframes gear-pop{0%{transform:scale(.4) rotate(-8deg);opacity:.2;filter:blur(8px)}40%{transform:scale(1.55) rotate(3deg);opacity:1;filter:blur(0)}62%{transform:scale(.86)}78%{transform:scale(1.08)}92%{transform:scale(.98)}100%{transform:scale(1)}}
+.gear-big.pop{animation:gear-pop .55s cubic-bezier(.2,1.3,.3,1)}
+.cluster.driving .gear-big.pop{animation:gear-pop-small .5s cubic-bezier(.2,1.25,.3,1)}
+@keyframes gear-pop{0%{transform:scale(.55);opacity:.4}55%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
+@keyframes gear-pop-small{0%{transform:scale(.2);opacity:.4}55%{transform:scale(.44);opacity:1}100%{transform:scale(.37);opacity:1}}
 .ap-mini{margin-top:14px;padding:9px 22px;display:inline-flex;align-items:center;gap:10px;background:rgba(15,23,42,.55);border:1px solid rgba(30,41,59,.9);border-radius:22px;font-size:16px;color:#64748b;letter-spacing:3px;font-weight:700;backdrop-filter:blur(6px)}
 .ap-mini .apv{color:#64748b}
 .ap-mini .ap-dot{width:10px;height:10px;border-radius:50%;background:#475569;transition:all .3s}
@@ -71,8 +73,9 @@ button{font-family:inherit;cursor:pointer}
 .cluster.warn .speedo-arc{filter:drop-shadow(0 0 44px rgba(239,68,68,.9));animation:arc-warn 1s ease-in-out infinite}
 .cluster.warn .spd-huge{color:#fecaca;text-shadow:0 4px 90px rgba(239,68,68,.85)}
 @keyframes arc-warn{0%,100%{filter:drop-shadow(0 0 44px rgba(239,68,68,.9))}50%{filter:drop-shadow(0 0 70px rgba(239,68,68,1))}}
-.speedo-inner{position:absolute;inset:6%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 55%,rgba(15,23,42,.55) 0%,rgba(11,17,32,.2) 55%,transparent 72%);border-radius:50%}
-.spd-huge{font-size:340px;font-weight:900;line-height:.8;letter-spacing:-10px;color:#f8fafc;font-variant-numeric:tabular-nums;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;text-shadow:0 4px 80px rgba(56,189,248,.35);will-change:transform;transition:text-shadow .3s}
+.speedo-inner{position:absolute;inset:13%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 55%,rgba(15,23,42,.55) 0%,rgba(11,17,32,.2) 55%,transparent 72%);border-radius:50%}
+.spd-huge{font-size:260px;font-weight:900;line-height:.8;letter-spacing:-8px;color:#f8fafc;font-variant-numeric:tabular-nums;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;text-shadow:0 4px 80px rgba(56,189,248,.35);will-change:transform;transition:text-shadow .3s, font-size .3s}
+.spd-huge.big3{font-size:220px;letter-spacing:-6px}
 .spd-huge.tick{animation:spd-tick .5s ease-out}
 @keyframes spd-tick{0%{transform:scale(1)}30%{transform:scale(1.06);text-shadow:0 6px 100px rgba(56,189,248,.75)}100%{transform:scale(1);text-shadow:0 4px 80px rgba(56,189,248,.35)}}
 .spd-unit{margin-top:18px;font-size:30px;color:#475569;letter-spacing:12px;font-weight:700;text-transform:uppercase}
@@ -252,8 +255,8 @@ button{font-family:inherit;cursor:pointer}
   .cluster{padding:14px;min-height:auto}
   .scene{grid-template-columns:110px 1fr 96px;gap:8px;min-height:auto}
   .gear-big{font-size:140px;letter-spacing:-8px}
-  .cluster.driving .gear-big{font-size:84px;letter-spacing:-5px}
-  .spd-huge{font-size:180px}
+  .spd-huge{font-size:160px}
+  .spd-huge.big3{font-size:130px}
   .spd-unit{font-size:18px;letter-spacing:6px}
   .limit-sign{width:96px;height:96px;border-width:7px}
   .limit-num{font-size:38px}
@@ -330,7 +333,6 @@ button{font-family:inherit;cursor:pointer}
             </svg>
             <div class="speedo-inner">
               <div class="spd-huge" id="vSpeed">0</div>
-              <div class="spd-unit">km/h</div>
               <div class="spd-off fade-el hide" id="spdOff">
                 <span id="vOffsetPct"></span>
                 <span class="spd-off-sep">·</span>
@@ -343,7 +345,6 @@ button{font-family:inherit;cursor:pointer}
             <div class="l-src" id="vFusedSrc">&nbsp;</div>
             <div class="limit-sign">
               <div class="limit-num" id="vFused"></div>
-              <div class="limit-unit">km/h</div>
             </div>
           </div>
         </div>
@@ -407,7 +408,18 @@ button{font-family:inherit;cursor:pointer}
       <div class="panel" id="panelHw3" style="display:none">
         <div class="ptitle">HW3 速度偏移</div>
         <div class="row"><div class="rlbl">自动突破</div><div class="tog" id="tgAuto" data-k="hw3AutoSpeed"></div><div class="rval">&lt;80 km/h 限速时自动拉到 64/85/100 目标</div></div>
-        <div class="tip">🛈 ≥80 km/h 限速让原车 EAP 偏移接管；低速限速下按固定目标提速。</div>
+        <div class="row"><div class="rlbl">自定义</div><div class="tog" id="tgCustom" data-k="hw3CustomSpeed"></div><div class="rval">按档位设定目标速度（覆盖自动）</div></div>
+        <div id="rowHw3Custom" style="display:none;padding:14px;background:rgba(0,0,0,.25);border-radius:10px;margin-top:6px">
+          <div style="font-size:14px;color:#94a3b8;margin-bottom:10px">遇到限速时的目标速度（km/h）。≥80 限速始终透传原厂。</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 30</div><input type="number" id="hw3CT0" min="30" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT0',this.value)"></div>
+            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 40</div><input type="number" id="hw3CT1" min="40" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT1',this.value)"></div>
+            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 50</div><input type="number" id="hw3CT2" min="50" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT2',this.value)"></div>
+            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 60</div><input type="number" id="hw3CT3" min="60" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT3',this.value)"></div>
+            <div><div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:4px">限速 70</div><input type="number" id="hw3CT4" min="70" max="200" style="width:100%;box-sizing:border-box;padding:10px;text-align:center;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-size:18px" onchange="apiSetHw3CT('hw3CT4',this.value)"></div>
+          </div>
+        </div>
+        <div class="tip">🛈 ≥80 km/h 限速让原车 EAP 偏移接管；低速限速下按固定目标提速。自动/自定义互斥；两者都关 = 原厂透传。</div>
       </div>
 
       <div class="panel" id="panelHw4" style="display:none">
@@ -770,6 +782,10 @@ window.__spdDisplay = 0; window.__spdTarget = 0; window.__spdLast = 0;
   var show = Math.round(v);
   var el = document.getElementById('vSpeed');
   if(el && el.textContent !== String(show)) el.textContent = show;
+  if(el){
+    var big3 = show >= 100;
+    if(big3 !== !!window.__big3){ el.classList.toggle('big3', big3); window.__big3 = big3; }
+  }
   var arcFill = document.getElementById('arcFill');
   if(arcFill){
     var pct = Math.min(1, Math.max(0, v/200));
@@ -963,6 +979,13 @@ function render(d){
   // 控制页
   setTog('tgFsd', d.fsdEnable);
   setTog('tgAuto', d.hw3AutoSpeed==null ? true : !!d.hw3AutoSpeed);
+  setTog('tgCustom', !!d.hw3CustomSpeed);
+  var rowCust = document.getElementById('rowHw3Custom');
+  if(rowCust) rowCust.style.display = (d.hwMode===1 && d.hw3CustomSpeed) ? '' : 'none';
+  if(!window._hw3CTLoaded && Array.isArray(d.hw3CustomTarget)){
+    for(var _i=0;_i<5;_i++){var _e=document.getElementById('hw3CT'+_i); if(_e) _e.value=d.hw3CustomTarget[_i];}
+    window._hw3CTLoaded=true;
+  }
   setTog('tgIsa', d.isaChime);
   setTog('tgEmerg', d.emergencyDet);
   setTog('tgForce', d.forceActivate);
@@ -1204,6 +1227,12 @@ function setTog(id, on){
 
 // ───── 开关点击 ─────
 var TRACK_WARN = '⚠️ 实验性功能，效果未经完全验证。开启后将向总线持续注入赛道模式请求，可能影响车辆稳定控制。请知悉风险后开启。';
+// Turning a paired toggle on forces its sibling off. Each side lists sibling's {key, togId}.
+var TOG_MUTEX = {hw3AutoSpeed:{k:'hw3CustomSpeed',id:'tgCustom'}, hw3CustomSpeed:{k:'hw3AutoSpeed',id:'tgAuto'}};
+function setTogCustomPanel(on){
+  var r = document.getElementById('rowHw3Custom');
+  if(r) r.style.display = on ? '' : 'none';
+}
 document.querySelectorAll('.tog[data-k]').forEach(function(t){
   t.onclick = function(){
     var k = t.dataset.k;
@@ -1211,6 +1240,12 @@ document.querySelectorAll('.tog[data-k]').forEach(function(t){
     if(k==='trackMode' && newVal && !confirm(TRACK_WARN)) return;
     t.classList.toggle('on', newVal);
     apiSet(k, newVal?1:0);
+    if(newVal && TOG_MUTEX[k]){
+      var sib = TOG_MUTEX[k], s = document.getElementById(sib.id);
+      if(s && s.classList.contains('on')){ s.classList.remove('on'); apiSet(sib.k, 0); }
+    }
+    if(k==='hw3CustomSpeed') setTogCustomPanel(newVal);
+    else if(k==='hw3AutoSpeed' && newVal) setTogCustomPanel(false);
   };
 });
 // DNS 开关（单独，需要调 wifi-bridge API）
@@ -1341,6 +1376,19 @@ document.querySelectorAll('#grpHw4Off .pill').forEach(function(b){
 function apiSet(k, v){
   fetch('/api/set?'+k+'='+v+(tok?'&token='+encodeURIComponent(tok):''))
     .then(function(r){if(r.status===200){toast('已保存','ok');poll()}else if(r.status===403){showPin()}else{toast('失败','err')}});
+}
+// Debounced batch save for hw3CT* slots — 1 NVS commit per edit burst.
+var _hw3CTTimer=null, _hw3CTPending={};
+function apiSetHw3CT(k, v){
+  _hw3CTPending[k]=v;
+  clearTimeout(_hw3CTTimer);
+  _hw3CTTimer=setTimeout(function(){
+    var qs=''; for(var kk in _hw3CTPending){qs+='&'+kk+'='+encodeURIComponent(_hw3CTPending[kk]);}
+    _hw3CTPending={};
+    if(!qs)return;
+    fetch('/api/set?'+qs.slice(1)+(tok?'&token='+encodeURIComponent(tok):''))
+      .then(function(r){if(r.status===200){toast('已保存','ok');poll()}else if(r.status===403){showPin()}else{toast('失败','err')}});
+  },400);
 }
 
 // ───── DNS 预设 ─────

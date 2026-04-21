@@ -118,7 +118,9 @@ static bool checkToken(AsyncWebServerRequest* req) {
 #define NV_PIN       "p1"
 #define NV_HW4_OFF   "d1"
 #define NV_TRACK_MD  "d2"
-#define NV_HW3_AUTO  "d4"   // hw3AutoSpeed: enable auto speed targeting for low-speed limits
+#define NV_HW3_AUTO  "d4"
+#define NV_HW3_CUST  "d5"
+#define NV_HW3_CT    "d6"   // blob: hw3CustomTarget[kHw3CustomTargetCount]
 
 // ═══════════════════════════════════════════
 //  Config persistence (NVS)
@@ -197,6 +199,15 @@ void loadConfig() {
     cfg.hw4OffsetRaw       = prefs.getUChar(NV_HW4_OFF, 0);
     cfg.trackModeEnable    = prefs.getBool(NV_TRACK_MD, false);
     cfg.hw3AutoSpeed       = prefs.getBool(NV_HW3_AUTO, true);
+    cfg.hw3CustomSpeed     = prefs.getBool(NV_HW3_CUST, false);
+    {
+        uint8_t buf[kHw3CustomTargetCount];
+        size_t got = prefs.getBytes(NV_HW3_CT, buf, sizeof(buf));
+        if (got == sizeof(buf)) {
+            for (int i = 0; i < kHw3CustomTargetCount; i++) cfg.hw3CustomTarget[i] = buf[i];
+        }
+        // else keep struct's in-class defaults {64,64,64,100,85}
+    }
     strlcpy(apSSID,  prefs.getString(NV_AP_SSID,  "FSD-Controller").c_str(), sizeof(apSSID));
     strlcpy(apPass,  prefs.getString(NV_AP_PASS,  "12345678").c_str(),       sizeof(apPass));
     strlcpy(staSSID, prefs.getString(NV_STA_SSID, "").c_str(),               sizeof(staSSID));
@@ -230,6 +241,12 @@ void saveConfig() {
     prefs.putUChar(NV_HW4_OFF,  cfg.hw4OffsetRaw);
     prefs.putBool(NV_TRACK_MD,  cfg.trackModeEnable);
     prefs.putBool(NV_HW3_AUTO,  cfg.hw3AutoSpeed);
+    prefs.putBool(NV_HW3_CUST,  cfg.hw3CustomSpeed);
+    {
+        uint8_t buf[kHw3CustomTargetCount];
+        for (int i = 0; i < kHw3CustomTargetCount; i++) buf[i] = cfg.hw3CustomTarget[i];
+        prefs.putBytes(NV_HW3_CT, buf, sizeof(buf));
+    }
     // WiFi keys written directly by /api/wifi — not touched here.
     prefs.end();
 }
@@ -446,7 +463,9 @@ void setupWebServer() {
             "\"fsdEnable\":%d,\"hwMode\":%d,\"speedProfile\":%d,\"gwAutopilot\":%d,"
             "\"profileMode\":%d,\"isaChime\":%d,\"emergencyDet\":%d,\"forceActivate\":%d,\"overrideSL\":%d,"
             "\"hw3AutoOffset\":%d,\"hwDetected\":%d,"
-            "\"hw3AutoSpeed\":%d,\"fusedLimit\":%u,"
+            "\"hw3AutoSpeed\":%d,\"hw3CustomSpeed\":%d,"
+            "\"hw3CustomTarget\":[%u,%u,%u,%u,%u],"
+            "\"fusedLimit\":%u,"
             "\"tempSeen\":%s,\"tempInRaw\":%u,\"tempOutRaw\":%u,"
             "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
@@ -477,6 +496,10 @@ void setupWebServer() {
             (int)cfg.hw3SpeedOffset,
             (int)cfg.hwDetected,
             (int)cfg.hw3AutoSpeed,
+            (int)cfg.hw3CustomSpeed,
+            (unsigned)cfg.hw3CustomTarget[0], (unsigned)cfg.hw3CustomTarget[1],
+            (unsigned)cfg.hw3CustomTarget[2], (unsigned)cfg.hw3CustomTarget[3],
+            (unsigned)cfg.hw3CustomTarget[4],
             (unsigned)cfg.fusedSpeedLimit,
             cfg.tempSeen ? "true" : "false",
             (unsigned)cfg.tempInsideRaw,    // × 0.25 = °C  (done in JS)
@@ -587,6 +610,16 @@ void setupWebServer() {
                 req->send(400, "text/plain", "bad hw4Offset"); return;
             }
         }
+        // Coarse guard only: 0..200 kph catches garbage input. The real ceiling is
+        // enforced downstream by encodeHW3OffsetRawFromKph (offset clamped to +40 kph).
+        // Keeping the wire-protocol cap out of the API layer avoids tight coupling.
+        for (int i = 0; i < kHw3CustomTargetCount; i++) {
+            char k[12]; snprintf(k, sizeof(k), "hw3CT%d", i);
+            if (req->hasParam(k)) {
+                int raw = req->getParam(k)->value().toInt();
+                if (raw < 0 || raw > 200) { req->send(400, "text/plain", "bad hw3CT"); return; }
+            }
+        }
 
         bool changed = false;
 
@@ -632,6 +665,17 @@ void setupWebServer() {
         if (req->hasParam("hw3AutoSpeed")) {
             bool v = req->getParam("hw3AutoSpeed")->value().toInt() != 0;
             if (v != cfg.hw3AutoSpeed) { cfg.hw3AutoSpeed = v; changed = true; }
+        }
+        if (req->hasParam("hw3CustomSpeed")) {
+            bool v = req->getParam("hw3CustomSpeed")->value().toInt() != 0;
+            if (v != cfg.hw3CustomSpeed) { cfg.hw3CustomSpeed = v; changed = true; }
+        }
+        for (int i = 0; i < kHw3CustomTargetCount; i++) {
+            char k[12]; snprintf(k, sizeof(k), "hw3CT%d", i);
+            if (req->hasParam(k)) {
+                uint8_t v = (uint8_t)req->getParam(k)->value().toInt();
+                if (v != cfg.hw3CustomTarget[i]) { cfg.hw3CustomTarget[i] = v; changed = true; }
+            }
         }
         // precond removed from UI — requires Vehicle CAN (X179 pin 9/10)
         if (req->hasParam("hw4Offset")) {

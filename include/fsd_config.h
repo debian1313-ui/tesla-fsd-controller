@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+static constexpr int kHw3CustomTargetCount = 5;  // 30/40/50/60/70 kph limit buckets
+
 // ── Runtime-configurable state (shared between CAN task and web server) ──
 // All fields are volatile — written by Core1 (CAN), read by Core0 (WiFi/web).
 // Individual 32-bit-or-smaller volatile reads are atomic on ESP32 Xtensa.
@@ -17,6 +19,9 @@ struct FSDConfig {
     volatile bool     overrideSpeedLimit  = false;   // Legacy: set UI_visionSpeedSlider=100 in frame 1080
     volatile int      hw3SpeedOffset      = 0;       // stock offset from mux-0 data[3] as pct*5 (0-100); display only
     volatile bool     hw3AutoSpeed        = true;    // HW3 auto speed targeting: <60→64, =60→100, 60-79→85, ≥80→stock passthrough
+    volatile bool     hw3CustomSpeed      = false;   // HW3 custom target table (overrides hw3AutoSpeed when true); ≥80 always stock passthrough
+    // Defaults match Auto so a fresh unit behaves identically until the user edits.
+    volatile uint8_t  hw3CustomTarget[kHw3CustomTargetCount] = {64, 64, 64, 100, 85};
     volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 mux-2 data[1][5:0]; 0=off (presets: 7=+5,10=+7,14=+10,21=+15 km/h)
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
     volatile int8_t   gatewayAutopilot    = -1;      // from 0x7FF mux-2: -1=unseen, 0=NONE,1=HIGHWAY,2=ENHANCED,3=SELF_DRIVING,4=BASIC

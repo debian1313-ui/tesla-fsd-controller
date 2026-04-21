@@ -229,7 +229,21 @@ select:focus{outline:none;border-color:#38bdf8}
   </div>
   <div class="row" id="rowHW3Auto" style="display:none">
     <span class="row-label" id="iLblHW3Auto">HW3 自动限速突破</span>
-    <label class="toggle"><input type="checkbox" id="hw3AutoSpeed" onchange="setVal('hw3AutoSpeed',this.checked?1:0)"><span class="slider"></span></label>
+    <label class="toggle"><input type="checkbox" id="hw3AutoSpeed" onchange="onHW3MutexChange(this)"><span class="slider"></span></label>
+  </div>
+  <div class="row" id="rowHW3Custom" style="display:none">
+    <span class="row-label" id="iLblHW3Custom">HW3 自定义限速</span>
+    <label class="toggle"><input type="checkbox" id="hw3CustomSpeed" onchange="onHW3MutexChange(this)"><span class="slider"></span></label>
+  </div>
+  <div id="rowHW3CustomPanel" style="display:none;padding:10px 12px;background:#0b1220;border-radius:8px;margin-top:4px">
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:8px" id="iLblHW3CustomHint">遇到限速时的目标速度（km/h）。≥80 限速始终透传原厂。</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">30</div><input type="number" id="hw3CT0" min="30" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT0',this.value)"></div>
+      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">40</div><input type="number" id="hw3CT1" min="40" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT1',this.value)"></div>
+      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">50</div><input type="number" id="hw3CT2" min="50" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT2',this.value)"></div>
+      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">60</div><input type="number" id="hw3CT3" min="60" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT3',this.value)"></div>
+      <div><div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:2px">70</div><input type="number" id="hw3CT4" min="70" max="200" style="width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px" onchange="setValHw3CT('hw3CT4',this.value)"></div>
+    </div>
   </div>
 </div>
 
@@ -671,8 +685,18 @@ function poll(){
     if(autoEl){
       autoEl.checked=(d.hw3AutoSpeed==null?true:!!d.hw3AutoSpeed);
       document.getElementById('rowHW3Auto').style.display=(d.hwMode===1)?'':'none';
+      document.getElementById('rowHW3Custom').style.display=(d.hwMode===1)?'':'none';
       document.getElementById('rowHW4Offset').style.display=(d.hwMode===2)?'':'none';
       document.getElementById('rowTrackMode').style.display=(d.hwMode===1)?'':'none';
+    }
+    var custEl=document.getElementById('hw3CustomSpeed');
+    if(custEl){
+      custEl.checked=!!d.hw3CustomSpeed;
+      document.getElementById('rowHW3CustomPanel').style.display=(d.hwMode===1&&d.hw3CustomSpeed)?'':'none';
+      if(!hw3CTLoaded && Array.isArray(d.hw3CustomTarget)){
+        for(var i=0;i<5;i++){var inp=document.getElementById('hw3CT'+i); if(inp) inp.value=d.hw3CustomTarget[i];}
+        hw3CTLoaded=true;
+      }
     }
     document.getElementById('apRestart').checked=!!d.apRestart;
     var hw4OffEl=document.getElementById('hw4Offset');
@@ -978,6 +1002,7 @@ fetch('/api/status').then(function(r){return r.json();}).then(function(d){
 });
 var wifiSSIDLoaded=false;
 var staSSIDLoaded=false;
+var hw3CTLoaded=false;
 function updateSpeedOptions(hwMode){
   // HW3/Legacy: 3 profiles (0-2) with different labels than HW4
   // HW4: 5 profiles (0-4) — Sloth/Chill/Standard/Hurry/Mad Max
@@ -1049,6 +1074,34 @@ function setVal(key,val){
         else if(ctrl2.tagName==='SELECT')ctrl2.value=prevVal;
       }
     });
+}
+// Debounced batch save for hw3CT* slots: coalesces rapid multi-field edits
+// into a single /api/set call → one NVS commit instead of N.
+var _hw3CTTimer=null, _hw3CTPending={};
+function setValHw3CT(key,val){
+  if(!agreed)return;
+  _hw3CTPending[key]=val;
+  clearTimeout(_hw3CTTimer);
+  _hw3CTTimer=setTimeout(function(){
+    var qs=''; for(var k in _hw3CTPending){qs+='&'+k+'='+encodeURIComponent(_hw3CTPending[k]);}
+    _hw3CTPending={};
+    if(!qs)return;
+    fetch('/api/set?'+qs.slice(1)+(token?'&token='+token:''))
+      .then(function(r){if(r.status===403){token='';try{sessionStorage.removeItem('fsd_tok');}catch(e){}showPinStep();}})
+      .catch(function(){});
+  },400);
+}
+// Paired toggles: turning one on forces its sibling off.
+var HW3_MUTEX={hw3AutoSpeed:'hw3CustomSpeed',hw3CustomSpeed:'hw3AutoSpeed'};
+function onHW3MutexChange(el){
+  var k=el.id, sibK=HW3_MUTEX[k];
+  if(el.checked){
+    var sib=document.getElementById(sibK);
+    if(sib && sib.checked){sib.checked=false;setVal(sibK,0);}
+  }
+  if(k==='hw3CustomSpeed') document.getElementById('rowHW3CustomPanel').style.display=el.checked?'':'none';
+  else if(el.checked) document.getElementById('rowHW3CustomPanel').style.display='none';
+  setVal(k,el.checked?1:0);
 }
 function onTrackModeChange(el){
   if(el.checked){

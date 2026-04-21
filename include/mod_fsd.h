@@ -33,12 +33,22 @@ static constexpr int kHw3AutoTargetForVisible80Kph    = 85;
 static constexpr int kHw3StockOffsetCutoverKph        = 80;
 static constexpr int kHw3SpeedOffsetRawPerKph         = 5;   // wire encoding: canVal = offsetKph × 5
 static constexpr int kHw3SpeedOffsetMaxKph            = 40;  // wire raw cap = 200
+// kHw3CustomTargetCount defined in fsd_config.h (shared with main.cpp/web UI)
 
 static inline int computeHW3MinimumTargetSpeedKph(int fusedLimitKph) {
     if (fusedLimitKph == 60)                      return 100;
     if (fusedLimitKph < kHw3AutoTargetBelow60Kph) return kHw3AutoTargetBelow60Kph;
     if (fusedLimitKph < kHw3StockOffsetCutoverKph) return kHw3AutoTargetForVisible80Kph;
     return fusedLimitKph;
+}
+
+// Custom mode: user-defined target-speed lookup for fused limits 30/40/50/60/70.
+// Returns 0 when input is outside the table range — caller falls back to passthrough.
+// Bucket by floor((limit-30)/10) so 30/35→idx0, 40/45→idx1, etc.
+static inline int computeHW3CustomTargetSpeedKph(int fusedLimitKph) {
+    if (fusedLimitKph < 30 || fusedLimitKph >= kHw3StockOffsetCutoverKph) return 0;
+    int idx = (fusedLimitKph - 30) / 10;
+    return (int)cfg.hw3CustomTarget[idx];
 }
 
 static inline uint8_t encodeHW3OffsetRawFromKph(int offsetKph) {
@@ -164,20 +174,23 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
             // stored as pct*5 in the [0,100] range, matching open-can-mod).
             uint8_t activeRaw = (uint8_t)std::max(std::min((int)cfg.hw3SpeedOffset, 255), 0);
 
-            if (cfg.hw3AutoSpeed) {
+            // UI enforces that Auto and Custom are mutually exclusive; the Custom-first
+            // ordering below is defensive if the client-side mutex ever fails.
+            // ≥80 kph fused limit always passes stock through (factory EAP ladder is good there).
+            if (cfg.hw3CustomSpeed || cfg.hw3AutoSpeed) {
                 uint8_t fl = (cfg.fusedSpeedLimit > 0 && cfg.fusedSpeedLimit < 31) ? cfg.fusedSpeedLimit : 0;
                 if (fl > 0) {
-                    int fusedLimitKph   = (int)fl * 5;
-                    int targetSpeedKph  = computeHW3MinimumTargetSpeedKph(fusedLimitKph);
-                    int desiredOffsetKph = std::max(targetSpeedKph - fusedLimitKph, 0);
-                    uint8_t floorRaw = encodeHW3OffsetRawFromKph(desiredOffsetKph);
-                    // Below 80 kph: deterministic auto target overrides stock.
-                    // At/above 80 kph: keep stock (factory EAP ladder is already good).
+                    int fusedLimitKph = (int)fl * 5;
                     if (fusedLimitKph < kHw3StockOffsetCutoverKph) {
-                        activeRaw = floorRaw;
+                        int targetSpeedKph = cfg.hw3CustomSpeed
+                            ? computeHW3CustomTargetSpeedKph(fusedLimitKph)
+                            : computeHW3MinimumTargetSpeedKph(fusedLimitKph);
+                        if (targetSpeedKph > 0) {
+                            int desiredOffsetKph = std::max(targetSpeedKph - fusedLimitKph, 0);
+                            activeRaw = encodeHW3OffsetRawFromKph(desiredOffsetKph);
+                        }
                     }
                 }
-                // If fused limit unknown (fl==0), pass stock through unchanged.
             }
 
             frame.data[0] &= ~(0b11000000);
