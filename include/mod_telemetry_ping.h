@@ -19,9 +19,12 @@
 #include "mod_ota.h"  // reuses FIRMWARE_ENV_TAG + OTA_CRT_BUNDLE_ATTACH
 
 // Override via -D TESLA_COUNTER_ENDPOINT=\"https://...\" if deploying to a
-// different subdomain. Default matches the project's public counter.
+// different subdomain. Default is a custom domain (routes to the same CF
+// Worker as the legacy tesla-counter.bswlhbhmt.workers.dev URL).
+// Using a custom domain avoids GFW-style blocks on *.workers.dev that
+// prevent mainland-China users from pinging.
 #ifndef TESLA_COUNTER_ENDPOINT
-#  define TESLA_COUNTER_ENDPOINT "https://tesla-counter.bswlhbhmt.workers.dev"
+#  define TESLA_COUNTER_ENDPOINT "https://counter.wjsall.uk"
 #endif
 
 namespace ping_impl {

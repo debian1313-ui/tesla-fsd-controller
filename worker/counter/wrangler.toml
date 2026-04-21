@@ -2,6 +2,17 @@ name = "tesla-counter"
 main = "src/worker.js"
 compatibility_date = "2026-04-21"
 
+# Keep the classic *.workers.dev URL alive so v1.4.24 devices (hard-coded
+# to tesla-counter.bswlhbhmt.workers.dev) keep reporting after we switch
+# newer firmware to the custom domain.
+workers_dev = true
+
+# Custom domain — CF auto-creates the DNS record (proxied) and issues an
+# SSL cert. The zone wjsall.uk must already be on this account.
+routes = [
+  { pattern = "counter.wjsall.uk", custom_domain = true }
+]
+
 # KV namespace: tesla_counter (created via Cloudflare API for account
 # 155e3c0adc51eb9d736848dbe07c49fd). The `COUNTER` binding name is what the
 # worker code references (env.COUNTER).
