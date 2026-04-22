@@ -443,15 +443,21 @@ void setupWebServer() {
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
         uint32_t uptime = (millis() - cfg.uptimeStart) / 1000;
 
-        // JSON-escape apSSID (guard against " and \ in SSID)
-        char escapedSSID[128] = {};
-        const char* src = apSSID;
-        char* dst = escapedSSID;
-        char* end = escapedSSID + sizeof(escapedSSID) - 3;
-        while (*src && dst < end) {
-            if (*src == '"' || *src == '\\') *dst++ = '\\';
-            *dst++ = *src++;
-        }
+        // JSON-escape SSIDs (guard against " and \ in SSID). Both AP and STA
+        // SSIDs are user-controlled via /api/wifi and /api/sta.
+        auto jsonEsc = [](const char* src, char* dst, size_t cap) {
+            char* out = dst;
+            char* end = dst + cap - 3;
+            while (*src && out < end) {
+                if (*src == '"' || *src == '\\') *out++ = '\\';
+                *out++ = *src++;
+            }
+            *out = 0;
+        };
+        char escapedAp[128] = {};
+        char escapedSta[128] = {};
+        jsonEsc(apSSID,  escapedAp,  sizeof(escapedAp));
+        jsonEsc(staSSID, escapedSta, sizeof(escapedSta));
 
         char buf[2400];
         static_assert(sizeof(buf) >= 2400, "JSON buffer too small");
@@ -467,7 +473,7 @@ void setupWebServer() {
             "\"tempSeen\":%s,\"tempInRaw\":%u,\"tempOutRaw\":%u,"
             "\"bmsSeen\":%s,\"bmsV\":%u,\"bmsA\":%d,\"bmsSoc\":%u,"
             "\"bmsMinT\":%d,\"bmsMaxT\":%d,"
-            "\"freeHeap\":%u,\"safeMode\":%s,\"pinRequired\":%s,"
+            "\"freeHeap\":%u,\"safeMode\":%s,\"pinRequired\":%s,\"apPassDefault\":%s,"
             "\"timeSynced\":%s,"
             "\"speedD\":%u,\"gearRaw\":%u,\"torqueF\":%d,\"torqueR\":%d,"
             "\"adaptLighting\":%s,\"hbForce\":%s,"
@@ -511,6 +517,7 @@ void setupWebServer() {
             (unsigned)esp_get_free_heap_size(),
             safeModeActive ? "true" : "false",
             (storedPin[0] != '\0') ? "true" : "false",
+            (strcmp(apPass, "12345678") == 0) ? "true" : "false",
             timeSynced ? "true" : "false",
             (unsigned)telemSpeedRaw(), (unsigned)telemGear(),
             (int)telemTorqueFront(), (int)telemTorqueRear(),
@@ -533,8 +540,8 @@ void setupWebServer() {
             (unsigned)cfg.perfAccelState, (unsigned)cfg.perfBrakeState,
             (unsigned)cfg.perfAccelMs,    (unsigned)cfg.perfBrakeMs,
             (unsigned)cfg.perfBrakeEntryKph,
-            escapedSSID,
-            staSSID,
+            escapedAp,
+            escapedSta,
             (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString().c_str() : "",
             (WiFi.status() == WL_CONNECTED) ? "true" : "false",
             FIRMWARE_VARIANT,
@@ -993,7 +1000,7 @@ void setupWebServer() {
 #ifdef WIFI_BRIDGE_ENABLED
     // ── WiFi bridge + DNS filter API ──────────────────────────────────────────
     server.on("/api/wifi-bridge/status", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!checkToken(req)) { req->send(401, "text/plain", "unauthorized"); return; }
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         bool upConnected = WiFi.status() == WL_CONNECTED;
         int32_t upRSSI = upConnected ? WiFi.RSSI() : 0;
         String upIP = upConnected ? WiFi.localIP().toString() : String();
@@ -1079,7 +1086,7 @@ void setupWebServer() {
     });
 
     server.on("/api/wifi-bridge/set", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!checkToken(req)) { req->send(401, "text/plain", "unauthorized"); return; }
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         bool changed = false, wifiChanged = false;
         if (req->hasParam("upstreamEnable")) {
             gWifiBridgeCfg.enabled = req->getParam("upstreamEnable")->value().toInt() != 0;
@@ -1113,7 +1120,7 @@ void setupWebServer() {
     });
 
     server.on("/api/wifi-bridge/add", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!checkToken(req)) { req->send(401, "text/plain", "unauthorized"); return; }
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         if (!req->hasParam("ssid")) { req->send(400, "text/plain", "missing ssid"); return; }
         String ssid = req->getParam("ssid")->value();
         String pass = req->hasParam("pass") ? req->getParam("pass")->value() : String();
@@ -1134,7 +1141,7 @@ void setupWebServer() {
     });
 
     server.on("/api/wifi-bridge/delete", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!checkToken(req)) { req->send(401, "text/plain", "unauthorized"); return; }
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         if (!req->hasParam("ssid")) { req->send(400, "text/plain", "missing ssid"); return; }
         String ssid = req->getParam("ssid")->value(); ssid.trim();
         if (!wifiBridgeRemoveNetwork(ssid)) { req->send(404, "text/plain", "not found"); return; }
@@ -1144,14 +1151,14 @@ void setupWebServer() {
     });
 
     server.on("/api/wifi-bridge/blocked-clear", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!checkToken(req)) { req->send(401, "text/plain", "unauthorized"); return; }
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         gDnsFilter.clearBlockedRequests();
         dnsIpBlockerClear();
         req->send(200, "text/plain", "OK");
     });
 
     server.on("/api/wifi-bridge/blocked-download", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!checkToken(req)) { req->send(401, "text/plain", "unauthorized"); return; }
+        if (!checkToken(req)) { req->send(403, "text/plain", "UNAUTH"); return; }
         uint32_t total = 0;
         // Heap: same reasoning as /status — capacity=50 × 136B would overflow
         // the AsyncTCP handler task stack.

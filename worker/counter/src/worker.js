@@ -3,13 +3,21 @@
 //   POST /ping  {id, version, env}  — records device for today (id = sha256(MAC) hex, 16-64 chars)
 //   GET  /stats                      — returns {today, yesterday, month, year, total, date, byEnv, byVersion, byCountry}
 //
-// Storage (all keyed by device id so counting = listAll().length, inherently unique):
-//   seen:YYYY-MM-DD:<id> → {v, e, c}   TTL 3d   — daily set, source of by-env/version/country aggregates
-//   mo:YYYY-MM:<id>      → "1"         TTL 62d  — MAU set for calendar month
-//   yr:YYYY:<id>         → "1"         TTL 400d — YAU set for calendar year
-//   ever:<id>            → "1"         no TTL   — all-time unique devices
-// Counts by listing prefixes — cheap enough for <10k daily devices,
-// which is the ceiling we'd want before moving to a Durable Object counter.
+// Storage — per-device dedup markers + pre-aggregated rollup counters.
+// /stats reads 5 counter keys (no list ops). /ping updates counters in place.
+//   seen:YYYY-MM-DD:<id> → "1"            TTL 3d   (daily dedup)
+//   mo:YYYY-MM:<id>      → "1"            TTL 62d  (MAU dedup)
+//   yr:YYYY:<id>         → "1"            TTL 400d (YAU dedup)
+//   ever:<id>            → "1"            no TTL   (all-time dedup)
+//   agg:YYYY-MM-DD       → {c, e, v, co}  TTL 3d   (daily rollup — count + byEnv/byVersion/byCountry)
+//   agg:mo:YYYY-MM       → "<int>"        TTL 62d  (MAU count)
+//   agg:yr:YYYY          → "<int>"        TTL 400d (YAU count)
+//   agg:ever             → "<int>"        no TTL   (all-time count)
+//
+// Concurrency: two concurrent /ping for distinct devices can race the
+// read-modify-write on agg:* and lose one increment. Acceptable for anon
+// stats. If tighter accuracy is needed later, move counters to a Durable
+// Object.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +25,14 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const STATS_CACHE_TTL_SEC = 60;
+// Edge cache for /stats. Kept long enough that a steady dashboard poll
+// (5-min) mostly hits cache — keeps us well under the 1k list-ops/day free
+// tier even if listing is reintroduced later.
+const STATS_CACHE_TTL_SEC = 600;
+
+const TTL_DAY = 3 * 24 * 3600;
+const TTL_MONTH = 62 * 24 * 3600;
+const TTL_YEAR = 400 * 24 * 3600;
 
 export default {
   async fetch(request, env, ctx) {
@@ -55,27 +70,70 @@ async function handlePing(request, env) {
   const moKey = `mo:${month}:${id}`;
   const yrKey = `yr:${year}:${id}`;
   const everKey = `ever:${id}`;
+  const aggDayKey = `agg:${today}`;
+  const aggMoKey = `agg:mo:${month}`;
+  const aggYrKey = `agg:yr:${year}`;
+  const aggEverKey = "agg:ever";
 
-  // Probe the rollup keys so we only write the ones missing — avoids turning
-  // one daily write into four and keeps us well under the 1k-writes/day free
-  // tier. Reads are 100k/day, so GETs are cheap by comparison.
-  const [hasMo, hasYr, hasEver] = await Promise.all([
+  // Probe dedup markers in parallel so we only increment the rollups we
+  // actually need. Reads are cheap (100k/day) — writes and lists are not.
+  const [hasMo, hasYr, hasEver, aggDayRaw] = await Promise.all([
     env.COUNTER.get(moKey),
     env.COUNTER.get(yrKey),
     env.COUNTER.get(everKey),
+    env.COUNTER.get(aggDayKey),
+  ]);
+
+  const [aggMoRaw, aggYrRaw, aggEverRaw] = await Promise.all([
+    hasMo ? null : env.COUNTER.get(aggMoKey),
+    hasYr ? null : env.COUNTER.get(aggYrKey),
+    hasEver ? null : env.COUNTER.get(aggEverKey),
   ]);
 
   const country = request.headers.get("cf-ipcountry") || "??";
+
+  // Daily rollup — bump count + per-dimension bucket. Schema uses short keys
+  // (c/e/v/co) to stay well under KV's 25MB value cap even at thousands of
+  // versions/countries.
+  const aggDay = parseAggDay(aggDayRaw);
+  aggDay.c = (aggDay.c || 0) + 1;
+  aggDay.e[fwEnv] = (aggDay.e[fwEnv] || 0) + 1;
+  aggDay.v[version] = (aggDay.v[version] || 0) + 1;
+  aggDay.co[country] = (aggDay.co[country] || 0) + 1;
+
   const writes = [
-    env.COUNTER.put(seenKey,
-      JSON.stringify({ v: version, e: fwEnv, c: country }),
-      { expirationTtl: 3 * 24 * 3600 }),
+    env.COUNTER.put(seenKey, "1", { expirationTtl: TTL_DAY }),
+    env.COUNTER.put(aggDayKey, JSON.stringify(aggDay), { expirationTtl: TTL_DAY }),
   ];
-  if (!hasMo)   writes.push(env.COUNTER.put(moKey,   "1", { expirationTtl: 62 * 24 * 3600 }));
-  if (!hasYr)   writes.push(env.COUNTER.put(yrKey,   "1", { expirationTtl: 400 * 24 * 3600 }));
-  if (!hasEver) writes.push(env.COUNTER.put(everKey, "1"));
+  if (!hasMo) {
+    writes.push(env.COUNTER.put(moKey, "1", { expirationTtl: TTL_MONTH }));
+    writes.push(env.COUNTER.put(aggMoKey, String((parseInt(aggMoRaw) || 0) + 1), { expirationTtl: TTL_MONTH }));
+  }
+  if (!hasYr) {
+    writes.push(env.COUNTER.put(yrKey, "1", { expirationTtl: TTL_YEAR }));
+    writes.push(env.COUNTER.put(aggYrKey, String((parseInt(aggYrRaw) || 0) + 1), { expirationTtl: TTL_YEAR }));
+  }
+  if (!hasEver) {
+    writes.push(env.COUNTER.put(everKey, "1"));
+    writes.push(env.COUNTER.put(aggEverKey, String((parseInt(aggEverRaw) || 0) + 1)));
+  }
   await Promise.all(writes);
   return txt("ok");
+}
+
+function parseAggDay(raw) {
+  if (!raw) return { c: 0, e: {}, v: {}, co: {} };
+  try {
+    const obj = JSON.parse(raw);
+    return {
+      c: obj.c || 0,
+      e: obj.e || {},
+      v: obj.v || {},
+      co: obj.co || {},
+    };
+  } catch {
+    return { c: 0, e: {}, v: {}, co: {} };
+  }
 }
 
 async function handleStatsCached(request, env, ctx) {
@@ -102,59 +160,34 @@ async function handleStats(env) {
   const month = today.slice(0, 7);
   const year = today.slice(0, 4);
 
-  const [todayEntries, ydayEntries, monthEntries, yearEntries, everEntries] = await Promise.all([
-    listAll(env.COUNTER, `seen:${today}:`),
-    listAll(env.COUNTER, `seen:${yesterday}:`),
-    listAll(env.COUNTER, `mo:${month}:`),
-    listAll(env.COUNTER, `yr:${year}:`),
-    listAll(env.COUNTER, `ever:`),
+  // 5 reads, 0 list ops. Yesterday's per-dim breakdown is not needed for
+  // the dashboard, so only the count is extracted.
+  const [aggTodayRaw, aggYdayRaw, aggMoRaw, aggYrRaw, aggEverRaw] = await Promise.all([
+    env.COUNTER.get(`agg:${today}`),
+    env.COUNTER.get(`agg:${yesterday}`),
+    env.COUNTER.get(`agg:mo:${month}`),
+    env.COUNTER.get(`agg:yr:${year}`),
+    env.COUNTER.get("agg:ever"),
   ]);
 
-  // Pull values for today to aggregate by env/version. Yesterday stays
-  // count-only to keep the stats cheap.
-  const byEnv = {};
-  const byVersion = {};
-  const byCountry = {};
-  await Promise.all(
-    todayEntries.map(async (k) => {
-      const raw = await env.COUNTER.get(k.name);
-      if (!raw) return;
-      try {
-        const { v, e, c } = JSON.parse(raw);
-        if (e) byEnv[e] = (byEnv[e] || 0) + 1;
-        if (v) byVersion[v] = (byVersion[v] || 0) + 1;
-        if (c) byCountry[c] = (byCountry[c] || 0) + 1;
-      } catch { /* skip malformed */ }
-    })
-  );
+  const aggToday = parseAggDay(aggTodayRaw);
+  const aggYday = parseAggDay(aggYdayRaw);
 
   return new Response(JSON.stringify({
-    today: todayEntries.length,
-    yesterday: ydayEntries.length,
-    month: monthEntries.length,
-    year: yearEntries.length,
-    total: everEntries.length,
+    today: aggToday.c,
+    yesterday: aggYday.c,
+    month: parseInt(aggMoRaw) || 0,
+    year: parseInt(aggYrRaw) || 0,
+    total: parseInt(aggEverRaw) || 0,
     date: today,
-    byEnv,
-    byVersion,
-    byCountry,
+    byEnv: aggToday.e,
+    byVersion: aggToday.v,
+    byCountry: aggToday.co,
   }), { headers: {
     ...CORS,
     "Content-Type": "application/json",
     "Cache-Control": `public, s-maxage=${STATS_CACHE_TTL_SEC}`,
   } });
-}
-
-async function listAll(KV, prefix) {
-  let cursor, all = [];
-  // Cap at 10 pages (10k keys) so a runaway day doesn't make /stats unbounded.
-  for (let i = 0; i < 10; i++) {
-    const r = await KV.list({ prefix, cursor, limit: 1000 });
-    all = all.concat(r.keys);
-    if (r.list_complete) break;
-    cursor = r.cursor;
-  }
-  return all;
 }
 
 function todayStr() { return dayStr(new Date()); }

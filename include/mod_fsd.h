@@ -23,8 +23,13 @@ extern FSDConfig cfg;  // defined in handlers.h
 // ── HW3 auto speed policy (mirrors tesla-open-can-mod hw3_speed_policy.h) ──
 // Field-calibrated request floors for metric clusters. Auto targets / bucket
 // shape / cutover live in fsd_config.h so defaults + policy share one source.
-static constexpr int kHw3SpeedOffsetRawPerKph = 5;   // wire encoding: canVal = offsetKph × 5
-static constexpr int kHw3SpeedOffsetMaxKph    = 40;  // wire raw cap = 200
+//
+// Wire encoding (0x3FD mux-2 data[0][6:7] + data[1][0:5], 8-bit raw):
+//   Tesla decodes raw as percentage of posted limit: pct = raw / 4.
+//   Firmware caps at 50%, so raw range [0, 200]. Source: tesla-open-can-mod
+//   include/app.h:211 (manualSpeedOffset = pct * 4) and include/can_helpers.h:113
+//   (offsetPct 0-50).
+static constexpr int kHw3SpeedOffsetMaxPct = 50;  // wire raw cap = 200
 
 static inline int computeHW3MinimumTargetSpeedKph(int fusedLimitKph) {
     if (fusedLimitKph == 60)                       return kHw3AutoTargetAt60Kph;
@@ -43,9 +48,17 @@ static inline int computeHW3CustomTargetSpeedKph(int fusedLimitKph) {
     return (int)cfg.hw3CustomTarget[idx];
 }
 
-static inline uint8_t encodeHW3OffsetRawFromKph(int offsetKph) {
-    int clamped = std::max(0, std::min(offsetKph, kHw3SpeedOffsetMaxKph));
-    return (uint8_t)(clamped * kHw3SpeedOffsetRawPerKph);
+static inline uint8_t encodeHW3OffsetRawFromPct(int pct) {
+    int clamped = std::max(0, std::min(pct, kHw3SpeedOffsetMaxPct));
+    return (uint8_t)(clamped * 4);
+}
+
+// Convert a desired km/h offset at a given posted limit into the raw byte
+// written to the 0x3FD active-offset field. Rounds to nearest pct.
+static inline uint8_t encodeHW3OffsetRawFromKph(int offsetKph, int fusedLimitKph) {
+    if (fusedLimitKph <= 0 || offsetKph <= 0) return 0;
+    int pct = (offsetKph * 100 + fusedLimitKph / 2) / fusedLimitKph;
+    return encodeHW3OffsetRawFromPct(pct);
 }
 
 // ── CAN ID filter tables (used by handleMessage) ──────────────────────────
@@ -179,7 +192,9 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
                             : computeHW3MinimumTargetSpeedKph(fusedLimitKph);
                         if (targetSpeedKph > 0) {
                             int desiredOffsetKph = std::max(targetSpeedKph - fusedLimitKph, 0);
-                            activeRaw = encodeHW3OffsetRawFromKph(desiredOffsetKph);
+                            // Convert kph → pct of fused limit; Tesla caps at 50% so values
+                            // beyond 1.5× limit silently clamp to the physical ceiling.
+                            activeRaw = encodeHW3OffsetRawFromKph(desiredOffsetKph, fusedLimitKph);
                         }
                     }
                 }

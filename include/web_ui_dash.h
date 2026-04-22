@@ -929,8 +929,15 @@ function acquireWakeLock(){
     }).catch(function(){});
   }
 }
+var __dashPollT=null;
 document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible'){acquireWakeLock();if(_noSleepVid)_noSleepVid.play().catch(function(){});}
+  if(document.visibilityState==='visible'){
+    acquireWakeLock();
+    if(_noSleepVid)_noSleepVid.play().catch(function(){});
+    if(!__dashPollT){ poll(); __dashPollT=setInterval(poll,1000); }
+  } else {
+    if(__dashPollT){ clearInterval(__dashPollT); __dashPollT=null; }
+  }
 });
 
 // Canvas-stream no-sleep: works on HTTP where Wake Lock API is blocked
@@ -956,7 +963,7 @@ function setupNoSleep(){
 // Start no-sleep on first user interaction (required by browsers)
 document.addEventListener('click',function nsInit(){setupNoSleep();document.removeEventListener('click',nsInit);},{once:true,capture:true});
 
-setInterval(poll,1000);
+__dashPollT=setInterval(poll,1000);
 setInterval(updateClock,15000);
 updateClock();
 requestAnimationFrame(frame);

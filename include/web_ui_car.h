@@ -175,8 +175,12 @@ button{font-family:inherit;cursor:pointer}
 .pin-overlay.show{display:flex}
 .pin-box{background:#131d32;border:2px solid #38bdf8;border-radius:20px;padding:40px;width:520px}
 .pin-box h3{font-size:26px;color:#38bdf8;margin-bottom:20px;text-align:center}
-.pin-box input{width:100%;background:#0b1120;border:2px solid #334155;border-radius:12px;padding:16px 20px;color:#e2e8f0;font-size:24px;text-align:center;letter-spacing:8px;font-weight:700}
+.pin-box input{width:100%;background:#0b1120;border:2px solid #334155;border-radius:12px;padding:16px 20px;color:#e2e8f0;font-size:24px;text-align:center;letter-spacing:8px;font-weight:700;box-sizing:border-box}
 .pin-box input:focus{outline:none;border-color:#38bdf8}
+.pw-wrap{position:relative;display:block;width:100%;box-sizing:border-box}
+.pw-wrap>input{width:100%;padding-right:54px !important;box-sizing:border-box}
+.pw-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94a3b8;font-size:22px;padding:6px 10px;cursor:pointer;line-height:1;min-height:44px;min-width:44px;z-index:2}
+.pw-eye:hover,.pw-eye:active{color:#e2e8f0}
 .pin-err{color:#ef4444;font-size:16px;text-align:center;margin-top:12px;min-height:20px}
 /* ── 测速页 ────────────────────────────────────────────────── */
 .perf-speed{background:#131d32;border-radius:16px;padding:24px 20px;margin-bottom:18px;text-align:center;position:relative;overflow:hidden}
@@ -301,6 +305,13 @@ button{font-family:inherit;cursor:pointer}
 
   <div class="main">
 
+    <!-- 默认 AP 密码未修改时的全局警告横幅 -->
+    <div id="passWarn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#991b1b);border:2px solid #ef4444;border-radius:12px;padding:14px 18px;margin-bottom:16px;color:#fee2e2">
+      <div style="font-weight:700;font-size:17px;margin-bottom:6px">⚠️ 请立即修改 WiFi 密码</div>
+      <div style="font-size:14px;color:#fecaca;margin-bottom:10px">当前使用默认密码 <code style="color:#fff;background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:4px">12345678</code>，公共停车时任何人可连入修改您的车辆设置。请在手机版修改密码。</div>
+      <button onclick="openPhone()" style="background:#fecaca;color:#7f1d1d;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer">打开手机版 →</button>
+    </div>
+
     <!-- ───── 仪表 ───── -->
     <div class="page show" id="pg-dash">
       <div id="rowSafeMode" style="display:none;background:#7f1d1d;border:2px solid #ef4444;border-radius:12px;padding:16px 20px;margin-bottom:20px;color:#fca5a5;font-size:18px;font-weight:700;line-height:1.5">
@@ -412,13 +423,13 @@ button{font-family:inherit;cursor:pointer}
         <div class="row"><div class="rlbl">自动突破</div><div class="tog" id="tgAuto" data-k="hw3AutoSpeed"></div><div class="rval">&lt;80 km/h 限速时自动拉到 64/85/100 目标</div></div>
         <div class="row"><div class="rlbl">自定义</div><div class="tog" id="tgCustom" data-k="hw3CustomSpeed"></div><div class="rval">按档位设定目标速度（覆盖自动）</div></div>
         <div id="rowHw3Custom" style="display:none;padding:14px;background:rgba(0,0,0,.25);border-radius:10px;margin-top:6px">
-          <div style="font-size:14px;color:#94a3b8;margin-bottom:10px">遇到限速时的目标速度（km/h）。≥80 限速始终透传原厂。</div>
+          <div style="font-size:14px;color:#94a3b8;margin-bottom:10px">遇到限速时的目标速度（km/h）。Tesla 固件硬限 +50%，超出按上限发送。≥80 限速始终透传原厂。</div>
           <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
-            <div><div class="hw3ct-label">限速 30</div><input type="number" id="hw3CT0" min="30" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT0',this.value)"></div>
-            <div><div class="hw3ct-label">限速 40</div><input type="number" id="hw3CT1" min="40" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT1',this.value)"></div>
-            <div><div class="hw3ct-label">限速 50</div><input type="number" id="hw3CT2" min="50" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT2',this.value)"></div>
-            <div><div class="hw3ct-label">限速 60</div><input type="number" id="hw3CT3" min="60" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT3',this.value)"></div>
-            <div><div class="hw3ct-label">限速 70</div><input type="number" id="hw3CT4" min="70" max="200" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT4',this.value)"></div>
+            <div><div class="hw3ct-label">限速 30</div><div style="font-size:11px;color:#64748b;margin-bottom:2px">最大 45</div><input type="number" id="hw3CT0" min="30" max="45" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT0',this.value)"></div>
+            <div><div class="hw3ct-label">限速 40</div><div style="font-size:11px;color:#64748b;margin-bottom:2px">最大 60</div><input type="number" id="hw3CT1" min="40" max="60" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT1',this.value)"></div>
+            <div><div class="hw3ct-label">限速 50</div><div style="font-size:11px;color:#64748b;margin-bottom:2px">最大 75</div><input type="number" id="hw3CT2" min="50" max="75" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT2',this.value)"></div>
+            <div><div class="hw3ct-label">限速 60</div><div style="font-size:11px;color:#64748b;margin-bottom:2px">最大 90</div><input type="number" id="hw3CT3" min="60" max="90" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT3',this.value)"></div>
+            <div><div class="hw3ct-label">限速 70</div><div style="font-size:11px;color:#64748b;margin-bottom:2px">最大 105</div><input type="number" id="hw3CT4" min="70" max="105" class="hw3ct-input" onchange="apiSetHw3CT('hw3CT4',this.value)"></div>
           </div>
         </div>
         <div class="tip">🛈 ≥80 km/h 限速让原车 EAP 偏移接管；低速限速下按固定目标提速。自动/自定义互斥；两者都关 = 原厂透传。</div>
@@ -745,7 +756,7 @@ button{font-family:inherit;cursor:pointer}
 <div class="pin-overlay" id="pinOv">
   <div class="pin-box">
     <h3>🔒 输入访问密码</h3>
-    <input type="password" id="pinInput" maxlength="8" inputmode="numeric" pattern="[0-9]*">
+    <input type="password" id="pinInput" maxlength="16">
     <div class="pin-err" id="pinErr"></div>
     <div class="actions" style="margin-top:20px">
       <button class="abtn blue" onclick="submitPin()">确认</button>
@@ -888,6 +899,9 @@ function setStat(id, ok, txt){
 }
 
 function render(d){
+  // 默认 AP 密码警告
+  var pw=document.getElementById('passWarn');
+  if(pw) pw.style.display = d.apPassDefault ? '' : 'none';
   // 顶栏
   setStat('hsCAN', d.canOK, 'CAN ' + (d.canOK?'已连接':'断开'));
   setStat('hsWifi', d.staOK, 'Wi-Fi ' + (d.staOK ? (d.staIP||'OK') : '仅热点'));
@@ -1693,11 +1707,55 @@ document.addEventListener('focusin', function(e){
   setTimeout(function(){ try { t.scrollIntoView({block:'center',behavior:'smooth'}); } catch(_){} }, 300);
 });
 
-// ───── 启动 ─────
+// ───── 启动（隐藏时停止轮询，恢复时立即补一次后重启） ─────
+var __brPollT = null;
+function __startPolls(){
+  if(!pollT) pollT = setInterval(poll, 250);
+  if(!__brPollT) __brPollT = setInterval(brPoll, 4000);
+}
+function __stopPolls(){
+  if(pollT){ clearInterval(pollT); pollT = null; }
+  if(__brPollT){ clearInterval(__brPollT); __brPollT = null; }
+}
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden){ __stopPolls(); }
+  else { poll(); brPoll(); __startPolls(); }
+});
 poll();
 brPoll();
-pollT = setInterval(poll, 250);
-setInterval(brPoll, 4000);
+__startPolls();
+
+(function installPassEye(){
+  var inputs=document.querySelectorAll('input[type=password]');
+  var LAYOUT=['flex','flexGrow','flexBasis','flexShrink','minWidth','width','marginBottom','marginTop'];
+  for(var i=0;i<inputs.length;i++){
+    var inp=inputs[i];
+    if(inp.dataset.pwEye)continue;
+    inp.dataset.pwEye='1';
+    var wrap=document.createElement('span');
+    wrap.className='pw-wrap';
+    for(var k=0;k<LAYOUT.length;k++){
+      var prop=LAYOUT[k];
+      if(inp.style[prop]){ wrap.style[prop]=inp.style[prop]; inp.style[prop]=''; }
+    }
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='pw-eye';
+    btn.setAttribute('aria-label','显示/隐藏密码');
+    btn.tabIndex=-1;
+    btn.textContent='👁';
+    (function(target,b){
+      b.onclick=function(ev){
+        ev.preventDefault();
+        if(target.type==='password'){ target.type='text'; b.textContent='🙈'; }
+        else { target.type='password'; b.textContent='👁'; }
+      };
+    })(inp,btn);
+    wrap.appendChild(btn);
+  }
+})();
 </script>
 </body>
 </html>)rawliteral";

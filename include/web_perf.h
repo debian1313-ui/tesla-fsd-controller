@@ -361,7 +361,15 @@ function resetTest(which){
 
 renderHistory('accel');
 renderHistory('brake');
-setInterval(poll,400);
+var __perfPollT=setInterval(poll,400);
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){
+    if(__perfPollT){ clearInterval(__perfPollT); __perfPollT=null; }
+  } else if(!__perfPollT){
+    poll();
+    __perfPollT=setInterval(poll,400);
+  }
+});
 poll();
 </script>
 </body>

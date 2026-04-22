@@ -50,8 +50,12 @@ select:focus{outline:none;border-color:#38bdf8}
 .msg{text-align:center;font-size:12px;margin-top:8px;min-height:16px}
 .msg.ok{color:#22c55e}
 .msg.err{color:#ef4444}
-.text-input{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;margin-top:4px}
+.text-input{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;margin-top:4px;box-sizing:border-box}
 .text-input:focus{outline:none;border-color:#38bdf8}
+.pw-wrap{position:relative;width:100%;margin-top:4px}
+.pw-wrap .text-input{margin-top:0;padding-right:36px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94a3b8;font-size:16px;padding:4px 8px;cursor:pointer;line-height:1}
+.pw-eye:hover{color:#e2e8f0}
 .save-btn{background:#22c55e;color:#fff;border:none;border-radius:8px;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:10px;letter-spacing:1px}
 .save-btn:hover{background:#16a34a}
 .save-btn:disabled{opacity:.4;cursor:not-allowed}
@@ -67,6 +71,17 @@ select:focus{outline:none;border-color:#38bdf8}
 .smart-rule input[type=number]:focus{outline:none;border-color:#38bdf8}
 .smart-rule .km{color:#38bdf8;font-weight:600}
 .stat-val.red{color:#ef4444}
+.cat-row{border:1px solid #1e293b;border-radius:6px;padding:8px;margin-bottom:6px;background:#0f172a}
+.cat-head{display:flex;align-items:center;gap:8px}
+.cat-info{flex:1;min-width:0}
+.cat-title{font-size:13px;color:#cbd5e1;font-weight:600}
+.cat-count{color:#64748b;font-weight:400;font-size:11px}
+.cat-desc{color:#64748b;font-size:11px;margin-top:2px}
+.cat-btn{height:26px;padding:0 10px;background:#334155;color:#cbd5e1;border:none;border-radius:4px;font-size:11px;cursor:pointer;flex:0 0 auto}
+.cat-body{display:none;margin-top:8px}
+.cat-ta{font-family:monospace;font-size:11px}
+.cat-reset{height:24px;padding:0 10px;background:#0ea5e9;color:#e0f2fe;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-top:4px}
+.cat-switch{flex:0 0 auto}
 .hw3ct-label{font-size:11px;color:#64748b;text-align:center;margin-bottom:2px}
 .hw3ct-input{width:100%;box-sizing:border-box;padding:6px 4px;text-align:center;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:13px}
 .car-link{position:fixed;bottom:14px;right:14px;background:rgba(30,41,59,.9);color:#94a3b8;border:1px solid #334155;border-radius:20px;padding:8px 14px;font-size:12px;text-decoration:none;z-index:500;backdrop-filter:blur(6px)}
@@ -124,6 +139,13 @@ select:focus{outline:none;border-color:#38bdf8}
 <div class="title-wrap">
   <h1 id="iTitle">特斯拉控制器</h1>
   <button class="lang-btn" id="iLangBtn" onclick="toggleLang()">EN</button>
+</div>
+
+<!-- 默认 AP 密码未修改时的警告横幅 -->
+<div id="passWarn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#991b1b);border:1px solid #fca5a5;border-radius:12px;padding:12px 14px;margin-bottom:12px;color:#fee2e2">
+  <div style="font-weight:700;font-size:14px;margin-bottom:4px">⚠️ <span id="iPassWarnTitle">请立即修改 WiFi 密码</span></div>
+  <div style="font-size:12px;color:#fecaca;margin-bottom:10px" id="iPassWarnDesc">您当前使用默认密码 <code style="color:#fff;background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px">12345678</code>，公共停车场/商场停车时任何人都可能连接并修改您的车辆设置。</div>
+  <button onclick="document.getElementById('cardWifi').scrollIntoView({behavior:'smooth',block:'start'});setTimeout(function(){var e=document.getElementById('wifiPass');if(e)e.focus();},600);" style="background:#fecaca;color:#7f1d1d;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer" id="iPassWarnBtn">现在修改 →</button>
 </div>
 
 <button onclick="location.href='/dash'" style="
@@ -238,13 +260,13 @@ select:focus{outline:none;border-color:#38bdf8}
     <label class="toggle"><input type="checkbox" id="hw3CustomSpeed" onchange="onHW3MutexChange(this)"><span class="slider"></span></label>
   </div>
   <div id="rowHW3CustomPanel" style="display:none;padding:10px 12px;background:#0b1220;border-radius:8px;margin-top:4px">
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:8px" id="iLblHW3CustomHint">遇到限速时的目标速度（km/h）。≥80 限速始终透传原厂。</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:8px" id="iLblHW3CustomHint">遇到限速时的目标速度（km/h）。Tesla 固件硬限 +50%，超出按上限发送。≥80 限速始终透传原厂。</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-      <div><div class="hw3ct-label">30</div><input type="number" id="hw3CT0" min="30" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT0',this.value)"></div>
-      <div><div class="hw3ct-label">40</div><input type="number" id="hw3CT1" min="40" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT1',this.value)"></div>
-      <div><div class="hw3ct-label">50</div><input type="number" id="hw3CT2" min="50" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT2',this.value)"></div>
-      <div><div class="hw3ct-label">60</div><input type="number" id="hw3CT3" min="60" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT3',this.value)"></div>
-      <div><div class="hw3ct-label">70</div><input type="number" id="hw3CT4" min="70" max="200" class="hw3ct-input" onchange="setValHw3CT('hw3CT4',this.value)"></div>
+      <div><div class="hw3ct-label">30</div><div style="font-size:10px;color:#64748b;margin-bottom:2px">max 45</div><input type="number" id="hw3CT0" min="30" max="45" class="hw3ct-input" onchange="setValHw3CT('hw3CT0',this.value)"></div>
+      <div><div class="hw3ct-label">40</div><div style="font-size:10px;color:#64748b;margin-bottom:2px">max 60</div><input type="number" id="hw3CT1" min="40" max="60" class="hw3ct-input" onchange="setValHw3CT('hw3CT1',this.value)"></div>
+      <div><div class="hw3ct-label">50</div><div style="font-size:10px;color:#64748b;margin-bottom:2px">max 75</div><input type="number" id="hw3CT2" min="50" max="75" class="hw3ct-input" onchange="setValHw3CT('hw3CT2',this.value)"></div>
+      <div><div class="hw3ct-label">60</div><div style="font-size:10px;color:#64748b;margin-bottom:2px">max 90</div><input type="number" id="hw3CT3" min="60" max="90" class="hw3ct-input" onchange="setValHw3CT('hw3CT3',this.value)"></div>
+      <div><div class="hw3ct-label">70</div><div style="font-size:10px;color:#64748b;margin-bottom:2px">max 105</div><input type="number" id="hw3CT4" min="70" max="105" class="hw3ct-input" onchange="setValHw3CT('hw3CT4',this.value)"></div>
     </div>
   </div>
 </div>
@@ -278,7 +300,7 @@ select:focus{outline:none;border-color:#38bdf8}
 </div>
 
 
-<div class="card">
+<div class="card" id="cardWifi">
   <div class="card-title" id="iCardWifi">WiFi 设置</div>
   <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
     <span class="row-label" id="iLblSSID">热点名称（SSID）</span>
@@ -312,7 +334,7 @@ select:focus{outline:none;border-color:#38bdf8}
       <span style="font-size:12px;font-family:monospace" id="staStatus">--</span>
     </div>
     <div style="display:flex;gap:8px">
-      <button class="save-btn" id="staSaveBtn" onclick="doSTA()" style="flex:3" id="staSaveBtn">保存并重启</button>
+      <button class="save-btn" id="staSaveBtn" onclick="doSTA()" style="flex:3">保存并重启</button>
       <button class="save-btn" id="staClearBtn" onclick="doSTAClear()" style="flex:1;background:#334155">断开</button>
     </div>
     <div class="msg" id="staMsg"></div>
@@ -360,30 +382,43 @@ select:focus{outline:none;border-color:#38bdf8}
     <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:2px;margin-bottom:10px">DNS 过滤</div>
     <div class="row"><span class="row-label">启用</span>
       <label class="switch"><input type="checkbox" id="brDnsEn" onchange="brSet()"><span class="slider"></span></label></div>
-    <div style="color:#64748b;font-size:11px;margin:4px 0 4px 0">空格/逗号/分号分隔，支持根域（含子域匹配）</div>
     <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:8px;margin:6px 0 8px 0;font-size:11px;color:#94a3b8;line-height:1.6">
-      <div style="color:#cbd5e1;font-weight:600;margin-bottom:4px">⚠️ 一键预设 · 载入后可自由修改</div>
-      <div>• 预设只是帮你填好文本框，<span style="color:#34d399">载入后还可以手动增删</span>，改完点「保存 DNS 配置」才生效</div>
-      <div>• 匹配规则：<span style="color:#cbd5e1">更长的规则优先</span>（如 tesla.cn 黑 + nav-prd-maps.tesla.cn 白 → nav-prd-maps 放行，其他 *.tesla.cn 拦）</div>
+      <div style="color:#cbd5e1;font-weight:600;margin-bottom:4px">📋 按类别勾选 · 每类可独立编辑</div>
+      <div>• 勾选想放行/屏蔽的类别，点每行「编辑」按钮展开可修改该类域名</div>
+      <div>• 匹配规则：<span style="color:#cbd5e1">更长的规则优先</span>（tesla.cn 屏蔽 + 具体子域放行 → 子域放行、其他拦）</div>
       <div>• 手机若开启「私人 DNS (DoT)」或 DoH 会<span style="color:#f87171">绕过</span>本过滤，需在系统设置关闭</div>
-      <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #334155;color:#fbbf24">• 预设内容<span style="color:#fde68a">来自网络收集</span>，仅供参考。Tesla 云域名可能因车型/区域/版本而异，请结合自己车的实际流量（参考"最近拦截"列表）自行增删调整。</div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #334155;color:#fbbf24">• 默认域名<span style="color:#fde68a">来自网络收集</span>，仅供参考。Tesla 云域名可能因车型/区域/版本而异，可参考"最近拦截"列表自行调整。</div>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
       <button type="button" id="pstTesla" onclick="brApplyPreset('tesla_min')" style="height:28px;padding:0 10px;background:#065f46;color:#d1fae5;border:2px solid #34d399;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">⭐ Tesla 推荐（实测）</button>
       <button type="button" id="pstLean" onclick="brApplyPreset('tesla_lean')" style="height:28px;padding:0 10px;background:#1e3a8a;color:#dbeafe;border:none;border-radius:6px;font-size:11px;cursor:pointer">🔹 精简官方</button>
       <button type="button" id="pstBl" onclick="brApplyPreset('bl_telemetry')" style="height:28px;padding:0 10px;background:#7c2d12;color:#fed7aa;border:none;border-radius:6px;font-size:11px;cursor:pointer">只屏蔽遥测</button>
-      <button type="button" id="pstCust" onclick="brApplyPreset('custom_blank')" style="height:28px;padding:0 10px;background:#4c1d95;color:#e9d5ff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✍️ 自定义留空</button>
-      <button type="button" id="pstClr" onclick="brApplyPreset('clear')" style="height:28px;padding:0 10px;background:#334155;color:#cbd5e1;border:none;border-radius:6px;font-size:11px;cursor:pointer">清空</button>
+      <button type="button" id="pstClr" onclick="brApplyPreset('clear')" style="height:28px;padding:0 10px;background:#334155;color:#cbd5e1;border:none;border-radius:6px;font-size:11px;cursor:pointer">全部取消</button>
     </div>
-    <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
-      <span class="row-label">白名单（留空=允许全部未拉黑）</span>
-      <textarea id="brDnsAllow" class="text-input" maxlength="1023" rows="3" style="font-family:monospace;font-size:12px"></textarea>
+    <div style="font-size:11px;font-weight:700;color:#34d399;letter-spacing:1px;margin:8px 0 4px 0">📥 放行（白名单）</div>
+    <div id="catAllowList"></div>
+    <div style="font-size:11px;font-weight:700;color:#f87171;letter-spacing:1px;margin:10px 0 4px 0">🚫 屏蔽（黑名单）</div>
+    <div id="catBlockList"></div>
+    <div style="margin-top:10px;padding:8px;border:1px dashed #334155;border-radius:6px;background:#0f172a">
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">其他自定义域名（不在上述类别中的）</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:2px">放行：</div>
+      <textarea id="catCustomAllow" class="text-input" rows="2" style="font-family:monospace;font-size:11px" oninput="catOnChange()" placeholder="空格/换行分隔的自定义放行域名"></textarea>
+      <div style="font-size:11px;color:#64748b;margin:4px 0 2px 0">屏蔽：</div>
+      <textarea id="catCustomBlock" class="text-input" rows="2" style="font-family:monospace;font-size:11px" oninput="catOnChange()" placeholder="空格/换行分隔的自定义屏蔽域名"></textarea>
     </div>
-    <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-top:8px">
-      <span class="row-label">黑名单（优先生效）</span>
-      <textarea id="brDnsBlock" class="text-input" maxlength="1023" rows="3" style="font-family:monospace;font-size:12px"></textarea>
-    </div>
-    <button class="save-btn" onclick="brSet()" style="margin-top:8px">保存 DNS 配置</button>
+    <details style="margin-top:8px">
+      <summary style="cursor:pointer;color:#64748b;font-size:11px;padding:4px 0">▼ 高级 · 查看/编辑最终规则文本</summary>
+      <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px">
+        <span class="row-label" style="font-size:11px">白名单合并结果（保存用）</span>
+        <textarea id="brDnsAllow" class="text-input" maxlength="1023" rows="3" style="font-family:monospace;font-size:11px"></textarea>
+      </div>
+      <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px">
+        <span class="row-label" style="font-size:11px">黑名单合并结果（保存用）</span>
+        <textarea id="brDnsBlock" class="text-input" maxlength="1023" rows="3" style="font-family:monospace;font-size:11px"></textarea>
+      </div>
+      <div style="color:#64748b;font-size:10px;margin-top:4px">此处为上方类别合并后的完整文本，保存时以此为准。手改会覆盖类别选择。</div>
+    </details>
+    <button class="save-btn" onclick="brSet()" style="margin-top:10px">保存 DNS 配置</button>
     <div style="margin-top:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:12px;color:#64748b">DNS 拦截 <span id="brBlkTot">0</span> 次 · IP 拦截 <span id="brIpDrops">0</span> 次 (cache <span id="brIpCache">0</span>/<span id="brIpCap">256</span> · peak <span id="brIpPeak">0</span>)</span>
@@ -652,6 +687,8 @@ function toggleLang(){lang=lang==='zh'?'en':'zh';applyLang();}
 function poll(){
   fetch('/api/status').then(r=>r.json()).then(d=>{
     var t=T[lang];
+    var pw=document.getElementById('passWarn');
+    if(pw) pw.style.display = d.apPassDefault ? '' : 'none';
     document.getElementById('sModified').textContent=d.modified;
     document.getElementById('sRX').textContent=d.rx;
     document.getElementById('sErrors').textContent=d.errors;
@@ -846,7 +883,7 @@ function startApp(){
   document.getElementById('disclaimer').style.display='none';
   if(appStarted)return;  // poll already running; only skip setInterval, not UI reset
   appStarted=true;
-  setInterval(poll,1000);poll();
+  __mainPollT=setInterval(poll,1000);poll();
   syncTime();  // push browser clock to ESP32 for real timestamps in CSV
   brInit();    // probe for WiFi bridge endpoint (esp32s3-waveshare-wifi only)
   // populate current version + env tag; pullBtn stays disabled until user checks.
@@ -857,6 +894,21 @@ function startApp(){
 // ── WiFi bridge card (shown only if backend supports it) ───────────
 var brDirty=false;  // true while user editing DNS lists → skip overwrite
 var brPollTimer=null;
+var __brPollEnabled=false;  // true once bridge endpoint confirmed + poll started
+var __mainPollT=null;       // handle for main 1s status poll (nullable when tab hidden)
+
+// Pause all polls while the tab is hidden → ESP32 handles zero requests from
+// parked UIs. On return, refresh once immediately to catch up before resuming.
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){
+    if(__mainPollT){ clearInterval(__mainPollT); __mainPollT=null; }
+    if(brPollTimer){ clearInterval(brPollTimer); brPollTimer=null; }
+  } else if(appStarted){
+    poll();
+    if(!__mainPollT) __mainPollT=setInterval(poll,1000);
+    if(__brPollEnabled && !brPollTimer){ brPoll(); brPollTimer=setInterval(brPoll,3000); }
+  }
+});
 function brInit(){
   // staSection (连接路由器) is default-hidden: only baseline variants (no bridge
   // endpoint) should expose it. On _wifi variants the bridge owns the STA radio
@@ -866,10 +918,12 @@ function brInit(){
   fetch('/api/wifi-bridge/status'+(token?'?token='+token:'')).then(function(r){
     if(!r.ok){showStaSection();return;}
     document.getElementById('cardBridge').style.display='';
+    catRenderAll();
     brPoll();
     brPollTimer=setInterval(brPoll,3000);
+    __brPollEnabled=true;
     // mark dirty on any edit so polling doesn't overwrite user input
-    ['brDnsAllow','brDnsBlock','brAddSsid','brAddPass'].forEach(function(id){
+    ['brDnsAllow','brDnsBlock','brAddSsid','brAddPass','catCustomAllow','catCustomBlock'].forEach(function(id){
       var el=document.getElementById(id);
       if(el)el.addEventListener('input',function(){brDirty=true;});
     });
@@ -905,13 +959,11 @@ function brPoll(){
     if(!brDirty){
       document.getElementById('brDnsAllow').value=d.dnsAllow||'';
       document.getElementById('brDnsBlock').value=d.dnsBlock||'';
+      catImportFromLists(d.dnsAllow||'', d.dnsBlock||'');
     }
-    // Highlight based on textarea (not server state) so uncommitted edits show
+    // Highlight based on current category state so uncommitted edits show
     // the right preset ring immediately, not just after save.
-    brHighlightPreset(
-      document.getElementById('brDnsAllow').value,
-      document.getElementById('brDnsBlock').value
-    );
+    brHighlightPreset();
     document.getElementById('brBlkTot').textContent=d.dnsBlockedTotal;
     document.getElementById('brIpDrops').textContent=(d.ipBlockDrops!=null?d.ipBlockDrops:0);
     document.getElementById('brIpCache').textContent=(d.ipCacheCount!=null?d.ipCacheCount:0);
@@ -953,50 +1005,155 @@ function brSet(){
   fetch('/api/wifi-bridge/set?'+qs+(token?'&token='+token:''))
     .then(function(r){brDirty=false;msg('brMsg',r.ok?'已保存':'保存失败',r.ok);});
 }
-var BR_PRESETS={
-  tesla_min:{name:'⭐ Tesla 推荐方案（实测）',
-    allow:'connman.vn.cloud.tesla.cn nav-prd-maps.tesla.cn hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn api-prd.vn.cloud.tesla.cn media-server-me.tesla.cn www.tesla.cn maps-cn-prd.go.tesla.services volcengine.com volces.com volcengineapi.com volccdn.com api.map.baidu.com lc.map.baidu.com newvector.map.baidu.com route.map.baidu.com newclient.map.baidu.com tracknavi.baidu.com itsmap3.baidu.com app.navi.baidu.com mapapip0.bdimg.com mapapisp0.bdimg.com automap0.bdimg.com baidunavi.cdn.bcebos.com lbsnavi.cdn.bcebos.com enlargeroad-view.su.bcebos.com',
-    block:'tesla.cn tesla.com teslamotors.com tesla.services',
-    note:'屏蔽全部 Tesla 云域名，仅放行核心子域：\n• Wi-Fi 检测 connman + www.tesla.cn\n• Tesla 地图导航 nav-prd-maps + maps-cn-prd\n• 手机 APP 控车 hermes-prd + signaling + api-prd\n• Intel 车机语音 media-server-me\n• AMD 车机语音 volcengine/volces/volcengineapi/volccdn（字节火山引擎）\n• 百度地图/导航 *.map.baidu.com + *.bdimg.com + *.bcebos.com（车机内置地图需要）\n\n✅ 已实测 2 天无异常（APP 控车/导航/语音/Wi-Fi 正常工作）。推荐优先使用此方案。'},
-  tesla_lean:{name:'🔹 精简官方（独立方案）',
-    allow:'connman.vn.cloud.tesla.cn www.tesla.cn nav-prd-maps.tesla.cn maps-cn-prd.go.tesla.services hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn hermes-stream-prd.vn.cloud.tesla.cn api-prd.vn.cloud.tesla.cn media-server-me.tesla.cn',
-    block:'tesla.cn tesla.com tesla.services',
-    note:'只放行 Tesla 官方必要子域（9 个）：\n• Wi-Fi 检测 connman + www.tesla.cn\n• 地图导航 nav-prd-maps + maps-cn-prd\n• APP 控车 hermes-prd + signaling + hermes-stream-prd + api-prd\n• Intel 车机娱乐 media-server-me\n\n⚠️ 不含：\n• AMD 车机语音 (volcengine/volces)——AMD 车主用「Tesla 推荐」\n• 百度地图域——车机内置地图会不可用\n\n适合 Intel 车机 + 不使用车机内置地图的用户。'},
-  bl_telemetry:{name:'屏蔽遥测（中风险）',
-    allow:'',
-    block:'hermes-stream-prd.vn.cloud.tesla.cn vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn firmware.tesla.cn',
-    note:'拦 4 条 Tesla 遥测/上传/OTA 端点：\n• hermes-stream-prd（车辆数据流）\n• vehicle-files prd.cnn1/cn1（车辆日志/文件上传）\n• firmware.tesla.cn（OTA 固件下载）\n\nhermes-stream 风险略高，可能影响部分推送/远程指令。屏蔽 firmware.tesla.cn 会阻止 OTA 升级。'},
-  custom_blank:{name:'✍️ 自定义留空',
-    allow:'',block:'',
-    note:'清空白/黑名单文本框，DNS 过滤保持开启。\n\n您可以自己填域名规则（空格或换行分隔），再点「保存 DNS 配置」生效。\n\n规则提示：\n• 黑名单里填根域会连带所有子域（如 tesla.cn 覆盖 *.tesla.cn）\n• 白名单里填子域可单独放行（更长的规则优先）\n• 留空两个文本框并点保存 = 过滤启用但无规则（等同没拦截）'},
-  clear:{name:'清空',allow:'',block:'',note:'清空所有过滤规则'}
+var DNS_CATS=[
+  {id:'wifi_detect',type:'allow',icon:'📶',label:'Wi-Fi 连接检测',desc:'系统在线检测，关闭会被车机认定为"无网络"',
+   domains:'connman.vn.cloud.tesla.cn www.tesla.cn',defaultOn:true},
+  {id:'tesla_maps',type:'allow',icon:'🗺️',label:'Tesla 地图/导航',desc:'车机原生 Tesla 地图/导航服务',
+   domains:'nav-prd-maps.tesla.cn maps-cn-prd.go.tesla.services',defaultOn:true},
+  {id:'app_control',type:'allow',icon:'📱',label:'手机 App 控车',desc:'Tesla App 远程控车、推送、API',
+   domains:'hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn api-prd.vn.cloud.tesla.cn',defaultOn:true},
+  {id:'intel_voice',type:'allow',icon:'🎙️',label:'Intel 车机语音',desc:'Intel MCU 车机语音/娱乐流',
+   domains:'media-server-me.tesla.cn',defaultOn:true},
+  {id:'amd_voice',type:'allow',icon:'🗣️',label:'AMD 车机语音',desc:'AMD MCU 字节火山引擎语音（volcengine/volces）',
+   domains:'volcengine.com volces.com volcengineapi.com volccdn.com',defaultOn:true},
+  {id:'baidu_maps',type:'allow',icon:'🧭',label:'百度地图/导航',desc:'车机内置百度地图瓦片/路径（*.map.baidu.com + *.bdimg.com + *.bcebos.com）',
+   domains:'api.map.baidu.com lc.map.baidu.com newvector.map.baidu.com route.map.baidu.com newclient.map.baidu.com tracknavi.baidu.com itsmap3.baidu.com app.navi.baidu.com mapapip0.bdimg.com mapapisp0.bdimg.com automap0.bdimg.com baidunavi.cdn.bcebos.com lbsnavi.cdn.bcebos.com enlargeroad-view.su.bcebos.com',defaultOn:true},
+  {id:'block_root',type:'block',icon:'🚫',label:'屏蔽 Tesla 根域',desc:'覆盖 *.tesla.cn / *.tesla.com / *.tesla.services（上方放行子域仍生效）',
+   domains:'tesla.cn tesla.com teslamotors.com tesla.services',defaultOn:true},
+  {id:'block_stream',type:'block',icon:'📡',label:'屏蔽车辆数据流',desc:'拦 hermes-stream-prd 遥测上报流（风险：可能影响部分推送/远程指令）',
+   domains:'hermes-stream-prd.vn.cloud.tesla.cn',defaultOn:false},
+  {id:'block_logs',type:'block',icon:'📄',label:'屏蔽车辆日志上传',desc:'vehicle-files 故障/日志/黑匣子文件',
+   domains:'vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn',defaultOn:false},
+  {id:'block_ota',type:'block',icon:'⛔',label:'屏蔽 OTA 固件下载',desc:'拦 firmware.tesla.cn，阻止 OTA 推送升级',
+   domains:'firmware.tesla.cn',defaultOn:false}
+];
+var PRESET_PROFILES={
+  tesla_min:{name:'⭐ Tesla 推荐（实测）',btnId:'pstTesla',
+    cats:['wifi_detect','tesla_maps','app_control','intel_voice','amd_voice','baidu_maps','block_root'],
+    note:'仅放行核心子域 + 屏蔽 Tesla 根域。实测 2 天 App/导航/语音/Wi-Fi 正常。'},
+  tesla_lean:{name:'🔹 精简官方（仅 Intel，无百度/AMD 语音）',btnId:'pstLean',
+    cats:['wifi_detect','tesla_maps','app_control','intel_voice','block_root'],
+    note:'只放行 Tesla 官方必要子域。不含 AMD 语音 / 百度地图（车机内置地图会不可用）。'},
+  bl_telemetry:{name:'只屏蔽遥测（中风险）',btnId:'pstBl',
+    cats:['block_stream','block_logs','block_ota'],
+    note:'只启用 3 类屏蔽（遥测流 / 日志上传 / OTA 固件），不设白名单。屏蔽 firmware 会阻止 OTA。'},
+  clear:{name:'全部取消',btnId:'pstClr',cats:[],note:'取消所有类别勾选。'}
 };
-var PRESET_IDS_PH={tesla_min:'pstTesla',tesla_lean:'pstLean',bl_telemetry:'pstBl',custom_blank:'pstCust',clear:'pstClr'};
-function normListPh(s){return String(s||'').trim().split(/\s+/).filter(Boolean).sort().join(' ');}
-function brHighlightPreset(allow,block){
-  var a=normListPh(allow),b=normListPh(block);
-  var active=null;
-  for(var k in BR_PRESETS){
-    if(k==='custom_blank') continue;
-    if(normListPh(BR_PRESETS[k].allow)===a && normListPh(BR_PRESETS[k].block)===b){active=k;break;}
+function catTokens(s){return String(s||'').trim().split(/[\s,;]+/).filter(Boolean);}
+function catNormSet(s){
+  var m={}; catTokens(s).forEach(function(d){m[d.toLowerCase()]=1;}); return m;
+}
+function catEach(fn){
+  DNS_CATS.forEach(function(c){
+    fn(c, document.getElementById('cat_'+c.id), document.getElementById('catTa_'+c.id));
+  });
+}
+function catRenderRow(c){
+  var count=catTokens(c.domains).length;
+  return '<div class="cat-row"><div class="cat-head">'+
+    '<label class="switch cat-switch"><input type="checkbox" id="cat_'+c.id+'" '+(c.defaultOn?'checked':'')+' onchange="catOnChange()"><span class="slider"></span></label>'+
+    '<div class="cat-info">'+
+      '<div class="cat-title">'+c.icon+' '+c.label+' <span class="cat-count">· '+count+' 个</span></div>'+
+      '<div class="cat-desc">'+c.desc+'</div>'+
+    '</div>'+
+    '<button type="button" class="cat-btn" id="btnEdit_'+c.id+'" onclick="catToggle(\''+c.id+'\')">编辑 ▼</button>'+
+    '</div>'+
+    '<div class="cat-body" id="catBody_'+c.id+'">'+
+      '<textarea id="catTa_'+c.id+'" class="text-input cat-ta" rows="2" oninput="catOnChange()">'+c.domains+'</textarea>'+
+      '<div><button type="button" class="cat-reset" onclick="catReset(\''+c.id+'\')">↺ 恢复默认域名</button></div>'+
+    '</div></div>';
+}
+function catRenderAll(){
+  var a='',b='';
+  for(var i=0;i<DNS_CATS.length;i++){
+    var c=DNS_CATS[i];
+    if(c.type==='allow') a+=catRenderRow(c); else b+=catRenderRow(c);
   }
-  for(var kk in PRESET_IDS_PH){
-    var el=document.getElementById(PRESET_IDS_PH[kk]);
-    if(el) el.style.boxShadow=(kk===active)?'0 0 0 3px #fbbf24':'none';
+  var la=document.getElementById('catAllowList'); if(la) la.innerHTML=a;
+  var lb=document.getElementById('catBlockList'); if(lb) lb.innerHTML=b;
+}
+function catToggle(id){
+  var b=document.getElementById('catBody_'+id), btn=document.getElementById('btnEdit_'+id);
+  if(!b)return;
+  if(b.style.display==='none'||!b.style.display){b.style.display='block';btn.textContent='收起 ▲';}
+  else{b.style.display='none';btn.textContent='编辑 ▼';}
+}
+function catById(id){
+  for(var i=0;i<DNS_CATS.length;i++) if(DNS_CATS[i].id===id) return DNS_CATS[i];
+  return null;
+}
+function catReset(id){
+  var c=catById(id);if(!c)return;
+  var ta=document.getElementById('catTa_'+id); if(ta) ta.value=c.domains;
+  var cb=document.getElementById('cat_'+id); if(cb) cb.checked=c.defaultOn;
+  catOnChange();
+}
+function catRebuildLists(){
+  var allow={},block={};
+  catEach(function(c,cb,ta){
+    if(!cb||!cb.checked) return;
+    var src=(ta&&ta.value)?ta.value:c.domains;
+    var bucket=(c.type==='allow')?allow:block;
+    catTokens(src).forEach(function(d){bucket[d.toLowerCase()]=1;});
+  });
+  var exA=document.getElementById('catCustomAllow'),exB=document.getElementById('catCustomBlock');
+  if(exA) catTokens(exA.value).forEach(function(d){allow[d.toLowerCase()]=1;});
+  if(exB) catTokens(exB.value).forEach(function(d){block[d.toLowerCase()]=1;});
+  document.getElementById('brDnsAllow').value=Object.keys(allow).join(' ');
+  document.getElementById('brDnsBlock').value=Object.keys(block).join(' ');
+}
+function catOnChange(){
+  catRebuildLists();
+  brDirty=true;
+  msg('brMsg','已修改，点「保存 DNS 配置」生效',true);
+}
+function catImportFromLists(allowStr,blockStr){
+  var allow=catNormSet(allowStr),block=catNormSet(blockStr);
+  var matchedAllow={},matchedBlock={};
+  catEach(function(c,cb,ta){
+    var bucket=(c.type==='allow')?allow:block;
+    var matched=(c.type==='allow')?matchedAllow:matchedBlock;
+    var defs=catTokens(c.domains);
+    var allPresent=defs.length>0 && defs.every(function(d){return bucket[d.toLowerCase()];});
+    if(cb) cb.checked=allPresent;
+    if(ta && ta.value!==c.domains) ta.value=c.domains;
+    if(allPresent) defs.forEach(function(d){matched[d.toLowerCase()]=1;});
+  });
+  var leftA=Object.keys(allow).filter(function(d){return !matchedAllow[d];});
+  var leftB=Object.keys(block).filter(function(d){return !matchedBlock[d];});
+  var exA=document.getElementById('catCustomAllow'),exB=document.getElementById('catCustomBlock');
+  if(exA) exA.value=leftA.join(' ');
+  if(exB) exB.value=leftB.join(' ');
+}
+function brHighlightPreset(){
+  var active=null;
+  for(var k in PRESET_PROFILES){
+    var want={}; PRESET_PROFILES[k].cats.forEach(function(id){want[id]=1;});
+    var ok=true;
+    catEach(function(c,cb){
+      if(!ok) return;
+      if(!!want[c.id] !== (cb?cb.checked:false)) ok=false;
+    });
+    if(ok){active=k;break;}
+  }
+  for(var pk in PRESET_PROFILES){
+    var el=document.getElementById(PRESET_PROFILES[pk].btnId);
+    if(el) el.style.boxShadow=(pk===active)?'0 0 0 3px #fbbf24':'none';
   }
 }
 function brApplyPreset(key){
-  var p=BR_PRESETS[key];if(!p)return;
-  if(!confirm('应用预设「'+p.name+'」？\n\n' + p.note + '\n\n⚠ 预设内容来自网络收集，仅供参考，准确性请自行验证。\n注意：会覆盖当前白/黑名单文本框内容。')){return;}
-  document.getElementById('brDnsAllow').value=p.allow;
-  document.getElementById('brDnsBlock').value=p.block;
-  // Auto-tick the DNS filter switch for non-clear presets — clicking a preset
-  // with the toggle still off would silently apply rules that never run.
+  var p=PRESET_PROFILES[key];if(!p)return;
+  if(!confirm('应用预设「'+p.name+'」？\n\n'+p.note+'\n\n⚠ 默认域名来自网络收集，仅供参考。\n应用后会覆盖当前类别勾选（自定义域名文本框会保留）。')){return;}
+  var want={}; p.cats.forEach(function(id){want[id]=1;});
+  catEach(function(c,cb,ta){
+    if(cb) cb.checked=!!want[c.id];
+    if(ta) ta.value=c.domains;
+  });
   if(key!=='clear'){document.getElementById('brDnsEn').checked=true;}
+  catRebuildLists();
   brDirty=true;
-  brHighlightPreset(p.allow,p.block);
-  var hint=(key==='custom_blank')?'已清空，请填写域名后点保存 DNS 配置':('已载入「'+p.name+'」，请点保存 DNS 配置');
-  msg('brMsg',hint,true);
+  brHighlightPreset();
+  msg('brMsg','已载入「'+p.name+'」，点「保存 DNS 配置」生效',true);
 }
 function brAdd(){
   var ssid=document.getElementById('brAddSsid').value.trim();
@@ -1008,7 +1165,6 @@ function brAdd(){
       if(r.ok){
         document.getElementById('brAddSsid').value='';
         document.getElementById('brAddPass').value='';
-        document.getElementById('brScanList').style.display='none';
         brDirty=false;
         msg('brMsg','已保存',true);
       }else{r.text().then(function(t){msg('brMsg','失败：'+t,false);});}
@@ -1525,6 +1681,38 @@ document.addEventListener('focusin',function(e){
   if(!t||!(t.matches&&t.matches('input,textarea')))return;
   setTimeout(function(){try{t.scrollIntoView({block:'center',behavior:'smooth'});}catch(_){}} ,300);
 });
+
+(function installPassEye(){
+  var inputs=document.querySelectorAll('input[type=password]');
+  var LAYOUT=['marginBottom','marginTop'];
+  for(var i=0;i<inputs.length;i++){
+    var inp=inputs[i];
+    if(inp.dataset.pwEye)continue;
+    inp.dataset.pwEye='1';
+    var wrap=document.createElement('span');
+    wrap.className='pw-wrap';
+    for(var k=0;k<LAYOUT.length;k++){
+      var prop=LAYOUT[k];
+      if(inp.style[prop]){ wrap.style[prop]=inp.style[prop]; inp.style[prop]=''; }
+    }
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='pw-eye';
+    btn.setAttribute('aria-label','显示/隐藏密码');
+    btn.tabIndex=-1;
+    btn.textContent='👁';
+    (function(target,b){
+      b.onclick=function(ev){
+        ev.preventDefault();
+        if(target.type==='password'){ target.type='text'; b.textContent='🙈'; }
+        else { target.type='password'; b.textContent='👁'; }
+      };
+    })(inp,btn);
+    wrap.appendChild(btn);
+  }
+})();
 </script>
 </body>
 </html>

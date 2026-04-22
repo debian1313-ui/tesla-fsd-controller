@@ -32,15 +32,15 @@ struct FSDConfig {
     volatile int      hw3SpeedOffset      = 0;       // stock offset from mux-0 data[3] as pct*5 (0-100); display only
     volatile bool     hw3AutoSpeed        = true;    // HW3 auto speed targeting: <60→64, =60→100, 60-79→85, ≥80→stock passthrough
     volatile bool     hw3CustomSpeed      = false;   // HW3 custom target table (overrides hw3AutoSpeed when true); ≥80 always stock passthrough
-    // Defaults mirror Auto's per-bucket preference at the bucket boundary (30/40/50→64, 60→100, 70→85).
-    // Auto's if-ladder still differs mid-bucket (e.g. fusedLimit=65 returns 85), so this is a
-    // reasonable starting point, not a literal equivalence.
+    // Defaults sit at the physical ceiling (limit × 1.5) per slot — Tesla fw
+    // caps offset at 50% of posted limit, so anything higher silently clamps.
+    // Users can dial back if they want less aggressive.
     volatile uint8_t  hw3CustomTarget[kHw3CustomTargetCount] = {
-        kHw3AutoTargetBelow60Kph,       // 30 kph bucket
-        kHw3AutoTargetBelow60Kph,       // 40 kph bucket
-        kHw3AutoTargetBelow60Kph,       // 50 kph bucket
-        kHw3AutoTargetAt60Kph,          // 60 kph bucket
-        kHw3AutoTargetForVisible80Kph,  // 70 kph bucket
+        45,   // 30 kph bucket → max +15
+        60,   // 40 kph bucket → max +20
+        75,   // 50 kph bucket → max +25
+        90,   // 60 kph bucket → max +30
+        105,  // 70 kph bucket → max +35
     };
     volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 mux-2 data[1][5:0]; 0=off (presets: 7=+5,10=+7,14=+10,21=+15 km/h)
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
