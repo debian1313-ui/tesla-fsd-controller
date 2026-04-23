@@ -115,7 +115,7 @@ struct FSDConfig {
     volatile bool     hw3HighSpeedEnable    = false;
     // Per-bucket pct for 80/90/100/110/120 kph fused limits.
     // Typical 10-20; clamps at 50 (Tesla fw cap). UI enforces softer default.
-    volatile uint8_t  hw3HighSpeedTargetPct[kHw3HighSpeedBucketCount] = {15, 15, 15, 15, 15};
+    volatile uint8_t  hw3HighSpeedTargetPct[kHw3HighSpeedBucketCount] = {25, 25, 25, 25, 25};
     volatile uint8_t  nagLevel            = 0;   // DAS_autopilotHandsOnState  bit42|4  0=ok, 1-15=nag
     volatile uint8_t  fcwLevel            = 0;   // DAS_forwardCollisionWarning bit22|2  0=none
     volatile uint8_t  accState            = 0;   // DAS_ACC_report             bit26|5  0=off, >0=AP active

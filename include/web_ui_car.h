@@ -1075,7 +1075,7 @@ function render(d){
   var rowHi = document.getElementById('rowHw3HiSpdPanel');
   if(rowHi) rowHi.style.display = (d.hwMode===1 && d.hw3HighSpeedEnable) ? '' : 'none';
   (function(){
-    var hsArr=Array.isArray(d.hw3HighSpeedPct)?d.hw3HighSpeedPct:[15,15,15,15,15];
+    var hsArr=Array.isArray(d.hw3HighSpeedPct)?d.hw3HighSpeedPct:[25,25,25,25,25];
     var hsLbl=[80,90,100,110,120];
     var parts=[];
     for(var i=0;i<5;i++){
