@@ -174,7 +174,11 @@ static void handleLegacy(CanFrame& frame, CanDriver& driver) {
         if (index == 0) cfg.fsdTriggered = cfg.forceActivate || isFSDSelectedInUI(frame);
         if (index == 0 && cfg.fsdTriggered && cfg.fsdEnable) {
             setBit(frame, 46, true);
+            if (cfg.legacyByte7Enable) {
+                frame.data[7] = (frame.data[7] & 0xF0) | (cfg.legacyByte7Value & 0x0F);
+            }
             setSpeedProfileV12V13(frame, cfg.speedProfile);
+            
             if (driver.send(frame)) cfg.modifiedCount++;
             else                    cfg.errorCount++;
         }

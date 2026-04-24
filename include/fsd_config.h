@@ -98,6 +98,14 @@ struct FSDConfig {
     // FSD activation triggered. Now an independent user toggle — default true to preserve
     // pre-v1.4.27 behavior. When false, UI_enableVisionSpeedControl is left untouched.
     volatile bool     removeVisionSpeedLimit  = true;
+    // 0x3EE (1006) mux-0 byte 7 low-nibble write inside the Legacy FSD activation
+    // path. Historically hardcoded to 0x0F. Now exposed:
+    //   legacyByte7Enable — when true, write low-nibble; when false, leave byte 7
+    //                       low-nibble untouched (preserve incoming bits).
+    //   legacyByte7Value  — 0..15 (4-bit) value to OR into byte 7 low-nibble.
+    // Defaults preserve pre-existing behavior (enabled, value 0x0F).
+    volatile bool     legacyByte7Enable       = true;
+    volatile uint8_t  legacyByte7Value        = 0x0F;  // 0..15
 
     // DAS status — read from 0x39B (DAS_status), 0x399 (DAS_status ISA) and 0x389 (DAS_status2)
     volatile uint8_t  fusedSpeedLimit     = 0;   // DAS_fusedSpeedLimit        0x39B byte1[4:0]  ×5=kph; 0=none (camera+map)

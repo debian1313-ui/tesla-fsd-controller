@@ -485,6 +485,10 @@ button{font-family:inherit;cursor:pointer}
         <div class="row" id="rowLegOff" style="display:none"><div class="rlbl">Legacy 偏移</div>
           <div class="ts-step" style="flex:0 0 180px"><button class="ts-step-btn" onclick="legacyStep(-1)">−</button><div class="ts-step-val"><span class="ts-step-pfx">+</span><span id="cLegOff">--</span><span class="ts-step-unit">kph/mph</span></div><button class="ts-step-btn" onclick="legacyStep(1)">+</button></div>
           <div class="rval">0~33（遵循车辆单位）</div></div>
+        <div class="row" id="rowLegB7En" style="display:none"><div class="rlbl">写入 FSD 最大速度偏移</div><div class="tog" id="tgLegB7En" data-k="legacyByte7Enable"></div><div class="rval">0x3EE 字节7 低 4 位 = UI_fsdMaxSpeedOffsetPercentage（关闭则保留车辆原值）</div></div>
+        <div class="row" id="rowLegB7Val" style="display:none"><div class="rlbl">FSD 最大速度偏移</div>
+          <div class="ts-step" style="flex:0 0 180px"><button class="ts-step-btn" onclick="legB7Step(-1)">−</button><div class="ts-step-val"><span id="cLegB7">--</span><span class="ts-step-unit">/ 15</span></div><button class="ts-step-btn" onclick="legB7Step(1)">+</button></div>
+          <div class="rval">UI_fsdMaxSpeedOffsetPercentage（0=最低 / 15=最高，原固件默认 15）</div></div>
         <div id="rowGps2F8" style="display:none;padding:10px 12px;background:rgba(0,0,0,.25);border-radius:10px;margin-top:6px;font-family:monospace;font-size:12px">
           <div style="color:#a0a0a0;margin-bottom:6px">0x2F8 (760) Legacy 限速帧嗅探（只读，用来确认是否可改写）</div>
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;color:#e5e5e5">
@@ -1106,7 +1110,9 @@ function render(d){
   setTog('tgForce', d.forceActivate);
   setTog('tgOvr', d.overrideSL);
   setTog('tgRvsl', d.removeVSL==null?true:!!d.removeVSL);
+  setTog('tgLegB7En', d.legacyByte7Enable==null?true:!!d.legacyByte7Enable);
   (function(){var e=document.getElementById('cLegOff'); if(e && !legacyDirty) e.textContent=(d.legacyOffset!=null?Number(d.legacyOffset):LEGACY_DEF);})();
+  (function(){var e=document.getElementById('cLegB7'); if(e && !legB7Dirty) e.textContent=(d.legacyByte7Value!=null?Number(d.legacyByte7Value):LEGB7_DEF);})();
   setTog('tgTrack', d.trackMode);
   (function(){
     var r=document.getElementById('rowGps2F8'); if(!r) return;
@@ -1148,6 +1154,8 @@ function render(d){
   document.getElementById('rowOvr').style.display = isLegacy ? '' : 'none';
   document.getElementById('rowRvsl').style.display = isLegacy ? '' : 'none';
   document.getElementById('rowLegOff').style.display = isLegacy ? '' : 'none';
+  document.getElementById('rowLegB7En').style.display = isLegacy ? '' : 'none';
+  document.getElementById('rowLegB7Val').style.display = isLegacy ? '' : 'none';
   document.getElementById('rowTrack').style.display = isHW3 ? '' : 'none';
   // HW4 偏移 stepper 值回填（respect dirty）
   (function(){
@@ -1535,10 +1543,10 @@ var STEP_DEBOUNCE_MS=400, STEP_SETTLE_MS=600;
 var HW3CT_RANGE=[[30,45],[40,60],[50,75],[60,90],[70,105]];
 var HW3CT_DEF=HW3CT_RANGE.map(function(r){return r[1];});
 var HW3HS_DEF=[25,25,25,25,25];
-var SLEW_DEF=5, LEGACY_DEF=0, HW4OFF_DEF=0;
+var SLEW_DEF=5, LEGACY_DEF=0, HW4OFF_DEF=0, LEGB7_DEF=15;
 // HW4 offset raw → km/h (~0.714 ratio, calibrated from legacy presets 7→5,10→7,14→10,15→11)
 function hw4RawToKph(r){ return r>0 ? Math.round(r*5/7) : 0; }
-var hw3CTDirty={}, hw3HSDirty={}, slewDirty=false, legacyDirty=false, hw4OffDirty=false;
+var hw3CTDirty={}, hw3HSDirty={}, slewDirty=false, legacyDirty=false, hw4OffDirty=false, legB7Dirty=false;
 function fmtSlewKph(rv){ return '≈ -'+(rv*0.6).toFixed(1)+' kph/s @60限速'; }
 
 // idOf(idx)→DOM id, paramOf(id)→POST key (default identity), range(idx)→[min,max], def(idx)→seed,
@@ -1557,6 +1565,7 @@ function makeStepper(opts){
     if(opts.dirty==='slew') slewDirty=true;
     else if(opts.dirty==='legacy') legacyDirty=true;
     else if(opts.dirty==='hw4off') hw4OffDirty=true;
+    else if(opts.dirty==='legb7') legB7Dirty=true;
     else opts.dirty[id]=true;
     pending[id]=nv;
     if(opts.onChange) opts.onChange(nv);
@@ -1571,6 +1580,7 @@ function makeStepper(opts){
             if(opts.dirty==='slew') slewDirty=false;
             else if(opts.dirty==='legacy') legacyDirty=false;
             else if(opts.dirty==='hw4off') hw4OffDirty=false;
+            else if(opts.dirty==='legb7') legB7Dirty=false;
             else for(var k in sent) delete opts.dirty[k];
           }
           if(r.status===200){
@@ -1621,6 +1631,14 @@ var _hw4OffImpl=makeStepper({
   onChange:function(nv){ var k=document.getElementById('cHw4OffKmh'); if(k) k.textContent=hw4RawToKph(nv); }
 });
 function hw4Step(delta){ _hw4OffImpl(0, delta); }
+var _legB7Impl=makeStepper({
+  idOf:function(){return 'cLegB7';},
+  paramOf:function(){return 'legacyByte7Value';},
+  range:function(){return [0,15];},
+  def:function(){return LEGB7_DEF;},
+  dirty:'legb7'
+});
+function legB7Step(delta){ _legB7Impl(0, delta); }
 function hint(msg){ toast(msg, '', 3500); }
 
 // Inject ts-step cells for the two HW3 grids at init — eliminates ~3KB of repeated PROGMEM HTML.
