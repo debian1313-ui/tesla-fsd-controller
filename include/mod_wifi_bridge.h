@@ -24,10 +24,19 @@ extern "C" {
 #include "mod_dns.h"
 #include "mod_thermal.h"
 
-static constexpr uint32_t UPSTREAM_RETRY_MS = 15000;
-static constexpr uint32_t UPSTREAM_FAILURE_RETRY_MS = 3000;
 static constexpr uint32_t UPSTREAM_RETRY_THROTTLED_MS = 60000;
 static constexpr uint8_t MAX_UPSTREAM_NETWORKS = 10;
+
+// Exponential-backoff schedule for repeated upstream connect failures.
+// Indexed by consecutiveFailures count; clamped to last entry. Replaces the
+// old fixed 3 s / 15 s retry pair, which retried wrong-password / out-of-range
+// routers every few seconds indefinitely (radio thrash + user-visible spam).
+// Reset to 0 on successful connect or when the user re-saves the network list.
+static constexpr uint32_t kUpstreamBackoffMs[] = {
+    3000, 8000, 15000, 30000, 60000, 120000, 300000
+};
+static constexpr uint8_t kUpstreamBackoffSteps =
+    sizeof(kUpstreamBackoffMs) / sizeof(kUpstreamBackoffMs[0]);
 
 struct SavedUpstreamNetwork {
     char ssid[33] = {};
@@ -42,6 +51,8 @@ struct UpstreamWiFiConfig {
     uint8_t              nextTryIndex        = 0;
     volatile bool        applyRequested      = false;
     uint32_t             lastAttemptMillis   = 0;
+    uint8_t              consecutiveFailures = 0;
+    int8_t               preferredIndex      = -1;  // last network that connected; tried first after apply/boot
 };
 
 static UpstreamWiFiConfig gWifiBridgeCfg;
@@ -234,6 +245,11 @@ static inline void wifiBridgeStartConnect(const char* apSsid) {
 static inline void wifiBridgeRequestApply() { gWifiBridgeCfg.applyRequested = true; }
 
 static inline void wifiBridgeApplyConfig(const char* apSsid) {
+    // Apply always resets the backoff counter — user-driven config change is
+    // an explicit signal to retry promptly even if the previous attempts were
+    // in long-backoff territory.
+    gWifiBridgeCfg.consecutiveFailures = 0;
+
     if (thermalProtectActive()) {
         WiFi.disconnect(false, true);
         gWifiBridgeCfg.activeIndex = -1;
@@ -252,7 +268,14 @@ static inline void wifiBridgeApplyConfig(const char* apSsid) {
 
     WiFi.disconnect(false, true);
     gWifiBridgeCfg.activeIndex = -1;
-    gWifiBridgeCfg.nextTryIndex = 0;
+    // Start with the last-known-good network if it's still in the saved list.
+    // Falls back to round-robin from index 0 if no preference exists.
+    if (gWifiBridgeCfg.preferredIndex >= 0
+     && gWifiBridgeCfg.preferredIndex < gWifiBridgeCfg.networkCount) {
+        gWifiBridgeCfg.nextTryIndex = (uint8_t)gWifiBridgeCfg.preferredIndex;
+    } else {
+        gWifiBridgeCfg.nextTryIndex = 0;
+    }
     wifiBridgeStartConnect(apSsid);
 }
 
@@ -277,27 +300,41 @@ static inline void serviceUpstreamWiFi(const char* apSsid) {
     if (WiFi.status() == WL_CONNECTED) {
         int idx = wifiBridgeFindNetwork(WiFi.SSID());
         if (idx >= 0) gWifiBridgeCfg.activeIndex = idx;
+        // First successful connect (or transition from failures): reset backoff
+        // and persist this network as the preferred one for next boot.
+        if (gWifiBridgeCfg.consecutiveFailures > 0 || gWifiBridgeCfg.preferredIndex != idx) {
+            gWifiBridgeCfg.consecutiveFailures = 0;
+            if (idx >= 0 && gWifiBridgeCfg.preferredIndex != idx) {
+                gWifiBridgeCfg.preferredIndex = idx;
+                Preferences p;
+                if (p.begin("fsd", false)) {
+                    p.putChar("ub_pref", (int8_t)idx);
+                    p.end();
+                }
+            }
+        }
         return;
     }
 
     uint32_t now = millis();
-    wl_status_t status = WiFi.status();
-    bool shouldRetry = gWifiBridgeCfg.lastAttemptMillis == 0;
-
-    if (!shouldRetry) {
-        if (status == WL_NO_SSID_AVAIL || status == WL_CONNECT_FAILED || status == WL_CONNECTION_LOST) {
-            shouldRetry = now - gWifiBridgeCfg.lastAttemptMillis >= UPSTREAM_FAILURE_RETRY_MS;
-        } else {
-            shouldRetry = now - gWifiBridgeCfg.lastAttemptMillis >= UPSTREAM_RETRY_MS;
-        }
-        if (!shouldRetry && thermalThrottleActive()) {
-            shouldRetry = now - gWifiBridgeCfg.lastAttemptMillis >= UPSTREAM_RETRY_THROTTLED_MS;
-        }
-    } else if (thermalThrottleActive()) {
-        shouldRetry = now - gWifiBridgeCfg.lastAttemptMillis >= UPSTREAM_RETRY_THROTTLED_MS;
+    uint8_t  fails = gWifiBridgeCfg.consecutiveFailures;
+    if (fails >= kUpstreamBackoffSteps) fails = kUpstreamBackoffSteps - 1;
+    uint32_t retryDelay = kUpstreamBackoffMs[fails];
+    if (thermalThrottleActive() && retryDelay < UPSTREAM_RETRY_THROTTLED_MS) {
+        retryDelay = UPSTREAM_RETRY_THROTTLED_MS;
     }
 
-    if (shouldRetry) wifiBridgeStartConnect(apSsid);
+    bool shouldRetry = (gWifiBridgeCfg.lastAttemptMillis == 0)
+                    || (now - gWifiBridgeCfg.lastAttemptMillis >= retryDelay);
+
+    if (shouldRetry) {
+        // Saturate at the last backoff step — incrementing past it would just
+        // waste cycles since we already clamp `fails` to the table size above.
+        if (gWifiBridgeCfg.consecutiveFailures < kUpstreamBackoffSteps) {
+            gWifiBridgeCfg.consecutiveFailures++;
+        }
+        wifiBridgeStartConnect(apSsid);
+    }
 }
 
 static inline void syncNATState() {
@@ -357,6 +394,11 @@ static inline void wifiBridgeLoadConfig() {
     gDnsFilterCfg.enabled = p.getBool("ub_dnsEn", false);
     wifiBridgeCopyStr(gDnsFilterCfg.allowlist, sizeof(gDnsFilterCfg.allowlist), p.getString("ub_allow", ""));
     wifiBridgeCopyStr(gDnsFilterCfg.blocklist, sizeof(gDnsFilterCfg.blocklist), p.getString("ub_block", ""));
+    // Last-known-good network index (-1 = no preference yet). Used to bias
+    // the first connect attempt after boot toward the network that succeeded
+    // last time, instead of always starting round-robin from index 0.
+    int8_t pref = p.getChar("ub_pref", -1);
+    gWifiBridgeCfg.preferredIndex = (pref >= 0 && pref < gWifiBridgeCfg.networkCount) ? pref : -1;
     bool initialized = p.getBool("ub_init", false);
     pingLoadEnabled(p);
     p.end();

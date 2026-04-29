@@ -59,6 +59,22 @@ body{font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-se
 .btn-arm:disabled{opacity:.35;cursor:not-allowed}
 .btn-reset{flex:0 0 76px;background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:10px;padding:14px;font-size:13px;font-weight:600;cursor:pointer;transition:border-color .2s,color .2s}
 .btn-reset:hover{border-color:#64748b;color:#e2e8f0}
+.btn-share{flex:0 0 76px;background:#1e293b;color:#38bdf8;border:1px solid #1e3a5f;border-radius:10px;padding:14px;font-size:13px;font-weight:600;cursor:pointer;transition:border-color .2s,color .2s,background .2s;display:none}
+.btn-share:hover{background:#0d2d4f;border-color:#38bdf8}
+.btn-share.show{display:block}
+
+/* ── Vehicle (model) row ── */
+.vrow{display:flex;align-items:center;gap:10px;background:#131d32;border-radius:12px;padding:12px 14px;margin-bottom:14px;border:1px solid transparent;transition:border-color .2s}
+.vrow.dirty{border-color:#f59e0b}
+.vrow-label{font-size:12px;color:#64748b;letter-spacing:1px;flex:0 0 auto}
+.vrow-input{flex:1;background:#0b1120;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;letter-spacing:.5px;outline:none;transition:border-color .2s}
+.vrow-input:focus{border-color:#38bdf8}
+.vrow-input::placeholder{color:#475569}
+.vrow-save{background:#0d2d4f;color:#38bdf8;border:1px solid #1e3a5f;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;display:none;letter-spacing:.5px}
+.vrow-save:hover{background:#0f3a66}
+.vrow-save.show{display:block}
+.vrow-save.saved{color:#22c55e;border-color:#22c55e}
+.vrow-save.failed{color:#ef4444;border-color:#ef4444}
 
 /* ── Ripple ── */
 @keyframes ripple{to{transform:scale(4);opacity:0}}
@@ -125,6 +141,13 @@ body{font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-se
   <div class="speed-label">km/h</div>
 </div>
 
+<!-- Vehicle (model) row -->
+<div class="vrow" id="vrowModel">
+  <span class="vrow-label">车型</span>
+  <input class="vrow-input" id="perfModelInput" placeholder="例如 Model Y Performance" maxlength="32" autocomplete="off">
+  <button class="vrow-save" id="perfModelSave" onclick="saveModel()">保存</button>
+</div>
+
 <!-- 0→100 card -->
 <div class="card" id="cardAccel">
   <div class="test-header">
@@ -139,6 +162,7 @@ body{font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-se
   <div class="btn-row">
     <button class="btn-arm" id="btnArm0" onclick="arm('accel',this)">预备</button>
     <button class="btn-reset" onclick="resetTest('accel')">重置</button>
+    <button class="btn-share" id="btnShareAccel" onclick="shareResult('accel')">分享</button>
   </div>
 </div>
 
@@ -157,6 +181,7 @@ body{font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-se
   <div class="btn-row">
     <button class="btn-arm" id="btnArm1" onclick="arm('brake',this)">预备</button>
     <button class="btn-reset" onclick="resetTest('brake')">重置</button>
+    <button class="btn-share" id="btnShareBrake" onclick="shareResult('brake')">分享</button>
   </div>
 </div>
 
@@ -194,6 +219,9 @@ var BADGE_TEXT=['待命','已备战','计时中','完成'];
 var prevAccel=0,prevBrake=0;
 var accelAnimDone=false,brakeAnimDone=false;
 var brakeEntryKph=0;
+// Latest perfAccelMs/perfBrakeMs from poll — used by share button (NOT previous-frame state).
+var lastAccelMs=0,lastBrakeMs=0,fwVer='';
+var perfModelDirty=false;
 
 // ── Count-up animation ──────────────────────────────────────────────────────
 function countUp(elId,targetSec,duration){
@@ -254,6 +282,13 @@ function applyState(prefix,state,ms,spd){
 
   // ARM button
   armBtn.disabled=(state===2||state===3);
+
+  // Share button — visible only when DONE with a real time
+  var shareBtn=document.getElementById('btnShare'+(prefix==='accel'?'Accel':'Brake'));
+  if(shareBtn){
+    if(state===3&&ms>0)shareBtn.classList.add('show');
+    else shareBtn.classList.remove('show');
+  }
 
   // Result
   if(state===3&&ms>0){
@@ -337,6 +372,16 @@ function poll(){
     var spd=d.speedD?Math.round(d.speedD/10):0;
     updateSpeed(spd);
     brakeEntryKph=d.brakeEntryKph||0;
+    if(d.version)fwVer=d.version;
+    lastAccelMs=d.perfAccelMs||0;
+    lastBrakeMs=d.perfBrakeMs||0;
+
+    // Sync model input (skip if user is editing)
+    var inp=document.getElementById('perfModelInput');
+    if(inp&&!perfModelDirty&&typeof d.perfModel==='string'&&inp.value!==d.perfModel){
+      inp.value=d.perfModel;
+    }
+
     var na=d.perfAccel||0,nb=d.perfBrake||0;
     // Detect DONE transition → save to history
     if(prevAccel!==3&&na===3&&d.perfAccelMs>0)saveHistory('accel',d.perfAccelMs,0);
@@ -357,6 +402,69 @@ function resetTest(which){
   if(which==='accel')accelAnimDone=false;
   else{brakeAnimDone=false;document.getElementById('brakeEntry').style.display='none';}
   fetch('/api/perf?cmd=reset_'+which+(token?'&token='+token:'')).then(function(r){return r.json();}).then(poll);
+}
+
+// ── Model save ───────────────────────────────────────────────────────────────
+function saveModel(){
+  var inp=document.getElementById('perfModelInput');
+  var btn=document.getElementById('perfModelSave');
+  var row=document.getElementById('vrowModel');
+  var v=(inp.value||'').trim();
+  var url='/api/perf?cmd=set_model&v='+encodeURIComponent(v)+(token?'&token='+token:'');
+  function onFail(){
+    btn.classList.add('failed');
+    btn.textContent='保存失败';
+    setTimeout(function(){
+      btn.classList.remove('failed');
+      btn.textContent='保存';
+    },1500);
+  }
+  fetch(url).then(function(r){
+    if(!r.ok)throw new Error('http '+r.status);
+    return r.json();
+  }).then(function(){
+    perfModelDirty=false;
+    row.classList.remove('dirty');
+    btn.classList.add('saved');
+    btn.textContent='已保存';
+    setTimeout(function(){
+      btn.classList.remove('saved');
+      btn.classList.remove('show');
+      btn.textContent='保存';
+    },1200);
+  }).catch(onFail);
+}
+
+(function(){
+  var inp=document.getElementById('perfModelInput');
+  var btn=document.getElementById('perfModelSave');
+  var row=document.getElementById('vrowModel');
+  if(!inp)return;
+  inp.addEventListener('input',function(){
+    perfModelDirty=true;
+    row.classList.add('dirty');
+    btn.classList.add('show');
+    btn.classList.remove('saved');
+    btn.textContent='保存';
+  });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();saveModel();}
+  });
+})();
+
+// ── Share ────────────────────────────────────────────────────────────────────
+function shareResult(type){
+  var ms=type==='accel'?lastAccelMs:lastBrakeMs;
+  if(!ms||ms<=0)return;
+  var inp=document.getElementById('perfModelInput');
+  var model=(inp&&inp.value)?inp.value.trim():'';
+  var url='/perf-share?type='+type
+    +'&ms='+ms
+    +'&model='+encodeURIComponent(model)
+    +'&ver='+encodeURIComponent(fwVer||'')
+    +'&t='+Date.now();
+  if(type==='brake'&&brakeEntryKph>0)url+='&v='+brakeEntryKph;
+  window.open(url,'_blank');
 }
 
 renderHistory('accel');

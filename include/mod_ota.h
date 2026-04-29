@@ -73,6 +73,11 @@ enum OtaState : uint8_t {
     OTA_ERROR       = 6,
 };
 
+// Release notes buffer sized for v1.4.32-style releases (~2 KB) with
+// headroom. UTF-8 boundary alignment on truncation keeps Chinese characters
+// from being split mid-byte.
+static constexpr size_t kOtaNotesCap = 4096;
+
 struct OtaStatus {
     volatile uint8_t  state;
     volatile uint32_t total;
@@ -80,6 +85,7 @@ struct OtaStatus {
     char message[128];
     char latestVersion[24];
     char latestUrl[256];
+    char releaseNotes[kOtaNotesCap];
 };
 
 static OtaStatus gOta = {};
@@ -102,6 +108,82 @@ static esp_err_t otaHttpEvent(esp_http_client_event_t* evt) {
     return ESP_OK;
 }
 
+// Decode a JSON string starting at `body[start]` (which is the char *after*
+// the opening quote) into `out`, capped at `cap-1` bytes plus null terminator.
+// Stops at the unescaped closing '"'. Honors \n \r \t \" \\ \/ \b \f and
+// \uXXXX (BMP only, BMP-truncated for surrogate pairs). On overflow, walks
+// back to a UTF-8 leading byte boundary so multi-byte Chinese characters
+// aren't split. Returns the index of the closing quote (or end of body).
+static int otaJsonUnescapeInto(const String& body, int start, char* out, size_t cap) {
+    if (cap == 0) return start;
+    size_t o = 0;
+    int i = start;
+    int n = (int)body.length();
+    auto hexNibble = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+        if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+        return -1;
+    };
+    auto putc = [&](uint8_t b) {
+        if (o + 1 < cap) out[o++] = (char)b;
+    };
+    while (i < n) {
+        char c = body[i];
+        if (c == '"') break;  // unescaped closing quote
+        if (c == '\\' && i + 1 < n) {
+            char e = body[i + 1];
+            switch (e) {
+                case 'n': putc('\n'); i += 2; break;
+                case 'r': putc('\r'); i += 2; break;
+                case 't': putc('\t'); i += 2; break;
+                case 'b': putc('\b'); i += 2; break;
+                case 'f': putc('\f'); i += 2; break;
+                case '"': putc('"');  i += 2; break;
+                case '\\': putc('\\'); i += 2; break;
+                case '/':  putc('/');  i += 2; break;
+                case 'u': {
+                    if (i + 5 >= n) { i = n; break; }
+                    int h0 = hexNibble(body[i + 2]);
+                    int h1 = hexNibble(body[i + 3]);
+                    int h2 = hexNibble(body[i + 4]);
+                    int h3 = hexNibble(body[i + 5]);
+                    if ((h0 | h1 | h2 | h3) < 0) { i += 2; break; }
+                    uint32_t cp = (h0 << 12) | (h1 << 8) | (h2 << 4) | h3;
+                    if (cp < 0x80) {
+                        putc((uint8_t)cp);
+                    } else if (cp < 0x800) {
+                        putc(0xC0 | (cp >> 6));
+                        putc(0x80 | (cp & 0x3F));
+                    } else {
+                        putc(0xE0 | (cp >> 12));
+                        putc(0x80 | ((cp >> 6) & 0x3F));
+                        putc(0x80 | (cp & 0x3F));
+                    }
+                    i += 6;
+                    break;
+                }
+                default:  putc(e); i += 2; break;
+            }
+        } else {
+            putc((uint8_t)c);
+            i += 1;
+        }
+    }
+    // UTF-8 boundary trim: if we filled the buffer, walk back so we don't
+    // leave a partial multi-byte sequence at the tail. Strip continuation
+    // bytes (0b10xxxxxx) — anything left with the high bit set must be a
+    // multi-byte lead whose follow-up bytes were dropped, so drop it too.
+    if (o + 1 >= cap && o > 0) {
+        while (o > 0 && (((uint8_t)out[o - 1]) & 0xC0) == 0x80) o--;
+        if (o > 0 && (((uint8_t)out[o - 1]) & 0x80) != 0) o--;
+    }
+    out[o] = '\0';
+    // Advance i to past the closing quote if present
+    if (i < n && body[i] == '"') i++;
+    return i;
+}
+
 static bool otaParseLatest(const String& body) {
     int tagIdx = body.indexOf("\"tag_name\":\"");
     if (tagIdx < 0) { otaSetMsg(OTA_ERROR, "未找到 tag_name"); return false; }
@@ -111,6 +193,13 @@ static bool otaParseLatest(const String& body) {
     String tag = body.substring(tagIdx, tagEnd);
     if (tag.startsWith("v")) tag = tag.substring(1);
     strlcpy(gOta.latestVersion, tag.c_str(), sizeof(gOta.latestVersion));
+
+    // Parse body field (release notes). Optional — absence is not fatal.
+    gOta.releaseNotes[0] = '\0';
+    int bodyIdx = body.indexOf("\"body\":\"");
+    if (bodyIdx >= 0) {
+        otaJsonUnescapeInto(body, bodyIdx + 8, gOta.releaseNotes, sizeof(gOta.releaseNotes));
+    }
 
     String envTag = FIRMWARE_ENV_TAG;
     String suffix = String("_v") + gOta.latestVersion + "_ota.bin";
@@ -374,6 +463,51 @@ static bool otaStartPullImpl(const char* url) {
     return true;
 }
 
+// Encode `in` as a JSON string body (without surrounding quotes) into `out`.
+// Escapes \\ \" and control chars; passes UTF-8 through verbatim. Truncates
+// safely at multi-byte boundaries so the JSON parser on the client side can
+// still decode it. Returns bytes written (not counting null).
+static size_t otaJsonEscapeInto(const char* in, char* out, size_t cap) {
+    if (cap == 0) return 0;
+    size_t o = 0;
+    auto put = [&](char c) -> bool {
+        if (o + 1 >= cap) return false;
+        out[o++] = c;
+        return true;
+    };
+    for (size_t i = 0; in[i]; ++i) {
+        uint8_t c = (uint8_t)in[i];
+        bool ok = true;
+        switch (c) {
+            case '\\': ok = put('\\') && put('\\'); break;
+            case '"':  ok = put('\\') && put('"');  break;
+            case '\n': ok = put('\\') && put('n');  break;
+            case '\r': ok = put('\\') && put('r');  break;
+            case '\t': ok = put('\\') && put('t');  break;
+            case '\b': ok = put('\\') && put('b');  break;
+            case '\f': ok = put('\\') && put('f');  break;
+            default:
+                if (c < 0x20) {
+                    char tmp[8];
+                    int  m = snprintf(tmp, sizeof(tmp), "\\u%04x", c);
+                    for (int k = 0; k < m && ok; ++k) ok = put(tmp[k]);
+                } else {
+                    ok = put((char)c);
+                }
+                break;
+        }
+        if (!ok) {
+            // Walk back to a UTF-8 lead-byte boundary so we don't leave a
+            // partial sequence (which would break JSON.parse on the client).
+            while (o > 0 && (((uint8_t)out[o - 1]) & 0xC0) == 0x80) o--;
+            if (o > 0 && (((uint8_t)out[o - 1]) & 0x80) != 0) o--;
+            break;
+        }
+    }
+    out[o] = '\0';
+    return o;
+}
+
 static size_t otaStatusJsonImpl(char* buf, size_t cap) {
     uint8_t  st  = gOta.state;
     uint32_t wr  = gOta.written;
@@ -381,10 +515,34 @@ static size_t otaStatusJsonImpl(char* buf, size_t cap) {
     return snprintf(buf, cap,
         "{\"state\":%u,\"written\":%u,\"total\":%u,"
         "\"message\":\"%s\",\"latest\":\"%s\",\"url\":\"%s\","
-        "\"current\":\"%s\",\"envTag\":\"%s\"}",
+        "\"current\":\"%s\",\"envTag\":\"%s\","
+        "\"hasNotes\":%s}",
         (unsigned)st, (unsigned)wr, (unsigned)tot,
         gOta.message, gOta.latestVersion, gOta.latestUrl,
-        FIRMWARE_VERSION, FIRMWARE_ENV_TAG);
+        FIRMWARE_VERSION, FIRMWARE_ENV_TAG,
+        gOta.releaseNotes[0] ? "true" : "false");
+}
+
+// Separate endpoint for release notes — fetched once per check, not on each
+// /api/ota/status poll (which the UI hits every couple seconds during OTA).
+// Caller should size buf >= 6 KB to hold the worst-case JSON-escaped 4 KB
+// notes plus the small version/envelope. Truncates safely if smaller.
+static constexpr size_t kOtaNotesJsonSuffix = 3;  // sizeof("\"}\0")
+
+static size_t otaNotesJsonImpl(char* buf, size_t cap) {
+    if (cap < 64) { if (cap) buf[0] = '\0'; return 0; }
+    int prefix = snprintf(buf, cap,
+        "{\"version\":\"%s\",\"notes\":\"", gOta.latestVersion);
+    if (prefix < 0 || (size_t)prefix >= cap) { buf[0] = '\0'; return 0; }
+    size_t o = (size_t)prefix;
+    if (cap - o < kOtaNotesJsonSuffix + 1) { buf[o] = '\0'; return o; }
+    size_t notesCap = cap - o - kOtaNotesJsonSuffix;
+    size_t wrote = otaJsonEscapeInto(gOta.releaseNotes, buf + o, notesCap);
+    o += wrote;
+    buf[o++] = '"';
+    buf[o++] = '}';
+    buf[o]   = '\0';
+    return o;
 }
 
 // Report both OTA partitions so the UI can tell the user what a rollback
@@ -454,6 +612,7 @@ static bool otaDoRollbackImpl(char* err, size_t errCap) {
 static inline bool   otaStartCheck()                       { return ota_impl::otaStartCheckImpl(); }
 static inline bool   otaStartPull(const char* url)         { return ota_impl::otaStartPullImpl(url); }
 static inline size_t otaStatusJson(char* buf, size_t cap)  { return ota_impl::otaStatusJsonImpl(buf, cap); }
+static inline size_t otaNotesJson(char* buf, size_t cap)   { return ota_impl::otaNotesJsonImpl(buf, cap); }
 static inline size_t otaPartInfoJson(char* buf, size_t cap){ return ota_impl::otaPartInfoJsonImpl(buf, cap); }
 static inline bool   otaDoRollback(char* err, size_t errCap){ return ota_impl::otaDoRollbackImpl(err, errCap); }
 static inline const char* otaLatestUrl()                   { return ota_impl::gOta.latestUrl; }

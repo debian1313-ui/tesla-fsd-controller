@@ -109,7 +109,7 @@ static inline uint8_t encodeHW3OffsetFromPct(int pct, int fusedLimitKph) {
 
 // ── CAN ID filter tables (used by handleMessage) ──────────────────────────
 static constexpr uint32_t LEGACY_IDS[] = {69, 760, 1006, 1080};
-static constexpr uint32_t HW3_IDS[]    = {787, 1016, 1021};
+static constexpr uint32_t HW3_IDS[]    = {1016, 1021};
 static constexpr uint32_t HW4_IDS[]    = {921, 1016, 1021};
 
 inline const uint32_t* getFilterIds() {
@@ -122,7 +122,7 @@ inline const uint32_t* getFilterIds() {
 inline uint8_t getFilterIdCount() {
     switch (cfg.hwMode) {
         case 0:  return 4;
-        case 1:  return 3;
+        case 1:  return 2;
         default: return 3;
     }
 }
@@ -178,7 +178,7 @@ static void handleLegacy(CanFrame& frame, CanDriver& driver) {
                 frame.data[7] = (frame.data[7] & 0xF0) | (cfg.legacyByte7Value & 0x0F);
             }
             setSpeedProfileV12V13(frame, cfg.speedProfile);
-            
+            btMark(bt_firstFsdMod);
             if (driver.send(frame)) cfg.modifiedCount++;
             else                    cfg.errorCount++;
         }
@@ -190,18 +190,8 @@ static void handleLegacy(CanFrame& frame, CanDriver& driver) {
     }
 }
 
-// ── Handler: HW3 (0x3FD / 0x3F8 / 0x313) ────────────────────────────────
+// ── Handler: HW3 (0x3FD / 0x3F8) ────────────────────────────────────────
 static void handleHW3(CanFrame& frame, CanDriver& driver) {
-    // 0x313 (787) — UI_trackModeSettings: echo with trackModeRequest=ON
-    if (frame.id == 787) {
-        if (!cfg.trackModeEnable) return;
-        if (frame.dlc < 8) return;
-        setTrackModeRequest(frame, 0x01);
-        frame.data[7] = computeVehicleChecksum(frame);
-        if (driver.send(frame)) cfg.modifiedCount++;
-        else                    cfg.errorCount++;
-        return;
-    }
     // 0x3F8 (1016) — stalk position → speed profile (auto mode only)
     if (frame.id == 1016 && cfg.profileModeAuto) {
         if (frame.dlc < 6) return;
@@ -227,7 +217,9 @@ static void handleHW3(CanFrame& frame, CanDriver& driver) {
             // follow tesla-open-can-mod verbatim: ((d3>>1)&0x3F - 30)*5 clamped [0,100].
             cfg.hw3SpeedOffset = std::max(std::min(((int)((frame.data[3] >> 1) & 0x3F) - 30) * 5, 100), 0);
             setBit(frame, 46, true);
+            if (cfg.tlsscBypass) setBit(frame, 38, true);  // ev-open-can-tools-plugins bypass-tlssc-hw3
             setSpeedProfileV12V13(frame, cfg.speedProfile);
+            btMark(bt_firstFsdMod);
             if (driver.send(frame)) cfg.modifiedCount++;
             else                    cfg.errorCount++;
         }
@@ -372,6 +364,8 @@ static void handleHW4(CanFrame& frame, CanDriver& driver) {
             setBit(frame, 46, true);
             setBit(frame, 60, true);
             if (cfg.emergencyDetection) setBit(frame, 59, true);
+            if (cfg.tlsscBypass)        setBit(frame, 38, true);  // ev-open-can-tools-plugins bypass-tlssc-hw4
+            btMark(bt_firstFsdMod);
             if (driver.send(frame)) cfg.modifiedCount++;
             else                    cfg.errorCount++;
         }

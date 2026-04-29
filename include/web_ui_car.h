@@ -13,6 +13,9 @@
 #define PROGMEM
 #endif
 
+#include "version.h"
+#include "web_ui_diag_js.h"  // DIAG_SHARED_JS macro embedded mid-string below
+
 const char CAR_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -44,8 +47,8 @@ button{font-family:inherit;cursor:pointer}
 .page.show{display:block}
 /* ── dashboard v1.5 (全新设计) ─────────────────── */
 .cluster{position:relative;padding:30px 40px 24px;margin-bottom:24px;background:radial-gradient(ellipse 70% 55% at 50% 48%,#1a2c4e 0%,#0a0a0a 75%);border-radius:28px;overflow:hidden;min-height:660px;animation:cluster-in .6s cubic-bezier(.2,.8,.2,1)}
-.cluster::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 30% 22% at 50% 48%,rgba(56,189,248,.1) 0%,transparent 70%),radial-gradient(ellipse 12% 8% at 20% 30%,rgba(52,211,153,.05),transparent 70%),radial-gradient(ellipse 12% 8% at 80% 30%,rgba(239,68,68,.05),transparent 70%);pointer-events:none}
-.scene{position:relative;display:grid;grid-template-columns:240px 1fr 170px;gap:20px;align-items:center;min-height:680px}
+.cluster::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 30% 22% at 50% 48%,rgba(56,189,248,.1) 0%,transparent 70%),radial-gradient(ellipse 12% 8% at 20% 30%,rgba(52,211,153,.05),transparent 70%),radial-gradient(ellipse 12% 8% at 80% 30%,rgba(239,68,68,.05),transparent 70%),repeating-linear-gradient(0deg,transparent 0 79px,rgba(255,255,255,.018) 79px 80px);pointer-events:none}
+.scene{position:relative;display:grid;grid-template-columns:200px 1fr 200px;gap:20px;align-items:center;min-height:600px}
 /* ── 挡位列 ── */
 .c-gear{text-align:center;position:relative;z-index:2}
 .gear-big{font-size:260px;font-weight:900;line-height:.82;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;letter-spacing:-16px;color:#8a8a8a;transform-origin:center center;transition:color .35s, transform .45s cubic-bezier(.2,.8,.2,1);text-shadow:0 6px 80px currentColor;display:inline-block;will-change:transform}
@@ -53,7 +56,7 @@ button{font-family:inherit;cursor:pointer}
 .gear-big.P{color:#60a5fa}
 .gear-big.R{color:#f87171}
 .gear-big.N{color:#a0a0a0}
-.gear-big.D{color:#34d399}
+.gear-big.D{color:#14b8a6}
 .gear-big.pop{animation:gear-pop .55s cubic-bezier(.2,1.3,.3,1)}
 .cluster.driving .gear-big.pop{animation:gear-pop-small .5s cubic-bezier(.2,1.25,.3,1)}
 @keyframes gear-pop{0%{transform:scale(.55);opacity:.4}55%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
@@ -70,12 +73,12 @@ button{font-family:inherit;cursor:pointer}
 .speedo-wrap{position:relative;width:100%;max-width:860px;aspect-ratio:1;margin:0 auto}
 .speedo-arc{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 36px rgba(56,189,248,.55));transition:filter .5s}
 .speedo-arc circle{transition:stroke-dasharray .55s cubic-bezier(.3,.9,.3,1),stroke .8s ease}
-.cluster.warn .speedo-arc{filter:drop-shadow(0 0 44px rgba(239,68,68,.9));animation:arc-warn 1s ease-in-out infinite}
-.cluster.warn .spd-huge{color:#fecaca;text-shadow:0 4px 90px rgba(239,68,68,.85)}
-@keyframes arc-warn{0%,100%{filter:drop-shadow(0 0 44px rgba(239,68,68,.9))}50%{filter:drop-shadow(0 0 70px rgba(239,68,68,1))}}
+.cluster.warn .speedo-arc{filter:drop-shadow(0 0 50px rgba(239,68,68,1));animation:arc-warn 1s ease-in-out infinite}
+.cluster.warn .spd-huge{color:#ffffff;text-shadow:0 4px 100px rgba(239,68,68,.95),0 0 30px rgba(239,68,68,.7)}
+@keyframes arc-warn{0%,100%{filter:drop-shadow(0 0 50px rgba(239,68,68,.9))}50%{filter:drop-shadow(0 0 80px rgba(239,68,68,1))}}
 .speedo-inner{position:absolute;inset:13%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 55%,rgba(15,23,42,.55) 0%,rgba(11,17,32,.2) 55%,transparent 72%);border-radius:50%}
-.spd-huge{font-size:260px;font-weight:900;line-height:.8;letter-spacing:-8px;color:#f8fafc;font-variant-numeric:tabular-nums;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;text-shadow:0 4px 80px rgba(56,189,248,.35);will-change:transform;transition:text-shadow .3s, font-size .3s}
-.spd-huge.big3{font-size:220px;letter-spacing:-6px}
+.spd-huge{font-size:260px;font-weight:900;line-height:.8;letter-spacing:-6px;color:#f8fafc;font-variant-numeric:tabular-nums;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;text-shadow:0 4px 80px rgba(56,189,248,.35);will-change:transform;transition:text-shadow .3s, font-size .3s, color .3s}
+.spd-huge.big3{font-size:220px;letter-spacing:-4px}
 .spd-huge.tick{animation:spd-tick .5s ease-out}
 @keyframes spd-tick{0%{transform:scale(1)}30%{transform:scale(1.06);text-shadow:0 6px 100px rgba(56,189,248,.75)}100%{transform:scale(1);text-shadow:0 4px 80px rgba(56,189,248,.35)}}
 .spd-unit{margin-top:18px;font-size:30px;color:#475569;letter-spacing:12px;font-weight:700;text-transform:uppercase}
@@ -84,8 +87,9 @@ button{font-family:inherit;cursor:pointer}
 /* ── 限速牌 (缩小) ── */
 .c-limit{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;z-index:2}
 .c-limit .l-src{font-size:12px;color:#8a8a8a;letter-spacing:3px;min-height:16px;font-weight:600;text-transform:uppercase}
-.limit-sign{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff 0%,#f8fafc 70%);border:11px solid #dc2626;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 6px 36px rgba(220,38,38,.4),inset 0 3px 10px rgba(0,0,0,.08);animation:glow-breath 3.5s ease-in-out infinite}
-@keyframes glow-breath{0%,100%{box-shadow:0 6px 36px rgba(220,38,38,.4),inset 0 3px 10px rgba(0,0,0,.08)}50%{box-shadow:0 6px 54px rgba(220,38,38,.65),inset 0 3px 10px rgba(0,0,0,.08)}}
+.limit-sign{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff 0%,#f8fafc 70%);border:11px solid #dc2626;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 6px 36px rgba(220,38,38,.4),inset 0 3px 10px rgba(0,0,0,.08);transition:box-shadow .35s}
+.limit-sign.pulse{animation:limit-flash .9s cubic-bezier(.2,.7,.2,1)}
+@keyframes limit-flash{0%{box-shadow:0 6px 36px rgba(220,38,38,.4),inset 0 3px 10px rgba(0,0,0,.08)}35%{box-shadow:0 6px 80px rgba(220,38,38,.95),0 0 40px rgba(255,255,255,.4),inset 0 3px 10px rgba(0,0,0,.08)}100%{box-shadow:0 6px 36px rgba(220,38,38,.4),inset 0 3px 10px rgba(0,0,0,.08)}}
 .limit-num{font-size:58px;font-weight:900;color:#0f172a;line-height:1;letter-spacing:-3px;font-family:-apple-system,system-ui,sans-serif}
 .limit-unit{font-size:11px;color:#475569;font-weight:700;letter-spacing:1px;margin-top:-2px}
 /* ── SOC 宽条 ── */
@@ -96,18 +100,18 @@ button{font-family:inherit;cursor:pointer}
 .soc-wide-val.low{color:#fbbf24}
 .soc-wide-val.crit{color:#ef4444}
 .soc-wide-bar{position:relative;height:14px;background:rgba(15,23,42,.9);border:1px solid rgba(30,41,59,.9);border-radius:7px;overflow:hidden}
-.soc-wide-fill{height:100%;background:linear-gradient(90deg,#34d399 0%,#22c55e 100%);background-size:200% 100%;transition:width .55s cubic-bezier(.3,.9,.3,1);box-shadow:0 0 22px rgba(52,211,153,.5);animation:soc-shimmer 3s linear infinite}
+.soc-wide-fill{height:100%;background:linear-gradient(90deg,#34d399 0%,#22c55e 100%);background-size:200% 100%;transition:width .55s cubic-bezier(.3,.9,.3,1);box-shadow:0 0 22px rgba(52,211,153,.5)}
 .soc-wide-fill.low{background:linear-gradient(90deg,#fbbf24,#f59e0b);box-shadow:0 0 22px rgba(251,191,36,.5)}
-.soc-wide-fill.crit{background:linear-gradient(90deg,#ef4444,#dc2626);box-shadow:0 0 22px rgba(239,68,68,.5)}
+.soc-wide-fill.crit{background:linear-gradient(90deg,#ef4444,#dc2626);box-shadow:0 0 22px rgba(239,68,68,.5);animation:soc-shimmer 2s linear infinite}
 @keyframes soc-shimmer{0%{background-position:0 0}100%{background-position:-200% 0}}
 /* ── 信息芯片 ── */
 .chips{margin-top:18px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;padding:0 10px}
-.chip{display:inline-flex;align-items:center;gap:10px;padding:10px 22px;background:rgba(15,23,42,.55);border:1px solid rgba(30,41,59,.9);border-radius:22px;font-size:17px;color:#e5e5e5;font-weight:700;backdrop-filter:blur(6px)}
-.chip-ic{font-size:17px}
+.chip{display:inline-flex;align-items:center;gap:10px;padding:11px 22px;background:rgba(15,23,42,.55);border:1px solid rgba(30,41,59,.9);border-radius:22px;font-size:19px;color:#e5e5e5;font-weight:700;backdrop-filter:blur(6px)}
+.chip-ic{font-size:19px}
 .chip-v{font-variant-numeric:tabular-nums;color:#e2e8f0}
 /* ── fade 通用 ── */
-.fade-el{transition:opacity .32s ease, transform .32s ease, visibility .32s}
-.fade-el.hide{opacity:0;visibility:hidden;transform:scale(.9);pointer-events:none}
+.fade-el{transition:opacity .32s ease}
+.fade-el.hide{opacity:0;pointer-events:none}
 @keyframes cluster-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 /* ── 仪表盘模式：导航栏变成窄图标栏（每项始终可点） ── */
 .app{transition:grid-template-columns .35s ease}
@@ -157,6 +161,14 @@ button{font-family:inherit;cursor:pointer}
 .slbl{font-size:14px;color:#8a8a8a;margin-top:8px;letter-spacing:2px;font-weight:600}
 .sunit{font-size:16px;color:#8a8a8a;margin-left:4px;font-weight:600}
 .tip{font-size:14px;color:#8a8a8a;margin-top:8px;line-height:1.6}
+.tip.tip-collapsed{display:none}
+/* Panel-title info button — opens/closes all .tip blocks within the panel.
+   Absolute-positioned in the panel's top-right corner so it lines up with
+   .ptitle vertically without disturbing the existing title flow.
+   Active state highlights when at least one tip in the panel is open. */
+.panel{position:relative}
+.info-toggle{position:absolute;top:22px;right:24px;cursor:pointer;margin-left:0}
+.info-ic.active{background:#0ea5e9;color:#fff;border-color:#0284c7}
 .disclaimer{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:12px;padding:16px 20px;margin-bottom:20px;color:#fca5a5;font-size:16px;font-weight:600;line-height:1.6}
 .ota-zone{border:3px dashed #333;border-radius:16px;padding:40px;text-align:center;background:rgba(255,255,255,.03);margin-bottom:20px}
 .ota-zone.drag{border-color:#e5e5e5;background:rgba(255,255,255,.08)}
@@ -337,12 +349,9 @@ button{font-family:inherit;cursor:pointer}
             <svg class="speedo-arc" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
               <defs>
                 <linearGradient id="arcGrad" x1="0" y1="1" x2="1" y2="0">
-                  <stop offset="0%" stop-color="#22c55e"/>
-                  <stop offset="30%" stop-color="#38bdf8"/>
-                  <stop offset="50%" stop-color="#818cf8"/>
-                  <stop offset="65%" stop-color="#f472b6"/>
-                  <stop offset="75%" stop-color="#ef4444"/>
-                  <stop offset="100%" stop-color="#b91c1c"/>
+                  <stop offset="0%"   stop-color="#22c55e"/>
+                  <stop offset="65%"  stop-color="#fbbf24"/>
+                  <stop offset="100%" stop-color="#ef4444"/>
                 </linearGradient>
                 <linearGradient id="arcBg" x1="0" y1="1" x2="1" y2="0">
                   <stop offset="0%" stop-color="rgba(30,41,59,.55)"/>
@@ -350,7 +359,7 @@ button{font-family:inherit;cursor:pointer}
                 </linearGradient>
               </defs>
               <circle cx="50" cy="50" r="45" fill="none" stroke="url(#arcBg)" stroke-width="4" stroke-dasharray="212.06 283" transform="rotate(135 50 50)" stroke-linecap="round"/>
-              <circle id="arcFill" cx="50" cy="50" r="45" fill="none" stroke="url(#arcGrad)" stroke-width="4.5" stroke-dasharray="0 283" transform="rotate(135 50 50)" stroke-linecap="round"/>
+              <circle id="arcFill" cx="50" cy="50" r="45" fill="none" stroke="url(#arcGrad)" stroke-width="5" stroke-dasharray="0 283" transform="rotate(135 50 50)" stroke-linecap="round"/>
             </svg>
             <div class="speedo-inner">
               <div class="spd-huge" id="vSpeed">0</div>
@@ -381,6 +390,7 @@ button{font-family:inherit;cursor:pointer}
         <div class="chips">
           <div class="chip fade-el hide" id="miBmsT"><span class="chip-ic">🔋</span><span class="chip-v"><span id="vBmsT"></span>°C</span></div>
           <div class="chip fade-el hide" id="rowCabinTemp"><span class="chip-ic">🌡</span><span class="chip-v"><span id="vCabinTemp"></span>°C</span></div>
+          <div class="chip fade-el hide" id="rowChipTemp"><span class="chip-ic">🔥</span><span class="chip-v"><span id="vChipTemp"></span></span></div>
           <div class="chip fade-el hide" id="miUp"><span class="chip-ic">⏱</span><span class="chip-v" id="vUp"></span></div>
         </div>
       </div>
@@ -404,7 +414,7 @@ button{font-family:inherit;cursor:pointer}
           <button class="pill" data-v="2">HW4</button>
           <button class="pill" data-v="0">Legacy</button>
         </div>
-        <div class="tip" id="hwTip">HW3 = Model 3/Y 大部分；HW4 = Highland/新 S/X；Legacy = 老款</div>
+        <div class="tip" id="hwTip">按 FSD 协议版本选，不是按芯片型号。<br>HW3 = FSD V13 协议（HW3 芯片 / HW4 芯片跑 2026.8 及更早固件都是 V13）<br>HW4 = FSD V14 协议（仅 HW4 芯片 + 已升 V14 的固件）<br>Legacy = 老款 AP1/AP2</div>
       </div>
 
       <div class="panel">
@@ -470,7 +480,7 @@ button{font-family:inherit;cursor:pointer}
             <div class="ts-step-val"><span id="cHw4Off">0</span><span class="ts-step-unit">raw ≈ <span id="cHw4OffKmh">0</span> km/h</span></div>
             <button class="ts-step-btn" onclick="hw4Step(1)">+</button>
           </div>
-          <div class="rval">0~15（0=关，15≈+11 km/h）</div>
+          <div class="rval">0~21（0=关，21≈+15 km/h）</div>
         </div>
         <div class="row"><div class="rlbl">ISA 限速覆盖</div><div class="tog" id="tgIsaOvr" data-k="isaOverride"></div><div class="rval">阻止 nav 限速压速（2024+ 固件必开）</div></div>
       </div>
@@ -479,7 +489,10 @@ button{font-family:inherit;cursor:pointer}
         <div class="ptitle">常用开关</div>
         <div class="row"><div class="rlbl">ISA 提示音</div><div class="tog" id="tgIsa" data-k="isaChime"></div><div class="rval">屏蔽限速提示音</div></div>
         <div class="row" id="rowEmerg" style="display:none"><div class="rlbl">紧急检测</div><div class="tog" id="tgEmerg" data-k="emergencyDet"></div><div class="rval">紧急制动/碰撞检测（HW4 专用）</div></div>
-        <div class="row"><div class="rlbl">强制激活</div><div class="tog" id="tgForce" data-k="forceActivate"></div><div class="rval">强制启用 FSD（风险高）</div></div>
+        <div class="row"><div class="rlbl">强制激活</div><div class="tog" id="tgForce" data-k="forceActivate"></div><div class="rval">无视车端"FSD 已选"判断直接注入</div></div>
+        <div class="tip">🛈 实测车型上必须开，FSD 才能激活。不开时只在车机端广播"FSD 已选定"位时才触发注入，但目前所见车型该位都不广播，关着等于功能不工作。</div>
+        <div class="row" id="rowTlssc" style="display:none"><div class="rlbl">TLSSC 旁路</div><div class="tog" id="tgTlssc" data-k="tlsscBypass"></div><div class="rval">激活帧附带置位 TLSSC 旁路</div></div>
+        <div class="tip" id="tipTlssc" style="display:none">🛈 默认关。仅在 FSD 蓝方向盘点不亮的固件/地区试着开；未在每个固件验证。能正常激活的不要开，开了不一定有效甚至可能反向失败。</div>
         <div class="row" id="rowOvr" style="display:none"><div class="rlbl">忽略限速</div><div class="tog" id="tgOvr" data-k="overrideSL"></div><div class="rval">忽略路牌限速（Legacy 专用）</div></div>
         <div class="row" id="rowRvsl" style="display:none"><div class="rlbl">关闭视觉限速</div><div class="tog" id="tgRvsl" data-k="removeVSL"></div><div class="rval">屏蔽摄像头识别的限速（Legacy 专用）</div></div>
         <div class="row" id="rowLegOff" style="display:none"><div class="rlbl">Legacy 偏移</div>
@@ -499,8 +512,6 @@ button{font-family:inherit;cursor:pointer}
             <div style="grid-column:1 / -1">地图限速 raw：<span id="cGps2F8MppLim">--</span></div>
           </div>
         </div>
-        <div class="row"><div class="rlbl">AP 自动恢复</div><div class="tog" id="tgApRs"></div><div class="rval">刹车后自动恢复 AP</div></div>
-        <div class="row" id="rowTrack" style="display:none"><div class="rlbl">赛道模式</div><div class="tog" id="tgTrack" data-k="trackMode"></div><div class="rval">解锁高性能（HW3 专用）</div></div>
       </div>
     </div>
 
@@ -621,6 +632,16 @@ button{font-family:inherit;cursor:pointer}
           <div class="info-item"><div class="info-lbl">固件版本</div><div class="info-val" id="oVer">--</div></div>
           <div class="info-item"><div class="info-lbl">变体</div><div class="info-val" id="oVar">--</div></div>
         </div>
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid #222">
+          <div style="font-size:16px;color:#a0a0a0;margin-bottom:10px">车机软件版本（建议填写）</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <input id="carVerInput" placeholder="例如 2024.44.25.1" maxlength="32" autocomplete="off"
+              style="flex:1;min-width:220px;height:52px;padding:0 14px;background:rgba(255,255,255,.06);color:#fff;border:0;border-radius:10px;font-size:18px">
+            <button class="abtn gray" id="carVerSave" onclick="saveCarVer()" style="min-width:120px">💾 保存</button>
+          </div>
+          <div id="carVerMsg" style="font-size:14px;color:#64748b;margin-top:8px;min-height:18px"></div>
+          <div class="tip" style="margin-top:8px">🛈 建议填写：上传诊断包时一起带上方便定位限速/激活问题。在车机 控制 → 软件 里能看到，不填不影响功能。</div>
+        </div>
       </div>
       <div class="panel">
         <div class="ptitle">上传新固件</div>
@@ -654,6 +675,9 @@ button{font-family:inherit;cursor:pointer}
         <div class="actions" style="margin-top:14px">
           <button class="abtn blue" id="otaChkBtn" onclick="otaCheck()">🔍 检查更新</button>
           <button class="abtn" id="otaPullBtn" onclick="otaPull()" disabled style="opacity:.5">⬇️ 下载并安装</button>
+        </div>
+        <div class="actions" style="margin-top:8px;display:none" id="carOtaNotesRow">
+          <button class="abtn" id="carOtaNotesBtn" onclick="carShowOtaNotes()" style="background:#0e7490;width:100%">📋 查看更新内容</button>
         </div>
         <div class="progress" id="otaDlBox" style="display:none;margin-top:14px"><div class="progress-bar" id="otaDlBar" style="width:0%"></div></div>
         <div id="otaOnlineMsg" style="margin-top:10px;font-size:15px;color:#a0a0a0;min-height:22px"></div>
@@ -760,6 +784,20 @@ button{font-family:inherit;cursor:pointer}
         </div>
         <div class="tip">🛈 日志下载持久版本请用手机版（车机浏览器不便保存文件）</div>
       </div>
+      <div class="panel" id="diagUpPanel" style="display:none">
+        <div class="ptitle">上报诊断包</div>
+        <div class="tip" style="margin-bottom:10px">
+          🛈 一键打包当前模块状态（CAN 帧 ID 指纹、车型/HW 配置、限速/挡位/BMS 等）+ 最近 80 条日志，
+          上传到项目服务器，生成一个 6 位 ID。把 ID 贴到 GitHub Issue 即可，
+          内容只有维护者能解开（不公开）。<b>不包含位置 / VIN / 网络密码</b>。
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="abtn blue" id="diagUpBtn" onclick="diagUpload()" style="min-width:160px">📤 上传诊断包</button>
+          <span id="diagUpId" style="display:none;font-family:monospace;font-size:24px;font-weight:700;color:#22c55e;letter-spacing:2px"></span>
+          <button class="abtn gray" id="diagUpCopy" onclick="diagCopyId()" style="display:none">📋 复制 ID</button>
+        </div>
+        <div id="diagUpMsg" style="font-size:14px;color:#a0a0a0;margin-top:10px;min-height:18px"></div>
+      </div>
     </div>
 
     <!-- ───── 设置 ───── -->
@@ -819,6 +857,21 @@ button{font-family:inherit;cursor:pointer}
   </div>
 </div>
 
+<!-- OTA Release Notes 弹窗 -->
+<div id="carOtaNotesOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1500;align-items:center;justify-content:center;padding:24px;box-sizing:border-box" onclick="carHideOtaNotes(event)">
+  <div style="background:#0a0a0a;border:1px solid #333;border-radius:14px;max-width:680px;width:100%;max-height:86vh;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:18px 22px;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:18px;font-weight:600;color:#fff" id="carOtaNotesTitle">更新内容</div>
+      <button onclick="carHideOtaNotes()" style="background:none;border:none;color:#888;font-size:28px;cursor:pointer;padding:0 6px;line-height:1">×</button>
+    </div>
+    <div id="carOtaNotesBody" style="padding:18px 22px;overflow-y:auto;color:#ccc;font-size:15px;line-height:1.7;flex:1"></div>
+    <div class="actions" style="padding:14px 22px;border-top:1px solid #222">
+      <button class="abtn" onclick="carHideOtaNotes()" style="flex:1">关闭</button>
+      <button class="abtn blue" id="carOtaNotesInstallBtn" onclick="carHideOtaNotes();otaPull()" style="flex:1">⬇️ 下载并安装</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var tok = sessionStorage.getItem('fsd_tok') || '';
 var pollT = null;
@@ -839,7 +892,7 @@ document.querySelectorAll('.nbtn').forEach(function(b){
     document.querySelectorAll('.page').forEach(function(x){x.classList.remove('show')});
     document.getElementById('pg-'+p).classList.add('show');
     applyNavForPage(p);
-    if(p === 'log') logRefresh();
+    if(p === 'log'){ logRefresh(); diagPoll(); }
     if(p === 'ota'){
       fetch('/api/ota/status'+(tok?'?token='+encodeURIComponent(tok):''))
         .then(function(r){ return r.ok?r.json():null; })
@@ -923,6 +976,32 @@ document.getElementById('pinInput').addEventListener('keydown', function(e){if(e
 
 // ───── 状态轮询 ─────
 function authSuffix(){return tok ? '?token='+encodeURIComponent(tok) : ''}
+// ───── 适配器：car UI 用 inline style.color，token 名是 `tok` ─────
+function _DIAG_LITERALS(){return {
+  upload:'📤 上传诊断包', retry:'📤 重试', retryAgain:'📤 重新上传',
+  uploading:'⏳ 上传中…', inProg:'正在打包并上传…',
+  done:'✓ 已生成 ID — 把它贴到 GitHub Issue 即可',
+  reqFail:'请求失败', netErr:'网络错误',
+  copied:'✓ 已复制 ', notSupported:'此固件变体不支持',
+  carVerOK:'✓ 已保存', carVerFail:'✗ 保存失败',
+  carVerSaving:'保存中...', carVerNetErr:'✗ 网络错误',
+  carVerBadFmt:'⚠ 格式应为 2024.32.25 或 2024.32.25.1（年.周.补丁[.子号]），仍可保存'
+};}
+function _DIAG_STYLE(el,kind){
+  if(!el) return;
+  var c = kind==='ok' ? '#22c55e'
+        : kind==='err' ? '#ef4444'
+        : kind==='pending' ? '#64748b'
+        : '#a0a0a0';
+  el.style.color = kind ? c : '';
+}
+function _AUTH_TOKEN(){return tok||'';}
+// Phone UI exposes diagPoll(); car UI used to call it the same way.
+// Keep that alias so the rest of the page can call diagPoll().
+function diagPoll(){ diagPollOnce(); }
+)rawliteral"
+DIAG_SHARED_JS
+R"rawliteral(
 function poll(){
   fetch('/api/status'+authSuffix())
     .then(function(r){
@@ -960,8 +1039,16 @@ function render(d){
   // 顶栏
   setStat('hsCAN', d.canOK, 'CAN ' + (d.canOK?'已连接':'断开'));
   setStat('hsWifi', d.staOK, 'Wi-Fi ' + (d.staOK ? (d.staIP||'OK') : '仅热点'));
-  var tempC = d.tempSeen ? Math.round(d.tempInRaw*0.25) : null;
-  document.getElementById('hsTempTxt').textContent = tempC!==null ? tempC+'°C' : '--';
+  // 顶栏温度显示芯片温度（所有固件都有）；车内温度在仪表盘 chips 行单独展示
+  var hsTempEl = document.getElementById('hsTempTxt');
+  if(d.chipTempC!==null && d.chipTempC!==undefined){
+    hsTempEl.textContent = d.chipTempC.toFixed(0)+'°C';
+    var lvl = d.thermalLevel||0;
+    hsTempEl.style.color = lvl===0?'':(lvl===1?'#fbbf24':lvl===2?'#fb923c':'#ef4444');
+  } else {
+    hsTempEl.textContent = '--';
+    hsTempEl.style.color = '';
+  }
   document.getElementById('hsHeapTxt').textContent = Math.round(d.freeHeap/1024)+'KB';
 
   // ── 仪表盘 ──
@@ -1020,6 +1107,12 @@ function render(d){
     document.getElementById('vFused').textContent = fusedKmh;
     var usingVision = !(d.fusedLimit>0 && d.fusedLimit<31) && (d.visionLimit>0 && d.visionLimit<31);
     document.getElementById('vFusedSrc').innerHTML = usingVision ? '视觉识别' : '&nbsp;';
+    // 限速变化时短促 pulse 一次（用 window.__prevLim 保证全局唯一态）
+    if(fusedKmh !== window.__prevLim){
+      var box = lim.querySelector('.limit-sign');
+      if(box){ box.classList.remove('pulse'); void box.offsetWidth; box.classList.add('pulse'); }
+      window.__prevLim = fusedKmh;
+    }
   }
   lim.classList.toggle('hide', !(fusedKmh > 0));
   // 挡位：未知隐藏
@@ -1057,6 +1150,17 @@ function render(d){
     document.getElementById('vCabinTemp').textContent = tIn+' / '+tOut;
   }
   document.getElementById('rowCabinTemp').classList.toggle('hide', !d.tempSeen);
+  // 芯片温度（thermalLevel: 0 normal / 1 warning / 2 throttled / 3 protect）
+  var hasChip = d.chipTempC!=null;
+  document.getElementById('rowChipTemp').classList.toggle('hide', !hasChip);
+  if(hasChip){
+    var s = d.chipTempC.toFixed(1)+'°C';
+    if(d.thermalLevel>0 && d.thermalStatus) s += ' · '+d.thermalStatus;
+    var ce = document.getElementById('vChipTemp');
+    ce.textContent = s;
+    var lvl = d.thermalLevel||0;
+    ce.style.color = lvl===0?'':(lvl===1?'#fbbf24':lvl===2?'#fb923c':'#ef4444');
+  }
   // 安全模式横幅
   document.getElementById('rowSafeMode').style.display = d.safeMode ? '' : 'none';
 
@@ -1108,6 +1212,7 @@ function render(d){
   setTog('tgIsaOvr', d.isaOverride);
   setTog('tgEmerg', d.emergencyDet);
   setTog('tgForce', d.forceActivate);
+  setTog('tgTlssc', d.tlsscBypass);
   setTog('tgOvr', d.overrideSL);
   setTog('tgRvsl', d.removeVSL==null?true:!!d.removeVSL);
   setTog('tgLegB7En', d.legacyByte7Enable==null?true:!!d.legacyByte7Enable);
@@ -1144,7 +1249,6 @@ function render(d){
   document.querySelectorAll('#grpPMode .pill').forEach(function(b){
     b.classList.toggle('active', parseInt(b.dataset.pm)===d.profileMode);
   });
-  setTog('tgApRs', d.apRestart);
 
   // HW3/HW4 面板切换（0=Legacy, 1=HW3, 2=HW4）
   document.getElementById('panelHw3').style.display = isHW3 ? 'block' : 'none';
@@ -1157,6 +1261,8 @@ function render(d){
   document.getElementById('rowLegB7En').style.display = isLegacy ? '' : 'none';
   document.getElementById('rowLegB7Val').style.display = isLegacy ? '' : 'none';
   document.getElementById('rowTrack').style.display = isHW3 ? '' : 'none';
+  document.getElementById('rowTlssc').style.display = (isHW3||isHW4) ? '' : 'none';
+  document.getElementById('tipTlssc').style.display = (isHW3||isHW4) ? '' : 'none';
   // HW4 偏移 stepper 值回填（respect dirty）
   (function(){
     var e=document.getElementById('cHw4Off'), k=document.getElementById('cHw4OffKmh');
@@ -1213,6 +1319,15 @@ function render(d){
   // OTA 页
   document.getElementById('oVer').textContent = d.version;
   document.getElementById('oVar').textContent = d.variant||'baseline';
+  var carVerEl=document.getElementById('carVerInput');
+  if(carVerEl&&!carVerDirty&&typeof d.carSwVer==='string'&&carVerEl.value!==d.carSwVer)carVerEl.value=d.carSwVer;
+
+  // 诊断包上传：仅 Wi-Fi 变体启用（需要 STA 联网才能 POST 到外部 Worker）
+  var diagPanel=document.getElementById('diagUpPanel');
+  if(diagPanel){
+    var hasWifi = d.variant && d.variant.indexOf('Wi-Fi')>=0;
+    diagPanel.style.display = hasWifi ? '' : 'none';
+  }
 
   // 测速页：若加载了则同步状态
   perfRender(d);
@@ -1381,7 +1496,6 @@ function setTog(id, on){
 }
 
 // ───── 开关点击 ─────
-var TRACK_WARN = '⚠️ 实验性功能，效果未经完全验证。开启后将向总线持续注入赛道模式请求，可能影响车辆稳定控制。请知悉风险后开启。';
 // Turning a paired toggle on forces its sibling off. `panelOwner` is the key whose
 // on-state reveals the shared panel (symmetrical data structure vs desktop UI).
 var TOG_MUTEX = {
@@ -1392,7 +1506,6 @@ document.querySelectorAll('.tog[data-k]').forEach(function(t){
   t.onclick = function(){
     var k = t.dataset.k;
     var newVal = !t.classList.contains('on');
-    if(k==='trackMode' && newVal && !confirm(TRACK_WARN)) return;
     t.classList.toggle('on', newVal);
     apiSet(k, newVal?1:0);
     var cfg = TOG_MUTEX[k];
@@ -1517,17 +1630,6 @@ document.querySelectorAll('#grpSpd .pill').forEach(function(b){
 document.querySelectorAll('#grpPMode .pill').forEach(function(b){
   b.onclick = function(){apiSet('profileMode', b.dataset.pm)};
 });
-// ───── AP 自动恢复（专用端点，不走 /api/set） ─────
-document.getElementById('tgApRs').onclick = function(){
-  var t = this;
-  var newVal = !t.classList.contains('on');
-  t.classList.toggle('on', newVal);
-  fetch('/api/aprestart?en='+(newVal?1:0)+(tok?'&token='+encodeURIComponent(tok):''))
-    .then(function(r){return r.json()})
-    .then(function(j){if(j && j.ok){toast('已保存','ok');poll()}else{toast('失败','err')}})
-    .catch(function(){toast('网络错误','err')});
-};
-
 document.querySelectorAll('#grpHw3Enc .pill').forEach(function(b){
   b.onclick = function(){apiSet('hw3WireEncoding', b.dataset.enc)};
 });
@@ -1625,7 +1727,7 @@ function legacyStep(delta){ _legacyImpl(0, delta); }
 var _hw4OffImpl=makeStepper({
   idOf:function(){return 'cHw4Off';},
   paramOf:function(){return 'hw4Offset';},
-  range:function(){return [0,15];},
+  range:function(){return [0,21];},
   def:function(){return HW4OFF_DEF;},
   dirty:'hw4off',
   onChange:function(nv){ var k=document.getElementById('cHw4OffKmh'); if(k) k.textContent=hw4RawToKph(nv); }
@@ -1677,7 +1779,7 @@ var DNS_PRESETS = {
     allow: 'connman.vn.cloud.tesla.cn www.tesla.cn nav-prd-maps.tesla.cn maps-cn-prd.go.tesla.services hermes-prd.vn.cloud.tesla.cn signaling.vn.cloud.tesla.cn hermes-stream-prd.vn.cloud.tesla.cn api-prd.vn.cloud.tesla.cn media-server-me.tesla.cn',
     block: 'tesla.cn tesla.com tesla.services'
   },
-  bl_telemetry: { allow:'', block:'hermes-stream-prd.vn.cloud.tesla.cn vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn firmware.tesla.cn' },
+  bl_telemetry: { allow:'', block:'apigateway-x2-trigger.tesla.cn telemetry-prd.vn.cloud.tesla.cn hermes-stream-prd.vn.cloud.tesla.cn' },
   clear: { allow:'', block:'' }
 };
 var PRESET_IDS = { tesla_min:'pstTesla', tesla_lean:'pstLean', bl_telemetry:'pstBl', clear:'pstClr' };
@@ -1869,6 +1971,11 @@ function otaRenderOnline(s){
   var pull = document.getElementById('otaPullBtn');
   if(s.current) cur.textContent = 'v'+s.current;
   if(s.envTag)  env.textContent = s.envTag;
+  // Track latest release version so /api/ota/notes can be fetched on demand
+  // (kept off the hot-path /api/ota/status poll).
+  if(s.latest && __carOtaNotesVersion!==s.latest){__carOtaNotesVersion=s.latest;__carOtaNotesCache=null;}
+  var notesRow=document.getElementById('carOtaNotesRow');
+  if(notesRow){notesRow.style.display = (s.hasNotes && s.latest) ? '' : 'none';}
   function setBtn(b, on){ b.disabled=!on; b.style.opacity = on?1:.5; }
   if(s.state===1){ msg.textContent='正在查询 GitHub…'; msg.style.color='#a0a0a0'; setBtn(chk,false); setBtn(pull,false); }
   else if(s.state===2){ msg.textContent='正在下载…'; msg.style.color='#fff'; box.style.display='block'; setBtn(chk,false); setBtn(pull,false); }
@@ -1914,6 +2021,117 @@ function otaPull(){
       otaStartOnlinePoll();
     })
     .catch(function(){ msg.textContent='网络错误'; msg.style.color='#ef4444'; });
+}
+// Minimal markdown → HTML for release notes. Tesla black/white theme variant.
+// HTML-escapes all input first (defends against XSS via crafted release body).
+// Supports # ## ### headings, ``` fenced code, `inline` code, **bold**,
+// *italic*, [text](url) links, `- ` and `1. ` lists, GitHub-style tables,
+// `---` horizontal rule. Unknown markup falls through as escaped text.
+function carMdMini(src){
+  if(!src)return'';
+  var esc=function(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+  var inline=function(s){
+    s=esc(s);
+    s=s.replace(/`([^`]+)`/g,'<code style="background:#000;padding:1px 6px;border:1px solid #333;border-radius:3px;font-family:monospace;font-size:0.92em">$1</code>');
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g,'$1<em>$2</em>');
+    s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">$1</a>');
+    return s;
+  };
+  var lines=src.replace(/\r\n/g,'\n').split('\n');
+  var out=[],i=0,inCode=false,codeBuf=[],listType=null,tableRows=null,tableAligns=null;
+  var closeList=function(){if(listType){out.push('</'+listType+'>');listType=null;}};
+  var closeTable=function(){
+    if(!tableRows)return;
+    var html='<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:0.92em;margin:8px 0">';
+    for(var r=0;r<tableRows.length;r++){
+      var tag=r===0?'th':'td';
+      var bg=r===0?'background:#1a1a1a;':'';
+      html+='<tr>';
+      for(var c=0;c<tableRows[r].length;c++){
+        var al=tableAligns&&tableAligns[c]?'text-align:'+tableAligns[c]+';':'';
+        html+='<'+tag+' style="border:1px solid #333;padding:6px 10px;'+bg+al+'">'+inline(tableRows[r][c])+'</'+tag+'>';
+      }
+      html+='</tr>';
+    }
+    html+='</table></div>';
+    out.push(html);
+    tableRows=null;tableAligns=null;
+  };
+  while(i<lines.length){
+    var ln=lines[i];
+    if(inCode){
+      if(/^```/.test(ln)){
+        out.push('<pre style="background:#000;border:1px solid #333;padding:10px;border-radius:6px;overflow-x:auto;font-family:monospace;font-size:0.88em">'+esc(codeBuf.join('\n'))+'</pre>');
+        codeBuf=[];inCode=false;
+      } else codeBuf.push(ln);
+      i++;continue;
+    }
+    if(/^```/.test(ln)){closeList();closeTable();inCode=true;i++;continue;}
+    var isTable=/^\s*\|.*\|\s*$/.test(ln) && i+1<lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i+1]) && /[-]/.test(lines[i+1]);
+    if(isTable){
+      closeList();
+      var split=function(row){return row.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(function(c){return c.trim();});};
+      tableRows=[split(ln)];
+      var sep=split(lines[i+1]);
+      tableAligns=sep.map(function(s){
+        var L=/^:/.test(s),R=/:$/.test(s);
+        return L&&R?'center':R?'right':L?'left':'';
+      });
+      i+=2;
+      while(i<lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){tableRows.push(split(lines[i]));i++;}
+      closeTable();continue;
+    }
+    var h=/^(#{1,3})\s+(.+)/.exec(ln);
+    if(h){closeList();closeTable();var lv=h[1].length;var sz=lv===1?'1.4em':lv===2?'1.2em':'1.05em';out.push('<h'+lv+' style="margin:14px 0 6px;font-size:'+sz+';color:#fff;font-weight:600">'+inline(h[2])+'</h'+lv+'>');i++;continue;}
+    if(/^\s*---+\s*$/.test(ln)){closeList();closeTable();out.push('<hr style="border:none;border-top:1px solid #333;margin:10px 0">');i++;continue;}
+    var ul=/^\s*[-*]\s+(.+)/.exec(ln);
+    var ol=/^\s*\d+\.\s+(.+)/.exec(ln);
+    if(ul||ol){
+      var want=ul?'ul':'ol';
+      if(listType&&listType!==want){closeList();}
+      if(!listType){out.push('<'+want+' style="margin:6px 0 6px 24px;padding:0">');listType=want;}
+      out.push('<li style="margin:3px 0">'+inline((ul||ol)[1])+'</li>');
+      i++;continue;
+    }
+    closeList();closeTable();
+    if(/^\s*$/.test(ln)){out.push('');i++;continue;}
+    out.push('<div style="margin:5px 0">'+inline(ln)+'</div>');
+    i++;
+  }
+  closeList();closeTable();
+  if(inCode){out.push('<pre style="background:#000;padding:10px;border-radius:6px">'+esc(codeBuf.join('\n'))+'</pre>');}
+  return out.join('\n');
+}
+var __carOtaNotesCache=null;
+var __carOtaNotesVersion='';
+function carShowOtaNotes(){
+  var ov=document.getElementById('carOtaNotesOverlay');
+  var body=document.getElementById('carOtaNotesBody');
+  var title=document.getElementById('carOtaNotesTitle');
+  var pull=document.getElementById('otaPullBtn');
+  var installBtn=document.getElementById('carOtaNotesInstallBtn');
+  if(installBtn) installBtn.disabled = pull ? pull.disabled : false;
+  if(installBtn) installBtn.style.opacity = installBtn.disabled ? .5 : 1;
+  body.innerHTML='<div style="color:#888">加载中…</div>';
+  ov.style.display='flex';
+  var fetchNotes=function(){
+    if(__carOtaNotesCache!==null) return Promise.resolve(__carOtaNotesCache);
+    return fetch('/api/ota/notes'+(tok?'?token='+encodeURIComponent(tok):''))
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(j){
+        if(j && typeof j.notes==='string'){__carOtaNotesCache=j.notes;return j.notes;}
+        return null;
+      }).catch(function(){return null;});
+  };
+  fetchNotes().then(function(notes){
+    if(__carOtaNotesVersion) title.textContent='v'+__carOtaNotesVersion+' 更新内容';
+    body.innerHTML = notes ? carMdMini(notes) : '<div style="color:#888">没有发布说明</div>';
+  });
+}
+function carHideOtaNotes(e){
+  if(e && e.target && e.target.id!=='carOtaNotesOverlay')return;
+  document.getElementById('carOtaNotesOverlay').style.display='none';
 }
 function carLoadPartInfo(){
   fetch('/api/ota/partinfo'+(tok?'?token='+encodeURIComponent(tok):''))
@@ -2000,6 +2218,42 @@ __startPolls();
     })(inp,btn);
     wrap.appendChild(btn);
   }
+})();
+// 折叠 panel 内静态 .tip 为标题旁感叹号 — 点击切换该 panel 全部 tip。
+// 复用 .info-ic 视觉，添加 .info-toggle 让其绝对定位到 panel 右上角。
+//
+// 关于 inline display:none 的 tip：
+//   - 初始空（如 brAddMsg 这类动态消息槽）→ 跳过，留给原 JS 控制。
+//   - 有内容（如 tipTlssc，HW3/HW4 时 JS 把 inline display 清空让其可见）
+//     → 纳入。.tip-collapsed class 与 inline display 协作：inline 'none'
+//     时优先隐藏；inline 清空后 class 起作用，初始仍折叠等用户点感叹号。
+(function(){
+  document.querySelectorAll('.panel').forEach(function(panel){
+    var tips = [];
+    panel.querySelectorAll('.tip').forEach(function(t){
+      if (t.dataset.tipReady) return;
+      if (!t.textContent.trim()) return;  // skip empty dynamic-message slots
+      t.dataset.tipReady = '1';
+      t.classList.add('tip-collapsed');
+      tips.push(t);
+    });
+    if (tips.length === 0) return;
+    var btn = document.createElement('span');
+    btn.className = 'info-ic info-toggle';
+    btn.textContent = 'i';
+    btn.title = '查看说明';
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('aria-label', '查看说明');
+    btn.onclick = function(){
+      var open = false;
+      tips.forEach(function(t){
+        var nowHidden = t.classList.toggle('tip-collapsed');
+        if (!nowHidden) open = true;
+      });
+      btn.classList.toggle('active', open);
+    };
+    panel.appendChild(btn);
+  });
 })();
 </script>
 </body>

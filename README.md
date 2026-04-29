@@ -12,7 +12,7 @@
 
 ---
 
-基于 [tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod) 的 ESP32 + WiFi 控制面板版本。
+基于 [ev-open-can-tools](https://github.com/ev-open-can-tools/ev-open-can-tools)（原 tesla-open-can-mod） 的 ESP32 + WiFi 控制面板版本。
 
 烧录后，ESP32 会创建一个 WiFi 热点，手机连上就能用浏览器实时控制所有参数，**无需重新编程**。
 
@@ -268,8 +268,6 @@ static char apPass[64] = "12345678";
 | **限速提示音抑制** | 关闭 ISA 限速提示音（仅 HW4 有效）|
 | **紧急车辆检测** | 启用紧急车辆靠近检测（仅 HW4 FSD V14 有效）|
 | **强制激活** | 适用于「交通灯和停车标志控制」功能在车机 UI 中被隐藏的地区（中国、日本等）。这些地区的触发条件永远不满足，设备完全无反应。开启后强制绕过此判断，直接激活 FSD。 |
-| **AP 自动恢复** | 踩刹车退出 AP 后自动重新激活自动驾驶 |
-| **赛道模式** | HW3 专属，解锁高性能驾驶模式（实验性）|
 | **WiFi 设置** | 修改热点名称（SSID）和密码，点「保存并重启」后设备重启并以新名称/密码创建热点 |
 
 **HW3 速度偏移**
@@ -378,6 +376,16 @@ static char apPass[64] = "12345678";
 
 ---
 
+## 🧪 帮助建立兼容矩阵
+
+不同 Tesla 固件 / HW 芯片 / 协议（V13/V14）/ 地区组合下激活成功率差很大，社区还在收集样本。**激活成功或失败的同学**都欢迎花 1 分钟提交一份匿名上报：
+
+➡️ **[新建兼容性上报](../../issues/new?template=compat-report.yml)** — 选择"兼容性上报 / Compatibility Report"模板
+
+只填固件版本、HW 芯片、选的协议、是否激活成功、地区。**不要包含 VIN / 车牌 / 账号** 等可识别信息。提交结果会聚合进 README 的兼容矩阵供后续用户参考。
+
+---
+
 ## 项目结构（供开发者参考）
 
 整个项目是**单翻译单元架构**：所有模块都以 header 的形式被 `main.cpp` 通过 `handlers.h` 引入，不额外新增 `.cpp` 源文件。
@@ -441,14 +449,17 @@ platformio.ini          ← 4 个 env：esp32 / esp32s3_waveshare /
 
 ## Credits
 
-本项目基于以下开源项目开发，核心 CAN 报文处理逻辑直接来源于原项目：
+本项目基于以下开源项目开发。核心 CAN 报文处理逻辑直接源自 ev-open-can-tools，其他几项作为信号定义、bit 位置和功能扩展的交叉参考：
 
-| 项目 | 链接 | 许可证 |
-|------|------|--------|
-| tesla-open-can-mod | [gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod) | GPLv3 |
+| 项目 | 用途 | 链接 | 许可证 |
+|------|------|------|--------|
+| ev-open-can-tools | 上游主项目，CAN 帧注入核心逻辑 | [github.com/ev-open-can-tools/ev-open-can-tools](https://github.com/ev-open-can-tools/ev-open-can-tools)（原 tesla-open-can-mod，已迁出 GitLab） | GPLv3 |
+| ev-open-can-tools-plugins | 功能扩展插件库（v1.4.32 起 HW4 offset 上限、TLSSC 旁路依据） | [github.com/ev-open-can-tools/ev-open-can-tools-plugins](https://github.com/ev-open-can-tools/ev-open-can-tools-plugins) | GPLv3 |
+| opendbc | 权威 Tesla DBC 信号定义（bit 位置、width、factor、checksum） | [github.com/commaai/opendbc](https://github.com/commaai/opendbc) | MIT |
+| flipper-tesla-fsd | Flipper Zero 版 FSD 注入实现，bit 提取/checksum 交叉验证 | [github.com/hypery11/flipper-tesla-fsd](https://github.com/hypery11/flipper-tesla-fsd) | GPLv3 |
 
 ---
 
 ## 许可证
 
-GPLv3 — 基于 [tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod)（GPLv3）开发。
+GPLv3 — 基于 [ev-open-can-tools](https://github.com/ev-open-can-tools/ev-open-can-tools)（原 tesla-open-can-mod）（GPLv3）开发。

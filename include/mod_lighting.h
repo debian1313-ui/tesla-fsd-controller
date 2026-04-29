@@ -29,16 +29,12 @@ extern FSDConfig cfg;  // defined in handlers.h
 
 // ── DAS_settings (0x293 / 659) parser ────────────────────────────────────────
 // Full readback: adaptive headlights, autosteer, AEB, FCW.
-// Also caches the raw frame bytes for AP auto-restart injection.
 //
 // Key signals (bit/8 = byte, bit%8 = shift):
 //   DAS_adaptiveHeadlights  bit22|1  (data[2]>>6) & 0x01
 //   DAS_aebEnabled          bit18|1  (data[2]>>2) & 0x01
 //   DAS_fcwEnabled          bit34|1  (data[4]>>2) & 0x01
 //   DAS_autosteerEnabled    bit38|1  (data[4]>>6) & 0x01
-//   DAS_autosteerEnabled2   bit24|1  data[3] & 0x01
-//   DAS_settingCounter      bit52|4  (data[6]>>4) & 0x0F
-//   DAS_settingChecksum     bit56|8  data[7]
 inline void handleDASSettings(const CanFrame& frame) {
     if (frame.dlc < 5) return;
     bool adaptive = ((frame.data[2] >> 6) & 0x01) != 0;
@@ -47,35 +43,6 @@ inline void handleDASSettings(const CanFrame& frame) {
     cfg.aebOn        = ((frame.data[2] >> 2) & 0x01) != 0;  // bit18
     cfg.fcwOn        = ((frame.data[4] >> 2) & 0x01) != 0;  // bit34
     cfg.autosteerOn  = ((frame.data[4] >> 6) & 0x01) != 0;  // bit38
-    // Cache full frame for AP restart injection
-    if (frame.dlc >= 8) {
-        for (uint8_t i = 0; i < 8; i++) cfg.apRestartCache[i] = frame.data[i];
-        cfg.apRestartValid = true;
-    }
-}
-
-// ── AP auto-restart — inject modified 0x293 with autosteerEnabled=1 ──────────
-// Called when accState transitions from active → 0 (AP just disengaged).
-// Checksum formula: (id_lo + id_hi + sum(data[0..6])) & 0xFF — verified
-// against tesla-open-can-mod slx implementation.
-inline void tryAPRestart(CanDriver& driver) {
-    if (!cfg.apRestart || !cfg.apRestartValid) return;
-    CanFrame f;
-    f.id  = 0x293;
-    f.dlc = 8;
-    for (uint8_t i = 0; i < 8; i++) f.data[i] = cfg.apRestartCache[i];
-    // Set both autosteer enable bits
-    f.data[4] |= (1 << 6);   // DAS_autosteerEnabled  bit38
-    f.data[3] |= (1 << 0);   // DAS_autosteerEnabled2 bit24
-    // Increment rolling counter (bit52|4 = data[6] bits[7:4])
-    uint8_t cnt = ((f.data[6] >> 4) & 0x0F);
-    cnt = (cnt + 1) & 0x0F;
-    f.data[6] = (f.data[6] & 0x0F) | (uint8_t)(cnt << 4);
-    // Recalculate checksum
-    uint16_t sum = (0x293 & 0xFF) + ((0x293 >> 8) & 0xFF);
-    for (uint8_t i = 0; i < 7; i++) sum += f.data[i];
-    f.data[7] = (uint8_t)(sum & 0xFF);
-    if (!driver.send(f)) cfg.errorCount++;
 }
 
 // ── SCCM_leftStalk (0x249 / 585) interceptor ─────────────────────────────────

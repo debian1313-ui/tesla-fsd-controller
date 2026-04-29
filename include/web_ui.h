@@ -1,5 +1,8 @@
 #pragma once
 
+#include "version.h"
+#include "web_ui_diag_js.h"  // DIAG_SHARED_JS macro embedded mid-string below
+
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="zh">
@@ -170,6 +173,7 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="status-row" id="rowLiveGWAP" style="display:none"><span id="iLblLiveGWAP">AP 类型</span><span id="liveGWAP" style="color:#38bdf8;font-weight:700">--</span></div>
   <div class="status-row" id="rowLiveTier" style="display:none"><span id="iLblLiveTier">智能档位</span><span id="liveTier" style="color:#38bdf8;font-weight:700">--</span></div>
   <div class="status-row" id="rowLiveTemp" style="display:none"><span id="iLblLiveTemp">车内/外温度</span><span id="liveTemp" style="color:#38bdf8;font-weight:700">--</span></div>
+  <div class="status-row" id="rowLiveChipTemp" style="display:none"><span id="iLblLiveChipTemp">芯片温度</span><span id="liveChipTemp" style="font-weight:700">--</span></div>
 </div>
 
 <div class="card">
@@ -185,7 +189,7 @@ select:focus{outline:none;border-color:#38bdf8}
       <option value="1">HW3</option>
       <option value="2" selected>HW4</option>
     </select>
-    <div id="iHWHint" style="width:100%;font-size:11px;color:#64748b;padding:2px 0">HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3</div>
+    <div id="iHWHint" style="width:100%;font-size:11px;color:#64748b;padding:2px 0">按 FSD 协议版本选：HW3 = V13 协议；HW4 = V14 协议。HW4 芯片但固件 2026.8 或更早仍是 V13 → 选 HW3</div>
     <div id="iHWAuto" style="width:100%;font-size:11px;color:#22c55e;padding:2px 0;display:none"></div>
   </div>
   <div class="row">
@@ -217,6 +221,12 @@ select:focus{outline:none;border-color:#38bdf8}
     <span class="row-label" id="iLblCN">强制激活</span>
     <label class="toggle"><input type="checkbox" id="forceActivate" onchange="setVal('forceActivate',this.checked?1:0)"><span class="slider"></span></label>
   </div>
+  <div style="width:100%;font-size:11px;color:#64748b;padding:0 0 6px 0;line-height:1.5">实测车型上必须开，FSD 才能激活。不开时只在车机端广播"FSD 已选定"位时才触发注入，目前所见车型该位都不广播，关着等于功能不工作。</div>
+  <div class="row" id="rowTlsscBypass" style="display:none">
+    <span class="row-label" id="iLblTlsscBp" data-zh="TLSSC 旁路（HW3/HW4）" data-en="TLSSC Bypass (HW3/HW4)">TLSSC 旁路（HW3/HW4）</span>
+    <label class="toggle"><input type="checkbox" id="tlsscBypass" onchange="setVal('tlsscBypass',this.checked?1:0)"><span class="slider"></span></label>
+  </div>
+  <div id="hintTlsscBypass" style="display:none;width:100%;font-size:11px;color:#64748b;padding:0 0 6px 0;line-height:1.5">默认关。激活帧附带置位 TLSSC 旁路位；仅在 FSD 蓝方向盘点不亮的固件/地区试，未在每个固件验证，能正常激活的不要开。</div>
   <!-- highbeam hidden: requires Vehicle CAN (X179 pin 9/10), not available on Party CAN -->
   <div class="row" id="rowOverrideSL" style="display:none">
     <span class="row-label" id="iLblOverrideSL">重写速度限制</span>
@@ -257,14 +267,10 @@ select:focus{outline:none;border-color:#38bdf8}
       <div style="grid-column:1 / -1"><span data-zh="地图限速 raw：" data-en="mppLimit raw:">地图限速 raw：</span><span id="sGps2F8MppLim">--</span></div>
     </div>
   </div>
-  <div class="row">
-    <span class="row-label" id="iLblAPRestart">AP 自动恢复</span>
-    <label class="toggle"><input type="checkbox" id="apRestart" onchange="setAPRestart(this.checked)"><span class="slider"></span></label>
-  </div>
   <div class="row" id="rowHW4Offset" style="display:none">
-    <span class="row-label" id="iLblHW4Off" data-zh="HW4 偏移强度 (0-15)" data-en="HW4 Offset Strength (0-15)">HW4 偏移强度 (0-15)</span>
+    <span class="row-label" id="iLblHW4Off" data-zh="HW4 偏移强度 (0-21)" data-en="HW4 Offset Strength (0-21)">HW4 偏移强度 (0-21)</span>
     <div style="display:flex;align-items:center;gap:8px">
-      <input type="range" id="hw4Offset" min="0" max="15" step="1" value="0"
+      <input type="range" id="hw4Offset" min="0" max="21" step="1" value="0"
              oninput="document.getElementById('hw4OffVal').textContent=this.value"
              onchange="setVal('hw4Offset',this.value)"
              style="width:140px">
@@ -274,10 +280,6 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="row" id="rowIsaOvr" style="display:none">
     <span class="row-label" data-zh="ISA 限速覆盖（HW4）" data-en="ISA Speed Override (HW4)">ISA 限速覆盖（HW4）</span>
     <label class="toggle"><input type="checkbox" id="isaOverride" onchange="setVal('isaOverride',this.checked?1:0)"><span class="slider"></span></label>
-  </div>
-  <div class="row" id="rowTrackMode" style="display:none">
-    <span class="row-label" id="iLblTrackMode">赛道模式（实验性）</span>
-    <label class="toggle"><input type="checkbox" id="trackMode" onchange="onTrackModeChange(this)"><span class="slider"></span></label>
   </div>
   <div class="row" id="rowHW3Auto" style="display:none">
     <span class="row-label" id="iLblHW3Auto">HW3 自动限速突破</span>
@@ -368,6 +370,16 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="status-row"><span id="iLblMdns">本地域名</span><span style="color:#38bdf8;font-weight:600;font-family:monospace">fsd.local</span></div>
 </div>
 
+<div class="card">
+  <div class="card-title" id="iCardCarVer">车辆信息</div>
+  <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
+    <span class="row-label" id="iLblCarVer">车机软件版本（建议填写）</span>
+    <input type="text" id="carVerInput" class="text-input" maxlength="32" placeholder="例如 2024.44.25.1" autocomplete="off">
+  </div>
+  <button class="save-btn" id="carVerSaveBtn" onclick="saveCarVer()">保存</button>
+  <div class="msg" id="carVerMsg"></div>
+  <div style="font-size:11px;color:#64748b;margin-top:6px" id="iCarVerHint">上传诊断包时一起带上方便定位限速/激活问题。在车机 控制 → 软件 里能看到，不填不影响功能。</div>
+</div>
 
 <div class="card" id="cardWifi">
   <div class="card-title" id="iCardWifi">WiFi 设置</div>
@@ -513,6 +525,20 @@ select:focus{outline:none;border-color:#38bdf8}
   <div class="msg" id="logMsg"></div>
 </div>
 
+<div class="card" id="diagUpCard" style="display:none">
+  <div class="card-title" id="iCardDiagUp">上报诊断包</div>
+  <div style="font-size:11px;color:#64748b;padding:4px 0 8px" id="iLblDiagUpNote">
+    打包当前模块状态 + CAN 帧 ID 指纹 + 最近 80 条日志，上传到项目服务器，生成一个 6 位 ID。
+    把 ID 贴到 GitHub Issue 即可，内容只有维护者能解开（不公开）。不包含位置 / VIN / 网络密码。
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="save-btn" id="diagUpBtn" onclick="diagUpload()" style="flex:1;min-width:120px">📤 上传诊断包</button>
+    <span id="diagUpId" style="display:none;font-family:monospace;font-size:18px;font-weight:700;color:#22c55e;letter-spacing:2px"></span>
+    <button class="save-btn" id="diagUpCopy" onclick="diagCopyId()" style="display:none;flex:0 0 auto;background:#334155">复制 ID</button>
+  </div>
+  <div class="msg" id="diagUpMsg"></div>
+</div>
+
 <div class="card">
   <div class="card-title" id="iCardOTA">固件更新</div>
   <div class="ota-row">
@@ -534,6 +560,7 @@ select:focus{outline:none;border-color:#38bdf8}
     <button class="save-btn" id="otaCheckBtn" onclick="doOtaCheck()" style="flex:1;background:#1e40af">检查更新</button>
     <button class="save-btn" id="otaPullBtn" onclick="doOtaPull()" style="flex:1" disabled>下载并安装</button>
   </div>
+  <button class="save-btn" id="otaNotesBtn" onclick="showOtaNotes()" style="display:none;background:#0e7490;margin-top:6px;width:100%" disabled>查看更新内容</button>
   <div class="progress" id="otaDlWrap"><div class="progress-bar" id="otaDlBar"></div></div>
   <div class="msg" id="otaPullMsg"></div>
   <div style="font-size:11px;color:#475569;margin-top:6px" id="iOnlineOtaHint">需连接路由器 (STA) 才能联网检查/下载</div>
@@ -574,6 +601,20 @@ select:focus{outline:none;border-color:#38bdf8}
   <a href="https://github.com/wjsall/tesla-fsd-controller" style="color:#334155;text-decoration:none">github.com/wjsall/tesla-fsd-controller</a>
 </div>
 
+<div id="otaNotesOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;padding:16px;box-sizing:border-box" onclick="hideOtaNotes(event)">
+  <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;max-width:560px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.5)" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid #1e293b;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:600;color:#e2e8f0" id="otaNotesTitle">更新内容</div>
+      <button onclick="hideOtaNotes()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+    </div>
+    <div id="otaNotesBody" style="padding:14px 18px;overflow-y:auto;color:#cbd5e1;font-size:13px;line-height:1.6;flex:1"></div>
+    <div style="padding:10px 18px;border-top:1px solid #1e293b;display:flex;gap:8px">
+      <button onclick="hideOtaNotes()" style="flex:1;background:#334155;color:#cbd5e1;border:none;border-radius:6px;padding:8px 0;font-size:13px;cursor:pointer" id="iOtaNotesClose">关闭</button>
+      <button onclick="hideOtaNotes();doOtaPull()" id="iOtaNotesInstallBtn" style="flex:1;background:#1e40af;color:#fff;border:none;border-radius:6px;padding:8px 0;font-size:13px;cursor:pointer">下载并安装</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var lang='zh';
 var agreed=false;
@@ -592,9 +633,10 @@ var T={
     lblVer:'固件版本',
     canOK:'正常',canErr:'异常',fsdYes:'是',fsdNo:'否',
     otaOK:'上传成功，正在重启...',otaFail:'上传失败: ',otaConn:'连接失败',
-    otaCurrent:'当前',otaLatest:'最新',otaChecking:'正在查询 GitHub…',otaDownloading:'正在下载…',otaWriting:'正在写入',otaSuccess:'更新成功,正在重启',otaConfirm:'确认下载并安装新版? 期间请勿断电',otaOnlineTitle:'在线更新 (GitHub)',otaOnlineHint:'需连接路由器 (STA) 才能联网检查/下载',otaCheckBtn:'检查更新',otaPullBtn:'下载并安装',otaPrev:'上一版',otaRollbackBtn:'回滚到上一版',otaRollbackConfirm:'将切换到上一个固件并重启，确定吗？',otaRollbackConfirmBtn:'确认回滚',otaRollbackOK:'已切换，正在重启...',otaRollbackFail:'回滚失败',rebootBtn:'重启设备',rebootConfirm:'确定要重启吗？',rebootConfirmBtn:'确认重启',rebootOK:'正在重启...',rebootFail:'重启失败',resetAllBtn:'恢复出厂设置',resetAllConfirm:'将清除所有配置（包括 WiFi、PIN、所有参数），确定吗？',resetAllConfirmBtn:'确认重置',resetAllOK:'已重置，正在重启...',resetAllFail:'重置失败',
+    otaCurrent:'当前',otaLatest:'最新',otaChecking:'正在查询 GitHub…',otaDownloading:'正在下载…',otaWriting:'正在写入',otaSuccess:'更新成功,正在重启',otaConfirm:'确认下载并安装新版? 期间请勿断电',otaOnlineTitle:'在线更新 (GitHub)',otaOnlineHint:'需连接路由器 (STA) 才能联网检查/下载',otaCheckBtn:'检查更新',otaPullBtn:'下载并安装',otaNotesBtn:'查看更新内容',otaNotesTitle:'更新内容',otaNotesClose:'关闭',otaPrev:'上一版',otaRollbackBtn:'回滚到上一版',otaRollbackConfirm:'将切换到上一个固件并重启，确定吗？',otaRollbackConfirmBtn:'确认回滚',otaRollbackOK:'已切换，正在重启...',otaRollbackFail:'回滚失败',rebootBtn:'重启设备',rebootConfirm:'确定要重启吗？',rebootConfirmBtn:'确认重启',rebootOK:'正在重启...',rebootFail:'重启失败',resetAllBtn:'恢复出厂设置',resetAllConfirm:'将清除所有配置（包括 WiFi、PIN、所有参数），确定吗？',resetAllConfirmBtn:'确认重置',resetAllOK:'已重置，正在重启...',resetAllFail:'重置失败',
     uptH:'时',uptM:'分',uptS:'秒',langBtn:'EN',
     hwHint:'HW4 硬件 + 固件 2026.8.x 或更旧（FSD V13）→ 请选 HW3',
+    cardCarVer:'车辆信息',lblCarVer:'车机软件版本（建议填写）',carVerHint:'上传诊断包时一起带上方便定位限速/激活问题。在车机 控制 → 软件 里能看到，不填不影响功能。',carVerSave:'保存',carVerOK:'✓ 已保存',carVerFail:'✗ 保存失败',carVerBadFmt:'⚠ 格式应为 2024.32.25 或 2024.32.25.1（年.周.补丁[.子号]），仍可保存',
     cardWifi:'WiFi 设置',lblSSID:'热点名称（SSID）',lblPass:'新密码（留空保持不变）',
     lblHW3Auto:'HW3 自动限速突破',lblBMS:'电池',
     wifiSave:'保存并重启',wifiOK:'已保存，正在重启...',wifiFail:'保存失败: ',
@@ -607,16 +649,16 @@ var T={
     scanBtn:'扫描',scanPlaceholder:'— 选择网络 —',scanScanning:'扫描中...',scanFail:'扫描失败',
     cardLog:'诊断日志',lblLogNote:'RAM日志掉电清除 · 最近 80 条 · SPIFFS持久日志可下载',
     logCopyBtn:'复制日志',logDlBtn:'下载持久日志',logClrBtn:'清除',logCleared:'已清除',logCopied:'已复制',
+    cardDiagUp:'上报诊断包',lblDiagUpNote:'打包当前模块状态 + CAN 帧 ID 指纹 + 最近 80 条日志，上传到项目服务器，生成一个 6 位 ID。把 ID 贴到 GitHub Issue 即可，内容只有维护者能解开（不公开）。不包含位置 / VIN / 网络密码。',
+    diagUpBtn:'📤 上传诊断包',diagUpRetry:'📤 重试',diagUpRetryAgain:'📤 重新上传',diagUpUploading:'⏳ 上传中…',diagUpCopyBtn:'复制 ID',
+    diagUpInProg:'正在打包并上传…',diagUpDone:'✓ 已生成 ID — 把它贴到 GitHub Issue 即可',diagUpCopied:'✓ 已复制 ',diagUpReqFail:'请求失败',diagUpNetErr:'网络错误',
     lblTimeSync:'时间同步',timeSyncOK:'已同步',timeSyncNo:'未同步',
-    lblAPRestart:'AP 自动恢复',
     lblHW4Off:'速度偏移 km/h（HW4）',
-    lblTrackMode:'赛道模式（实验性）',
-    trackModeWarn:'⚠️ 实验性功能，效果未经完全验证。开启后将向总线持续注入赛道模式请求，可能影响车辆稳定控制。请知悉风险后开启。',
     lblLiveGWAP:'AP 类型',
     hwDetHW3:'CAN 检测到：HW3',hwDetHW4:'CAN 检测到：HW4',
     hwDetNone:'未自动检测到，请手动选择（2020+ 车型不支持）',
     cardLive:'实时摘要',lblLiveCAN:'CAN',lblLiveSpeed:'车速',lblLiveLimit:'限速',lblLiveOffset:'偏移',
-    lblLiveFSD:'FSD 注入',lblLiveTier:'智能档位',lblLiveTemp:'车内/外温度',liveSpeedUnit:'km/h',liveLimitUnit:'km/h',liveOffUnit:'km/h',
+    lblLiveFSD:'FSD 注入',lblLiveTier:'智能档位',lblLiveTemp:'车内/外温度',lblLiveChipTemp:'芯片温度',liveSpeedUnit:'km/h',liveLimitUnit:'km/h',liveOffUnit:'km/h',
     lblLiveTorque:'扭矩 Nm',lblLiveGear:'挡位',lblLiveAP:'AP',lblLiveBrake:'刹车'},
   en:{title:'Tesla Controller',cardCtrl:'CONTROL',cardStat:'STATUS',cardOTA:'OTA UPDATE',
     lblFsdEn:'FSD Enable',lblHW:'Hardware',lblSpeed:'Speed Profile',lblPMode:'Profile Source',
@@ -628,9 +670,10 @@ var T={
     lblVer:'Firmware Version',
     canOK:'OK',canErr:'ERROR',fsdYes:'Yes',fsdNo:'No',
     otaOK:'Upload success, rebooting...',otaFail:'Upload failed: ',otaConn:'Connection error',
-    otaCurrent:'Current',otaLatest:'Latest',otaChecking:'Querying GitHub…',otaDownloading:'Downloading…',otaWriting:'Writing',otaSuccess:'Update OK, rebooting',otaConfirm:'Download and install now? Do not power off.',otaOnlineTitle:'Online Update (GitHub)',otaOnlineHint:'STA (router) connection required to fetch releases',otaCheckBtn:'Check for Update',otaPullBtn:'Download & Install',otaPrev:'Previous',otaRollbackBtn:'Roll Back to Previous',otaRollbackConfirm:'Switch to the previous firmware and reboot?',otaRollbackConfirmBtn:'Confirm Rollback',otaRollbackOK:'Switched, rebooting...',otaRollbackFail:'Rollback failed',rebootBtn:'Restart Device',rebootConfirm:'Restart the device?',rebootConfirmBtn:'Confirm Restart',rebootOK:'Rebooting...',rebootFail:'Reboot failed',resetAllBtn:'Factory Reset',resetAllConfirm:'This will erase all settings (WiFi, PIN, all config). Continue?',resetAllConfirmBtn:'Confirm Reset',resetAllOK:'Reset done, rebooting...',resetAllFail:'Reset failed',
+    otaCurrent:'Current',otaLatest:'Latest',otaChecking:'Querying GitHub…',otaDownloading:'Downloading…',otaWriting:'Writing',otaSuccess:'Update OK, rebooting',otaConfirm:'Download and install now? Do not power off.',otaOnlineTitle:'Online Update (GitHub)',otaOnlineHint:'STA (router) connection required to fetch releases',otaCheckBtn:'Check for Update',otaPullBtn:'Download & Install',otaNotesBtn:'View Release Notes',otaNotesTitle:'Release Notes',otaNotesClose:'Close',otaPrev:'Previous',otaRollbackBtn:'Roll Back to Previous',otaRollbackConfirm:'Switch to the previous firmware and reboot?',otaRollbackConfirmBtn:'Confirm Rollback',otaRollbackOK:'Switched, rebooting...',otaRollbackFail:'Rollback failed',rebootBtn:'Restart Device',rebootConfirm:'Restart the device?',rebootConfirmBtn:'Confirm Restart',rebootOK:'Rebooting...',rebootFail:'Reboot failed',resetAllBtn:'Factory Reset',resetAllConfirm:'This will erase all settings (WiFi, PIN, all config). Continue?',resetAllConfirmBtn:'Confirm Reset',resetAllOK:'Reset done, rebooting...',resetAllFail:'Reset failed',
     uptH:'h',uptM:'m',uptS:'s',langBtn:'中文',
     hwHint:'HW4 hardware + firmware 2026.8.x or older (FSD V13) → select HW3',
+    cardCarVer:'Vehicle Info',lblCarVer:'Tesla MCU Software Version (recommended)',carVerHint:'Helps triage speed-limit / FSD-activation issues when you upload a diagnostic bundle. Find it in your car: Controls → Software. Not required.',carVerSave:'Save',carVerOK:'\u2713 Saved',carVerFail:'\u2717 Save failed',carVerBadFmt:'\u26a0 Expected 2024.32.25 or 2024.32.25.1 (year.week.patch[.sub]); will still save',
     cardWifi:'WiFi Settings',lblSSID:'AP Name (SSID)',lblPass:'New Password (blank = keep current)',
     wifiSave:'Save & Restart',wifiOK:'Saved, rebooting...',wifiFail:'Save failed: ',
     wifiPassErr:'Password must be ≥ 8 chars',wifiSSIDErr:'SSID cannot be empty',
@@ -642,11 +685,11 @@ var T={
     scanBtn:'Scan',scanPlaceholder:'— Select network —',scanScanning:'Scanning...',scanFail:'Scan failed',
     cardLog:'Diagnostic Log',lblLogNote:'RAM log clears on power-off · last 80 events · SPIFFS log persists across reboots',
     logCopyBtn:'Copy Log',logDlBtn:'Download Persistent Log',logClrBtn:'Clear',logCleared:'Cleared',logCopied:'Copied',
+    cardDiagUp:'Submit Diagnostic Bundle',lblDiagUpNote:'Bundle current module state + CAN frame-ID fingerprint + last 80 log lines, upload to project server, get a 6-char ID. Paste it into your GitHub issue — only the maintainer can decode the contents (not public). Excludes location, VIN, and Wi-Fi passwords.',
+    diagUpBtn:'\ud83d\udce4 Upload',diagUpRetry:'\ud83d\udce4 Retry',diagUpRetryAgain:'\ud83d\udce4 Re-upload',diagUpUploading:'\u23f3 Uploading…',diagUpCopyBtn:'Copy ID',
+    diagUpInProg:'Packing and uploading…',diagUpDone:'\u2713 ID generated — paste it into your GitHub issue',diagUpCopied:'\u2713 Copied ',diagUpReqFail:'Request failed',diagUpNetErr:'Network error',
     lblTimeSync:'Time Sync',timeSyncOK:'Synced',timeSyncNo:'Not synced',
-    lblAPRestart:'AP Auto-Resume',
     lblHW4Off:'HW4 Speed Offset (km/h)',
-    lblTrackMode:'Track Mode (Experimental)',
-    trackModeWarn:'⚠️ Experimental. Continuously injects Track Mode request on the CAN bus. May affect stability control. Enable only if you understand the risk.',
     lblLiveGWAP:'AP TYPE',
     hwDetHW3:'CAN detected: HW3',hwDetHW4:'CAN detected: HW4',
     hwDetNone:'Auto-detect failed — select manually (2020+ vehicles not supported)',
@@ -681,6 +724,10 @@ function applyLang(){
   document.getElementById('iHWHint').textContent=t.hwHint;
   document.getElementById('iLblLanIP').textContent=t.lblLanIP;
   document.getElementById('iLblMdns').textContent=t.lblMdns;
+  document.getElementById('iCardCarVer').textContent=t.cardCarVer;
+  document.getElementById('iLblCarVer').textContent=t.lblCarVer;
+  document.getElementById('iCarVerHint').textContent=t.carVerHint;
+  document.getElementById('carVerSaveBtn').textContent=t.carVerSave;
   document.getElementById('iCardWifi').textContent=t.cardWifi;
   document.getElementById('iLblSSID').textContent=t.lblSSID;
   document.getElementById('iLblPass').textContent=t.lblPass;
@@ -694,9 +741,7 @@ function applyLang(){
   document.getElementById('staClearBtn').textContent=t.staClear;
   document.getElementById('scanBtn').textContent=t.scanBtn;
   document.getElementById('iScanPlaceholder').textContent=t.scanPlaceholder;
-  document.getElementById('iLblAPRestart').textContent=t.lblAPRestart;
   document.getElementById('iLblHW4Off').textContent=t.lblHW4Off;
-  document.getElementById('iLblTrackMode').textContent=t.lblTrackMode;
   document.getElementById('iLblLiveGWAP').textContent=t.lblLiveGWAP;
   document.getElementById('iLblLiveTemp').textContent=t.lblLiveTemp;
   document.getElementById('iLblTimeSync').textContent=t.lblTimeSync;
@@ -705,6 +750,18 @@ function applyLang(){
   document.getElementById('logCopyBtn').textContent=t.logCopyBtn;
   document.getElementById('logDlBtn').textContent=t.logDlBtn;
   document.getElementById('logClrBtn').textContent=t.logClrBtn;
+  var el2;
+  if(el2=document.getElementById('iCardDiagUp')) el2.textContent=t.cardDiagUp;
+  if(el2=document.getElementById('iLblDiagUpNote')) el2.textContent=t.lblDiagUpNote;
+  if(el2=document.getElementById('diagUpCopy')) el2.textContent=t.diagUpCopyBtn;
+  // diagUpBtn label is dynamic — set only when in idle state to respect upload progress.
+  if(el2=document.getElementById('diagUpBtn')){
+    var st=el2.getAttribute('data-state')||'0';
+    if(st==='0') el2.textContent=t.diagUpBtn;
+    else if(st==='1') el2.textContent=t.diagUpUploading;
+    else if(st==='2') el2.textContent=t.diagUpRetryAgain;
+    else if(st==='3') el2.textContent=t.diagUpRetry;
+  }
   document.getElementById('iLblFile').textContent=t.lblFile;
   document.getElementById('uploadBtn').textContent=t.uploadBtn;
   var el;
@@ -712,6 +769,10 @@ function applyLang(){
   if(el=document.getElementById('iOnlineOtaHint')) el.textContent=t.otaOnlineHint;
   if(el=document.getElementById('otaCheckBtn')) el.textContent=t.otaCheckBtn;
   if(el=document.getElementById('otaPullBtn')) el.textContent=t.otaPullBtn;
+  if(el=document.getElementById('otaNotesBtn')) el.textContent=t.otaNotesBtn;
+  if(el=document.getElementById('otaNotesTitle')) el.textContent=t.otaNotesTitle;
+  if(el=document.getElementById('iOtaNotesClose')) el.textContent=t.otaNotesClose;
+  if(el=document.getElementById('iOtaNotesInstallBtn')) el.textContent=t.otaPullBtn;
   if(el=document.getElementById('otaRollbackBtn')) el.textContent=t.otaRollbackBtn;
   if(el=document.getElementById('iRollbackConfirmMsg')) el.textContent=t.otaRollbackConfirm;
   if(el=document.getElementById('iRollbackConfirmBtn')) el.textContent=t.otaRollbackConfirmBtn;
@@ -842,7 +903,10 @@ function poll(){
     if(d.staOK&&d.staIP){document.getElementById('sLanIP').textContent=d.staIP;lanRow.style.display='';}
     else{lanRow.style.display='none';}
     if(d.version)document.getElementById('sVer').textContent=(d.variant?d.variant+' ':'')+'v'+d.version;
-    // AP auto-restart
+    var carVerEl=document.getElementById('carVerInput');
+    if(carVerEl&&!carVerDirty&&typeof d.carSwVer==='string'&&carVerEl.value!==d.carSwVer)carVerEl.value=d.carSwVer;
+    var diagCard=document.getElementById('diagUpCard');
+    if(diagCard){ var hasWifi=d.variant&&d.variant.indexOf('Wi-Fi')>=0; diagCard.style.display=hasWifi?'':'none'; }
     var autoEl=document.getElementById('hw3AutoSpeed');
     if(autoEl){
       autoEl.checked=(d.hw3AutoSpeed==null?true:!!d.hw3AutoSpeed);
@@ -850,7 +914,6 @@ function poll(){
       document.getElementById('rowHW3Custom').style.display=(d.hwMode===1)?'':'none';
       document.getElementById('rowHW4Offset').style.display=(d.hwMode===2)?'':'none';
       document.getElementById('rowIsaOvr').style.display=(d.hwMode===2)?'':'none';
-      document.getElementById('rowTrackMode').style.display=(d.hwMode===1)?'':'none';
     }
     // Server-authoritative sync: reset checkbox + panel from poll on every tick so a
     // failed /api/set (network/403) doesn't leave the UI in a "toggle on, panel off"
@@ -906,7 +969,13 @@ function poll(){
       }
       document.getElementById('sHiSpdHint').textContent='('+hintParts.join(' / ')+')';
     }
-    document.getElementById('apRestart').checked=!!d.apRestart;
+    var tlsscEl=document.getElementById('tlsscBypass');
+    if(tlsscEl){
+      tlsscEl.checked=!!d.tlsscBypass;
+      var tlsscShow=(d.hwMode===1||d.hwMode===2)?'':'none';
+      document.getElementById('rowTlsscBypass').style.display=tlsscShow;
+      document.getElementById('hintTlsscBypass').style.display=tlsscShow;
+    }
     var hw4OffEl=document.getElementById('hw4Offset');
     if(hw4OffEl && document.activeElement!==hw4OffEl){
       var hv=d.hw4Offset!=null?d.hw4Offset:0;
@@ -916,8 +985,6 @@ function poll(){
     }
     var isaOvrEl=document.getElementById('isaOverride');
     if(isaOvrEl) isaOvrEl.checked=!!d.isaOverride;
-    var trackModeEl=document.getElementById('trackMode');
-    if(trackModeEl)trackModeEl.checked=!!d.trackMode;
 
     var tsEl=document.getElementById('sTimeSync');
     if(d.timeSynced){tsEl.textContent=T[lang].timeSyncOK;tsEl.className='status-ok';}
@@ -958,6 +1025,22 @@ function poll(){
     } else {
       liveTempRow.style.display='none';
     }
+    var chipTempRow=document.getElementById('rowLiveChipTemp');
+    if(chipTempRow){
+      if(d.chipTempC!=null){
+        chipTempRow.style.display='';
+        var chipEl=document.getElementById('liveChipTemp');
+        var s=d.chipTempC.toFixed(1)+'°C';
+        if(d.chipTempPeakC!=null) s+=' (peak '+d.chipTempPeakC.toFixed(1)+')';
+        if(d.thermalStatus) s+=' · '+d.thermalStatus;
+        chipEl.textContent=s;
+        // thermalLevel: 0 normal, 1 warning, 2 throttled, 3 protect
+        var lvl=d.thermalLevel||0;
+        chipEl.style.color = lvl===0?'#38bdf8':lvl===1?'#fbbf24':lvl===2?'#fb923c':'#ef4444';
+      } else {
+        chipTempRow.style.display='none';
+      }
+    }
     var spdLimKph=d.fusedLimit>0?d.fusedLimit*5:(d.visionLimit>0?d.visionLimit*5:0);
     // HW3 offset: shows stock pct (hw3AutoOffset) as km/h estimate; auto mode
     // below 80 kph snaps to calibrated floor (64/85/100 targets).
@@ -994,11 +1077,6 @@ function poll(){
   }).catch(()=>{});
   logPollCount++;
   if(logPollCount%5===1)refreshDiagLog();
-}
-function setAPRestart(want){
-  fetch('/api/aprestart?en='+(want?'1':'0')+(token?'&token='+token:''))
-    .then(function(r){return r.json();})
-    .then(function(res){if(res.ok)poll();});
 }
 var FW_VER=')rawliteral" FIRMWARE_VERSION R"rawliteral(';
 var appStarted=false;
@@ -1161,7 +1239,7 @@ var DNS_PRESETS={
   bl_telemetry:{
     name:'只屏蔽遥测',btnId:'pstBl',
     allow:'',
-    block:'hermes-stream-prd.vn.cloud.tesla.cn vehicle-files.prd.cnn1.vn.cloud.tesla.cn vehicle-files.prd.cn1.vn.cloud.tesla.cn firmware.tesla.cn'
+    block:'apigateway-x2-trigger.tesla.cn telemetry-prd.vn.cloud.tesla.cn hermes-stream-prd.vn.cloud.tesla.cn'
   },
   clear:{name:'清空所有规则',btnId:'pstClr',allow:'',block:''}
 };
@@ -1323,7 +1401,6 @@ function updateSpeedOptions(hwMode){
   // Show HW3 rows only for HW3 mode
   var isHW3=(hwMode===1);
   document.getElementById('rowHW3Auto').style.display=isHW3?'':'none';
-  document.getElementById('rowTrackMode').style.display=isHW3?'':'none';
   // HW4-only rows — hide and reset on other modes
   document.getElementById('rowHW4Offset').style.display=isHW4?'':'none';
   document.getElementById('rowIsaOvr').style.display=isHW4?'':'none';
@@ -1417,12 +1494,6 @@ function onHW3MutexChange(el){
   var panel=document.getElementById(cfg.panel);
   if(panel && owner) panel.style.display = owner.checked ? '' : 'none';
   setVal(k,el.checked?1:0);
-}
-function onTrackModeChange(el){
-  if(el.checked){
-    if(!confirm(T[lang].trackModeWarn)){el.checked=false;return;}
-  }
-  setVal('trackMode',el.checked?1:0);
 }
 function doWifi(){
   var t=T[lang];
@@ -1565,6 +1636,23 @@ function doLogCopy(){
     setTimeout(function(){msg.textContent='';},2000);
   }
 }
+// ───── 适配器：phone UI 用 i18n + className 切类，token 名是 `token` ─────
+function _DIAG_LITERALS(){var t=T[lang];return {
+  upload:t.diagUpBtn, retry:t.diagUpRetry, retryAgain:t.diagUpRetryAgain,
+  uploading:t.diagUpUploading, inProg:t.diagUpInProg, done:t.diagUpDone,
+  reqFail:t.diagUpReqFail, netErr:t.diagUpNetErr, copied:t.diagUpCopied,
+  notSupported:'此固件变体不支持',
+  carVerOK:t.carVerOK, carVerFail:t.carVerFail, carVerSaving:'',
+  carVerNetErr:t.carVerFail, carVerBadFmt:t.carVerBadFmt
+};}
+function _DIAG_STYLE(el,kind){
+  if(!el) return;
+  el.className = kind ? ('msg '+kind) : 'msg';
+}
+function _AUTH_TOKEN(){return token||'';}
+)rawliteral"
+DIAG_SHARED_JS
+R"rawliteral(
 function doLogClear(){
   var t=T[lang];
   fetch('/api/log/clear'+(token?'?token='+token:''),{method:'POST'})
@@ -1613,8 +1701,18 @@ function otaRenderStatus(s){
   var bar=document.getElementById('otaDlBar');
   var pullBtn=document.getElementById('otaPullBtn');
   var chkBtn=document.getElementById('otaCheckBtn');
+  var notesBtn=document.getElementById('otaNotesBtn');
   if(s.current)cur.textContent=(t.otaCurrent||'当前')+': '+s.current;
   if(s.envTag)env.textContent=s.envTag;
+  // Track latest version so /api/ota/notes can be fetched lazily on user click.
+  if(s.latest && __otaNotesVersion!==s.latest){__otaNotesVersion=s.latest;__otaNotesCache=null;}
+  // Show "View notes" button only when the server says notes exist for the
+  // currently-resolved release. Default state preserves old user flow:
+  // users who don't click the button get the original two-button experience.
+  if(notesBtn){
+    if(s.hasNotes && s.latest){notesBtn.style.display='';notesBtn.disabled=false;}
+    else{notesBtn.style.display='none';notesBtn.disabled=true;}
+  }
   // state: 0=idle 1=checking 2=downloading 3=writing 4=ready 5=success 6=error
   if(s.state===1){msg.textContent=t.otaChecking||'正在查询 GitHub…';msg.className='msg';chkBtn.disabled=true;pullBtn.disabled=true;}
   else if(s.state===2){msg.textContent=t.otaDownloading||'正在下载…';msg.className='msg';wrap.style.display='block';chkBtn.disabled=true;pullBtn.disabled=true;}
@@ -1628,6 +1726,121 @@ function otaStartPoll(){
   if(__otaPoll)clearInterval(__otaPoll);
   var tick=function(){fetch('/api/ota/status'+(token?'?token='+token:'')).then(r=>r.ok?r.json():null).then(j=>{if(j)otaRenderStatus(j);}).catch(function(){});};
   tick();__otaPoll=setInterval(tick,1500);
+}
+// Minimal markdown → HTML for release notes. HTML-escapes all input first
+// (defends against XSS via crafted release body), then walks line-by-line
+// applying a small set of transforms: # ## ### headings, ``` fenced code,
+// `inline` code, **bold**, *italic*, [text](url) links, `- ` and `1. ` lists,
+// `|...|` GitHub-style tables, `---` horizontal rule. Unknown markup falls
+// through as escaped text (safe — never as raw HTML).
+function mdMini(src){
+  if(!src)return'';
+  var esc=function(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+  var inline=function(s){
+    s=esc(s);
+    // Code spans first so other rules don't touch their contents
+    s=s.replace(/`([^`]+)`/g,'<code style="background:#1e293b;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:0.92em">$1</code>');
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g,'$1<em>$2</em>');
+    // Links — only allow http(s) URLs to avoid javascript: schemes
+    s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:#38bdf8">$1</a>');
+    return s;
+  };
+  var lines=src.replace(/\r\n/g,'\n').split('\n');
+  var out=[],i=0,inCode=false,codeBuf=[],listType=null,tableRows=null,tableAligns=null;
+  var closeList=function(){if(listType){out.push('</'+listType+'>');listType=null;}};
+  var closeTable=function(){
+    if(!tableRows)return;
+    var html='<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:0.92em;margin:6px 0">';
+    for(var r=0;r<tableRows.length;r++){
+      var tag=r===0?'th':'td';
+      var bg=r===0?'background:#1e293b;':'';
+      html+='<tr>';
+      for(var c=0;c<tableRows[r].length;c++){
+        var al=tableAligns&&tableAligns[c]?'text-align:'+tableAligns[c]+';':'';
+        html+='<'+tag+' style="border:1px solid #334155;padding:4px 8px;'+bg+al+'">'+inline(tableRows[r][c])+'</'+tag+'>';
+      }
+      html+='</tr>';
+    }
+    html+='</table></div>';
+    out.push(html);
+    tableRows=null;tableAligns=null;
+  };
+  while(i<lines.length){
+    var ln=lines[i];
+    if(inCode){
+      if(/^```/.test(ln)){
+        out.push('<pre style="background:#1e293b;padding:10px;border-radius:6px;overflow-x:auto;font-family:monospace;font-size:0.88em">'+esc(codeBuf.join('\n'))+'</pre>');
+        codeBuf=[];inCode=false;
+      } else codeBuf.push(ln);
+      i++;continue;
+    }
+    if(/^```/.test(ln)){closeList();closeTable();inCode=true;i++;continue;}
+    // Table: header line followed by separator line
+    var isTable=/^\s*\|.*\|\s*$/.test(ln) && i+1<lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i+1]) && /[-]/.test(lines[i+1]);
+    if(isTable){
+      closeList();
+      var split=function(row){return row.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(function(c){return c.trim();});};
+      tableRows=[split(ln)];
+      var sep=split(lines[i+1]);
+      tableAligns=sep.map(function(s){
+        var L=/^:/.test(s),R=/:$/.test(s);
+        return L&&R?'center':R?'right':L?'left':'';
+      });
+      i+=2;
+      while(i<lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){tableRows.push(split(lines[i]));i++;}
+      closeTable();continue;
+    }
+    var h=/^(#{1,3})\s+(.+)/.exec(ln);
+    if(h){closeList();closeTable();var lv=h[1].length;var sz=lv===1?'1.25em':lv===2?'1.1em':'1em';out.push('<h'+lv+' style="margin:10px 0 4px;font-size:'+sz+';color:#e2e8f0">'+inline(h[2])+'</h'+lv+'>');i++;continue;}
+    if(/^\s*---+\s*$/.test(ln)){closeList();closeTable();out.push('<hr style="border:none;border-top:1px solid #334155;margin:8px 0">');i++;continue;}
+    var ul=/^\s*[-*]\s+(.+)/.exec(ln);
+    var ol=/^\s*\d+\.\s+(.+)/.exec(ln);
+    if(ul||ol){
+      var want=ul?'ul':'ol';
+      if(listType&&listType!==want){closeList();}
+      if(!listType){out.push('<'+want+' style="margin:6px 0 6px 22px;padding:0">');listType=want;}
+      out.push('<li style="margin:2px 0">'+inline((ul||ol)[1])+'</li>');
+      i++;continue;
+    }
+    closeList();closeTable();
+    if(/^\s*$/.test(ln)){out.push('');i++;continue;}
+    out.push('<div style="margin:4px 0">'+inline(ln)+'</div>');
+    i++;
+  }
+  closeList();closeTable();
+  if(inCode){out.push('<pre style="background:#1e293b;padding:10px;border-radius:6px">'+esc(codeBuf.join('\n'))+'</pre>');}
+  return out.join('\n');
+}
+var __otaNotesCache=null;
+var __otaNotesVersion='';
+function loadOtaNotes(version){
+  if(__otaNotesVersion===version && __otaNotesCache!==null) return Promise.resolve(__otaNotesCache);
+  return fetch('/api/ota/notes'+(token?'?token='+token:''))
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(j){
+      if(j && j.notes){__otaNotesCache=j.notes;__otaNotesVersion=j.version||version;return j.notes;}
+      return null;
+    }).catch(function(){return null;});
+}
+function showOtaNotes(){
+  var ov=document.getElementById('otaNotesOverlay');
+  var body=document.getElementById('otaNotesBody');
+  var title=document.getElementById('otaNotesTitle');
+  var lat=document.getElementById('otaLatest');
+  var pullBtn=document.getElementById('otaPullBtn');
+  var installBtn=document.getElementById('iOtaNotesInstallBtn');
+  if(installBtn) installBtn.disabled = pullBtn ? pullBtn.disabled : false;
+  body.innerHTML='<div style="color:#64748b">加载中…</div>';
+  ov.style.display='flex';
+  loadOtaNotes(__otaNotesVersion).then(function(notes){
+    if(__otaNotesVersion) title.textContent='v'+__otaNotesVersion+' 更新内容';
+    body.innerHTML = notes ? mdMini(notes) : '<div style="color:#64748b">没有发布说明</div>';
+  });
+}
+function hideOtaNotes(e){
+  if(e && e.target && e.target.id!=='otaNotesOverlay')return;
+  document.getElementById('otaNotesOverlay').style.display='none';
 }
 function doOtaCheck(){
   var msg=document.getElementById('otaPullMsg');

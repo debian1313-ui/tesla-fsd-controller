@@ -1,0 +1,147 @@
+name: 兼容性上报 / Compatibility Report
+description: 上报你的车 + 固件版本下 FSD 激活效果，帮助建立兼容矩阵 / Report your firmware + activation result to build the compatibility matrix
+title: "[compat] HW? + 固件? + 协议? = ?"
+labels: ["compat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢上报！这份调查只用于汇总"哪些固件 / 协议 / 设置组合能成功激活 FSD"。
+        请如实填写，**不要**提交个人信息（VIN、车牌、账号）。
+        Thanks! This survey is used only to compile a firmware × protocol × settings compatibility matrix.
+        Please **do not** submit personally identifying info (VIN, license plate, account).
+
+  - type: dropdown
+    id: hw_chip
+    attributes:
+      label: 车辆芯片 / Vehicle chip
+      description: 看 Tesla 官方"控制 > 软件 > 车辆配置"或第三方 OBD 工具
+      options:
+        - HW3 (AP3)
+        - HW4 (AP4)
+        - HW2 / HW2.5 (Legacy)
+        - 不确定 / Unknown
+    validations:
+      required: true
+
+  - type: input
+    id: fw_version
+    attributes:
+      label: Tesla 固件版本 / Firmware version
+      description: 例 2026.8.4 / 2025.44.30 / 2024.32.5。"控制 > 软件" 里看
+      placeholder: "2026.8.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: fsd_protocol
+    attributes:
+      label: FSD 协议（车端实际跑的）/ FSD protocol actually running
+      description: V14 = 已升 v14 的 HW4；V13 = 其他所有情况（含 HW4 跑 2026.8 及更早固件）
+      options:
+        - V13
+        - V14
+        - 不确定 / Unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mod_hw_mode
+    attributes:
+      label: 本固件里你选的"硬件型号"档位 / Mod hwMode selection
+      options:
+        - HW3
+        - HW4
+        - Legacy
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mod_version
+    attributes:
+      label: 本项目固件版本 / Mod firmware version
+      description: Web UI 顶栏 v1.4.x
+      options:
+        - v1.4.33
+        - v1.4.32
+        - v1.4.31
+        - v1.4.30 及更早 / or older
+        - 其他 / other（在备注写明）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: activation_result
+    attributes:
+      label: 激活结果 / Activation result
+      description: |
+        A：仪表已修改帧数 > 0 但 FSD 没真亮（蓝方向盘没出现）
+        B：FSD 蓝方向盘出现，但还是不能完整 FSD 行驶
+        C：完整可用，能跑 FSD
+        D：完全无反应（已修改帧数=0）
+      options:
+        - A — 帧在改但 FSD 没亮 / Frames modifying but FSD did not engage
+        - B — FSD 蓝方向盘亮了但功能不全 / FSD engaged but limited
+        - C — 完整可用 / Fully working
+        - D — 完全无反应 / No effect at all
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: toggles
+    attributes:
+      label: 用到的开关 / Toggles enabled
+      description: 多选；只勾你确实开了的
+      options:
+        - label: 强制激活 / Force Activate
+        - label: TLSSC 旁路 / TLSSC Bypass
+        - label: ISA 限速覆盖（HW4）/ ISA Override
+        - label: 紧急检测（HW4）/ Emergency Detection
+        - label: HW3 自动限速突破
+        - label: HW3 自定义限速
+
+  - type: input
+    id: region
+    attributes:
+      label: 国家 / 地区 / Country / Region
+      description: 国家 + 省/州即可，不要写具体城市或地址 / Country + state/province only
+      placeholder: "中国 上海 / USA California / Japan Tokyo-area"
+    validations:
+      required: true
+
+  - type: textarea
+    id: api_status
+    attributes:
+      label: /api/status JSON 快照（可选）/ /api/status snapshot (optional)
+      description: |
+        在车机连同 WiFi 后浏览器打开 `http://<车机IP>/api/status`，全选复制粘贴在这里。
+        激活异常时这份快照能看到 `fusedLimit` / `visionLimit` / `modifiedCount` / `errorCount` 等关键状态，比文字描述快十倍。
+        Paste full JSON from `http://<device-ip>/api/status`. Captures fused/vision limits, frame counters, and module state — far more useful than prose.
+      render: json
+
+  - type: textarea
+    id: diag_log
+    attributes:
+      label: 诊断日志（可选）/ Diagnostic log (optional)
+      description: |
+        车机 UI 顶部 **下载日志** → 得到 `diag.log`（或直接打开 `http://<车机IP>/api/log/download`），把这个文件**拖进下方输入框**作为附件，GitHub 会自动上传。
+        Hit **Download log** in the device UI (or open `http://<device-ip>/api/log/download`) to get `diag.log`. **Drag the file into the box below** — GitHub will attach it automatically.
+      placeholder: 把 diag.log 拖到这里 / Drag diag.log here
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注 / Notes
+      description: 失败现象、错误提示、特殊设置等。**不要包含 VIN / 车牌 / 个人账号**
+      placeholder: |
+        - 点击 FSD 后 ...
+        - 仪表显示 ...
+        - 我尝试过 ...
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认 / Confirmation
+      options:
+        - label: 我没有在本次提交里写入 VIN、车牌、账户名等可识别个人 / 车辆的信息 / I have not included VIN, plate, account name or any personally / vehicle-identifying info
+          required: true

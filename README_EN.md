@@ -12,7 +12,7 @@
 
 ---
 
-ESP32 + WiFi web panel build based on [tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod).
+ESP32 + WiFi web panel build based on [ev-open-can-tools](https://github.com/ev-open-can-tools/ev-open-can-tools) (formerly tesla-open-can-mod).
 
 After flashing, the ESP32 creates a WiFi hotspot. Connect with your phone and control all parameters in real time from a browser — **no reprogramming required**.
 
@@ -360,6 +360,16 @@ After modifying and rebuilding the firmware, you can update wirelessly — no US
 
 ---
 
+## 🧪 Help build the compatibility matrix
+
+Activation success varies a lot by firmware × HW chip × protocol (V13/V14) × region. We're still collecting samples — **whether activation worked or not, please take 1 minute to file an anonymous report**:
+
+➡️ **[New compatibility report](../../issues/new?template=compat-report.yml)** — pick the "Compatibility Report" template
+
+Only firmware version, HW chip, selected protocol, activation result, and region. **Do not include VIN, license plate, or account info.** Aggregated results will feed back into the README compatibility table.
+
+---
+
 ## Project Structure (for developers)
 
 ```
@@ -380,14 +390,17 @@ platformio.ini          ← Build config (ESP32 + ESPAsyncWebServer)
 
 ## Credits
 
-This project is built on top of the following open-source work. The core CAN frame handling logic is derived directly from the original project:
+This project is built on top of the following open-source work. Core CAN frame handling logic is derived directly from ev-open-can-tools; the others are used as cross-references for signal definitions, bit positions, and feature extensions:
 
-| Project | Link | License |
-|---------|------|---------|
-| tesla-open-can-mod | [gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod) | GPLv3 |
+| Project | Use | Link | License |
+|---------|-----|------|---------|
+| ev-open-can-tools | Upstream — core CAN frame injection logic | [github.com/ev-open-can-tools/ev-open-can-tools](https://github.com/ev-open-can-tools/ev-open-can-tools) (formerly tesla-open-can-mod, migrated off GitLab) | GPLv3 |
+| ev-open-can-tools-plugins | Feature plugin library (basis for v1.4.32 HW4 offset cap and TLSSC bypass) | [github.com/ev-open-can-tools/ev-open-can-tools-plugins](https://github.com/ev-open-can-tools/ev-open-can-tools-plugins) | GPLv3 |
+| opendbc | Authoritative Tesla DBC definitions (bit positions, width, factor, checksum) | [github.com/commaai/opendbc](https://github.com/commaai/opendbc) | MIT |
+| flipper-tesla-fsd | Flipper Zero FSD injection — bit extraction / checksum cross-check | [github.com/hypery11/flipper-tesla-fsd](https://github.com/hypery11/flipper-tesla-fsd) | GPLv3 |
 
 ---
 
 ## License
 
-GPLv3 — derived from [tesla-open-can-mod](https://gitlab.com/Tesla-OPEN-CAN-MOD/tesla-open-can-mod) (GPLv3).
+GPLv3 — derived from [ev-open-can-tools](https://github.com/ev-open-can-tools/ev-open-can-tools) (formerly tesla-open-can-mod, GPLv3).

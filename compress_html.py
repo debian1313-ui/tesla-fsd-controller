@@ -17,6 +17,7 @@ HTML_SOURCES = [
     ("include/web_ui.h",      "INDEX_HTML", "rawliteral"),
     ("include/web_ui_dash.h", "DASH_HTML",  "dash"),
     ("include/web_perf.h",    "PERF_HTML",  "rawliteral"),
+    ("include/web_perf_share.h", "PERF_SHARE_HTML", "rawliteral"),
     ("include/web_ui_car.h",  "CAR_HTML",   "rawliteral"),
 ]
 
@@ -35,8 +36,28 @@ def _read_firmware_version():
     return "unknown"
 
 
+def _read_diag_shared_js():
+    """Extract DIAG_SHARED_JS body from include/web_ui_diag_js.h.
+
+    The macro is defined as `#define DIAG_SHARED_JS R"rawjs(...)rawjs"` so we
+    just lift the inner R-string. Both phone and car HTML embed this macro
+    inline (between split rawliteral chunks) so the gzip-pass needs to inline
+    its body before regex extraction.
+    """
+    try:
+        with open("include/web_ui_diag_js.h", "r", encoding="utf-8") as f:
+            text = f.read()
+        m = re.search(r'#define\s+DIAG_SHARED_JS\s+R"rawjs\((.*?)\)rawjs"', text, re.DOTALL)
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    return ""
+
+
 def _compress(source, target, env):  # noqa: ARG001
     fw_version = _read_firmware_version()
+    diag_js    = _read_diag_shared_js()
     print(f"[compress_html] FIRMWARE_VERSION = {fw_version}")
 
     lines = [
@@ -54,14 +75,23 @@ def _compress(source, target, env):  # noqa: ARG001
         with open(src_path, "r", encoding="utf-8") as f:
             src_text = f.read()
 
-        # Some headers use a C++ macro-injection trick to embed FIRMWARE_VERSION:
-        #   R"delim(... html ...)delim" FIRMWARE_VERSION R"delim(... more ...)delim"
-        # This splits the raw literal so the C++ compiler inserts the version string.
-        # Substitute the macro before regex extraction so we capture the full HTML.
+        # Some headers use a C++ macro-injection trick to embed FIRMWARE_VERSION
+        # or DIAG_SHARED_JS into the raw literal:
+        #   R"delim(... )delim" MACRO R"delim( ...)delim"
+        # Substitute the macros before regex extraction so we capture the full HTML.
         src_text = src_text.replace(
             f')' + delimiter + '" FIRMWARE_VERSION R"' + delimiter + '(',
             fw_version
         )
+        # DIAG_SHARED_JS may sit on its own line — accept any whitespace
+        # (incl. newlines) around the macro between the two raw-string halves.
+        diag_pat = re.compile(
+            r'\)' + re.escape(delimiter) + r'"\s*DIAG_SHARED_JS\s*R"' + re.escape(delimiter) + r'\(',
+            re.DOTALL,
+        )
+        # Pass diag_js through a lambda so re.sub doesn't interpret backslash
+        # sequences (e.g. JS regex \d, \s) as replacement-template references.
+        src_text = diag_pat.sub(lambda _m: diag_js, src_text)
 
         pattern = r'R"' + re.escape(delimiter) + r'\((.*?)\)' + re.escape(delimiter) + r'"'
         match = re.search(pattern, src_text, re.DOTALL)

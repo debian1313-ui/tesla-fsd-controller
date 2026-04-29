@@ -1,10 +1,10 @@
 #pragma once
 // ── Thermal protection module ─────────────────────────────────────────────────
-// Samples ESP32 internal temperature sensor every 5s, maintains an EMA, and
-// produces a throttle level used to slow down WiFi retry / pause uplink when
-// the chip overheats. Ported from pudge9527/tesla-fsd-wifi-controller.
-
-#ifdef WIFI_BRIDGE_ENABLED
+// Samples ESP32 internal temperature sensor every 5s, maintains an EMA, tracks
+// peak since boot, and produces a throttle level. Wi-Fi-bridge-only behavior
+// (slowing down upstream retry, switching PS mode) lives in main.cpp guarded
+// by WIFI_BRIDGE_ENABLED — the sampling itself runs on every build so the UI
+// can show chip temperature even on CAN-only firmware.
 
 #include <Arduino.h>
 #include <cmath>
@@ -23,6 +23,7 @@ enum class ThermalLevel : uint8_t {
 struct ThermalStatus {
     float currentC = NAN;
     float averageC = NAN;
+    float peakC = NAN;            // max sample seen since boot
     uint32_t lastSampleMillis = 0;
     ThermalLevel level = ThermalLevel::Normal;
 };
@@ -128,8 +129,9 @@ static inline void serviceThermalStatus() {
     } else {
         gThermalStatus.averageC = currentC;
     }
+    if (!std::isfinite(gThermalStatus.peakC) || currentC > gThermalStatus.peakC) {
+        gThermalStatus.peakC = currentC;
+    }
 
     thermalUpdateLevel();
 }
-
-#endif // WIFI_BRIDGE_ENABLED

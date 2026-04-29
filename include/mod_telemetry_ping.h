@@ -16,7 +16,10 @@
 #include <WiFi.h>
 #include <Preferences.h>
 #include "version.h"
+#include "fsd_config.h"
 #include "mod_ota.h"  // reuses FIRMWARE_ENV_TAG + OTA_CRT_BUNDLE_ATTACH
+
+extern FSDConfig cfg;
 
 // Override via -D TESLA_COUNTER_ENDPOINT=\"https://...\" if deploying to a
 // different subdomain. Default is a custom domain to avoid GFW-style blocks
@@ -77,10 +80,25 @@ static bool doPing() {
     }
     computeDeviceId();
 
-    char body[160];
+    // carSwVer is user-entered; sanitizer in /api/carver already rejects
+    // controls. Whitelist before sending to keep ping body strictly safe and
+    // match worker.js carVer regex.
+    char escCarV[33] = {0};
+    {
+        size_t out = 0;
+        for (size_t i = 0; cfg.carSwVer[i] && out + 1 < sizeof(escCarV); i++) {
+            char c = cfg.carSwVer[i];
+            bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                   || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+            if (ok) escCarV[out++] = c;
+        }
+        escCarV[out] = 0;
+    }
+
+    char body[256];
     int n = snprintf(body, sizeof(body),
-        "{\"id\":\"%s\",\"version\":\"%s\",\"env\":\"%s\"}",
-        gPing.deviceId, FIRMWARE_VERSION, FIRMWARE_ENV_TAG);
+        "{\"id\":\"%s\",\"version\":\"%s\",\"env\":\"%s\",\"carVer\":\"%s\"}",
+        gPing.deviceId, FIRMWARE_VERSION, FIRMWARE_ENV_TAG, escCarV);
     if (n <= 0 || n >= (int)sizeof(body)) {
         strlcpy(gPing.lastMsg, "body 太大", sizeof(gPing.lastMsg));
         return false;

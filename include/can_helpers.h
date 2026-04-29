@@ -14,12 +14,6 @@ inline bool isFSDSelectedInUI(const CanFrame& frame) {
     return (frame.data[4] >> 6) & 0x01;
 }
 
-// UI_trackModeSettings — 0x313 (787), data[0] bits[1:0]
-inline void setTrackModeRequest(CanFrame& frame, uint8_t request) {
-    frame.data[0] &= static_cast<uint8_t>(~0x03);
-    frame.data[0] |= static_cast<uint8_t>(request & 0x03);
-}
-
 // Checksum: id_lo + id_hi + data[0..dlc-1] (excluding checksumByteIndex)
 inline uint8_t computeVehicleChecksum(const CanFrame& frame, uint8_t checksumByteIndex = 7) {
     uint16_t sum = static_cast<uint16_t>(frame.id & 0xFF)

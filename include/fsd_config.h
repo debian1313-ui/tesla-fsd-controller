@@ -34,6 +34,14 @@ struct FSDConfig {
     volatile bool     isaChimeSuppress    = false;
     volatile bool     emergencyDetection  = true;
     volatile bool     forceActivate       = false;   // bypass isFSDSelectedInUI (regions without TLSSC)
+    // TLSSC bypass (v1.4.32). Sets bit 38 on 0x3FD mux 0 alongside the normal
+    // FSD activation bits — same as the bypass-tlssc plugins from
+    // ev-open-can-tools-plugins (HW3 + HW4). Different from forceActivate:
+    // forceActivate skips Tesla's own UI selector check; this writes the
+    // explicit "TLSSC bypass" bit the car looks for. Useful in regions where
+    // the activation handshake stalls. Default OFF — unverified on every
+    // firmware. NVS key "e0".
+    volatile bool     tlsscBypass         = false;
     volatile bool     overrideSpeedLimit  = false;   // Legacy: set UI_visionSpeedSlider=100 in frame 1080
     volatile int      hw3SpeedOffset      = 0;       // stock offset from mux-0 data[3] as pct*5 (0-100); display only
     volatile bool     hw3AutoSpeed        = true;    // HW3 auto speed targeting: <60→64, =60→100, 60-79→85, ≥80→stock passthrough
@@ -48,7 +56,7 @@ struct FSDConfig {
         90,   // 60 kph bucket → max +30
         105,  // 70 kph bucket → max +35
     };
-    volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 mux-2 data[1][5:0]; 0=off. Hardware field=6 bits (cap 63), UI cap=15 (v1.4.28, aligned with upstream Turkish fw). Legacy presets 7/10/14 still valid; 21 now clamps to 15.
+    volatile uint8_t  hw4OffsetRaw       = 0;       // HW4 0x3FD mux-2 data[1][5:0]; 0=off. Hardware field=6 bits (max 63). UI cap=21 (v1.4.32, validated by ev-open-can-tools-plugins HW4 +15 preset); raw≈mph_offset×1.4 → 7=+5, 10=+7, 14=+10, 21=+15.
     // ISA speed-limit override (v1.4.28, HW4 only). When ON and FSD is active,
     // we re-broadcast 0x39B with DAS_fusedSpeedLimit (byte1[4:0]) and
     // DAS_visionOnlySpeedLimit (byte2[4:0]) forced to raw=31 ("NONE"), so the
@@ -59,7 +67,6 @@ struct FSDConfig {
     volatile bool     isaOverride         = false;
     volatile uint8_t  hwDetected          = 0;       // from 0x398: 0=unknown, 1=HW3, 2=HW4 (informational only)
     volatile int8_t   gatewayAutopilot    = -1;      // from 0x7FF mux-2: -1=unseen, 0=NONE,1=HIGHWAY,2=ENHANCED,3=SELF_DRIVING,4=BASIC
-    volatile bool     trackModeEnable     = false;   // HW3: echo 0x313 with UI_trackModeRequest=ON (off by default)
 
     // Climate — read from 0x283 (BODY_R1, GTW bus)
     volatile bool     tempSeen          = false;
@@ -159,17 +166,14 @@ struct FSDConfig {
     volatile bool     aebOn               = false; // DAS_aebEnabled        bit18
     volatile bool     fcwOn               = false; // DAS_fcwEnabled        bit34
 
-    // AP auto-restart — inject 0x293 with autosteerEnabled=1 on disengage
-    volatile bool     apRestart           = false;
-    volatile uint8_t  apRestartCache[8]   = {};    // last received 0x293 raw bytes
-    volatile bool     apRestartValid      = false; // cache has at least one frame
-
     // Performance test — 0→100 acceleration and 100→0 braking
     volatile uint8_t  perfAccelState      = 0;   // 0=idle,1=armed,2=running,3=done
     volatile uint8_t  perfBrakeState      = 0;
     volatile uint32_t perfAccelMs         = 0;   // result ms
     volatile uint32_t perfBrakeMs         = 0;   // result ms
     volatile uint8_t  perfBrakeEntryKph   = 0;   // actual speed (kph) when braking started
+    char              perfModel[33]       = {};  // user-set vehicle name shown on share card (UTF-8, ≤32 bytes)
+    char              carSwVer[33]        = {};  // user-entered Tesla MCU/IVI software version (e.g. "2024.44.25.1"), ≤32 bytes
 
     // Statistics
     volatile uint32_t rxCount             = 0;
