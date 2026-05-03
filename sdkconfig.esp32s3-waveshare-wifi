@@ -807,6 +807,11 @@ CONFIG_HEAP_TRACING_OFF=y
 # end of jsmn
 
 #
+# libsodium
+#
+# end of libsodium
+
+#
 # Log output
 #
 # CONFIG_LOG_DEFAULT_LEVEL_NONE is not set
